@@ -122,6 +122,7 @@ def render_result(
     sound_effects: str = "off",
     emoji_mode: str = "off",
     hook_position: str = "start",
+    quality: str = "high",
 ) -> None:
     """Рендер только из одобренной версии текста."""
     try:
@@ -135,7 +136,7 @@ def render_result(
                 words_override=reviewed_words,
                 caption_animation=caption_animation,
                 sound_effects=sound_effects, emoji_mode=emoji_mode,
-                hook_position=hook_position,
+                hook_position=hook_position, quality=quality,
             )
             caption = (
                 "🎬 Монтаж готов! "
@@ -148,6 +149,7 @@ def render_result(
                 subtitle_style, hook, speed, filter_style,
                 caption_position, font_profile, reviewed_words,
                 caption_animation, sound_effects, emoji_mode, hook_position,
+                quality,
             )
             caption = (
                 "✅ Готово! "
@@ -198,14 +200,14 @@ def main() -> None:
         else "word_pop"
     )
     subtitle_style = selected_subtitle_style.removesuffix("_phrases")
-    if subtitle_style not in ("signature", "classic", "contrast"):
+    if subtitle_style not in ("signature", "classic", "contrast", "reference_dynamic"):
         raise ValueError("Неизвестный стиль субтитров.")
     hook = os.environ.get("HOOK_TEXT", "").strip()[:70]
     hook_position = "start"
     sound_effects = "soft" if mode in ("my_style", "reference") else "off"
     emoji_mode = "on" if mode in ("my_style", "reference") else "off"
-    camera_style = os.environ.get("CAMERA_STYLE", "editorial")
-    if camera_style not in ("editorial", "enhanced", "soft_punch", "gentle", "off"):
+    camera_style = os.environ.get("CAMERA_STYLE", "cinematic_pan")
+    if camera_style not in ("cinematic_pan", "editorial", "enhanced", "soft_punch", "gentle", "off"):
         raise ValueError("Неверный режим камеры.")
     try:
         speed = float(os.environ.get("VIDEO_SPEED", "1.0"))
@@ -213,6 +215,9 @@ def main() -> None:
         raise ValueError("Скорость видео должна быть числом.") from None
     if not 0.8 <= speed <= 1.5:
         raise ValueError("Допустимая скорость: от 0.8 до 1.5.")
+    quality = os.environ.get("EXPORT_QUALITY", "high")
+    from export_profiles import get_export_profile
+    get_export_profile(quality)
     filter_style = os.environ.get("VIDEO_FILTER", "none")
     caption_position = os.environ.get("CAPTION_POSITION", "middle")
     font_profile = os.environ.get("FONT_PROFILE", "elegant")
@@ -399,7 +404,7 @@ def main() -> None:
                         font_profile=font_profile, reviewed_words=reviewed_words,
                         caption_animation=caption_animation,
                         sound_effects=sound_effects, emoji_mode=emoji_mode,
-                        hook_position=hook_position,
+                        hook_position=hook_position, quality=quality,
                     )
                     return
 
@@ -453,7 +458,7 @@ def main() -> None:
                             font_profile=font_profile, reviewed_words=None,
                             caption_animation=caption_animation,
                             sound_effects=sound_effects, emoji_mode=emoji_mode,
-                            hook_position=hook_position,
+                            hook_position=hook_position, quality=quality,
                         )
                         return
                     from telegram_editor import transcribe_words, duration_and_audio
