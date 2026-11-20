@@ -211,9 +211,12 @@ def apply_effects(
     sound: str = "off",
     emoji: str = "off",
     caption_position: str = "middle",
+    quality: str = "high",
 ) -> dict:
-    """После субтитров: в одном FFmpeg-проходе наложить эмодзи и смешать pop."""
+    """Наложить эмодзи и смешать акценты, сохраняя выбранное качество."""
     from telegram_editor import duration_and_audio, execute
+    from export_profiles import get_export_profile
+    export = get_export_profile(quality)
 
     validate_effects(sound, emoji, "off")
     if caption_position not in ("top", "middle", "bottom"):
@@ -233,7 +236,7 @@ def apply_effects(
         current_input = 1
         emoji_count = 0
         if visual:
-            y = {"top": 300, "middle": 690, "bottom": 960}[caption_position]
+            yratio = {"top": .22, "middle": .51, "bottom": .72}[caption_position]
             # Ограничение, чтобы до двух минут оставаться лёгким для runner.
             for i,(start,symbol) in enumerate(visual[:8]):
                 path = folder/f"emoji_{i}.png"
@@ -250,8 +253,8 @@ def apply_effects(
                 filters.append(alpha)
                 dest = f"[stage{i}]"
                 filters.append(
-                    f"{prev}[emoji{i}]overlay=x=538:"
-                    f"y='{y}+12*max(0,1-(t-{start:.2f})*4)':"
+                    f"{prev}[emoji{i}]overlay=x='main_w-overlay_w-0.06*main_w':"
+                    f"y='{yratio}*main_h+12*max(0,1-(t-{start:.2f})*4)':"
                     f"enable='between(t,{start:.2f},{clip_end:.2f})'"
                     f":shortest=1{dest}"
                 )
@@ -274,7 +277,7 @@ def apply_effects(
 
         if emoji_count:
             args.extend(["-filter_complex",";".join(filters),"-map",prev,
-                         "-c:v","libx264","-preset","veryfast","-crf","22"])
+                         "-c:v","libx264","-preset",export.preset,"-crf",str(export.crf)])
         elif sfx_count:
             args.extend(["-filter_complex",";".join(filters),"-map","0:v:0",
                          "-c:v","copy"])
@@ -282,7 +285,7 @@ def apply_effects(
             source.replace(target)
             return {"emoji_count":0,"sfx_count":0}
         if sfx_count:
-            args.extend(["-map",sound_output,"-c:a","aac","-b:a","160k"])
+            args.extend(["-map",sound_output,"-c:a","aac","-b:a",export.audio_bitrate])
         else:
             args.extend(["-map","0:a:0?","-c:a","copy"])
         args.extend(["-t",f"{duration:.3f}","-movflags","+faststart",str(target)])
