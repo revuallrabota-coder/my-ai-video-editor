@@ -269,6 +269,15 @@ def main() -> None:
                 if pending_words is not None and pending_chat_id == chat_id:
                     if raw_text.lower() == "/ok":
                         reviewed_words = pending_words
+                    elif raw_text.lower().startswith("/fix "):
+                        from speech_review import apply_word_fixes
+                        try:
+                            reviewed_words = apply_word_fixes(
+                                pending_words, raw_text[5:].strip()
+                            )
+                        except ValueError as err:
+                            send_text(token, chat_id, "⚠️ " + str(err))
+                            continue
                     elif raw_text.lower().startswith("/text "):
                         from speech_review import align_corrected_words
                         from telegram_editor import duration_and_audio
@@ -284,8 +293,8 @@ def main() -> None:
                         if raw_text:
                             send_text(
                                 token, chat_id,
-                                "Ответь /ok или пришли полную исправленную "
-                                "расшифровку: /text ТВОЯ РЕЧЬ"
+                                "Ответь /ok, /fix ошибка=верно или "
+                                "/text ПОЛНЫЙ ПРАВИЛЬНЫЙ ТЕКСТ"
                             )
                         continue
                     send_text(token, chat_id, "✅ Текст принят. Монтирую видео…")
@@ -374,7 +383,8 @@ def main() -> None:
                         token, chat_id,
                         "Проверь слова ДО монтажа:\n"
                         "/ok — всё верно;\n"
-                        "/text ТВОЙ ПОЛНЫЙ ТЕКСТ — исправить ошибки.\n\n"
+                        "/fix ошибка=правильно — исправить отдельные слова;\n"
+                        "/text ТВОЙ ПОЛНЫЙ ТЕКСТ — заменить все слова.\n\n"
                         "После подтверждения наложу анимацию и сделаю зум. "
                         "При больших исправлениях таймкоды приблизительные. "
                         "На ответ даётся 15 минут."
