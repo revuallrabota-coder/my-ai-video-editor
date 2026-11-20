@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 from typing import Sequence
+from font_presets import choose_font
 
 WIDTH, HEIGHT = 720, 1280
 DEFAULT_ACCENT = "#EBC0C8"
@@ -106,15 +107,9 @@ def build_signature_ass(
     accent = ass_color(color)
     if caption_position not in ("top", "middle", "bottom"):
         raise ValueError("Неизвестное положение субтитров.")
-    fonts = {
-        "elegant": ("Liberation Serif", "1"),
-        "clean": ("DejaVu Sans", "0"),
-        "bold": ("DejaVu Sans", "0"),
-    }
-    if font_profile not in fonts:
-        raise ValueError("Неизвестный шрифт.")
-    fontname, italic = fonts[font_profile]
-    font_size = 74 if font_profile != "bold" else 72
+    font = choose_font(font_profile)
+    fontname, italic = font.name, str(font.italic)
+    font_size = font.size
     header = (
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
@@ -129,8 +124,9 @@ def build_signature_ass(
         " Alignment, MarginL, MarginR, MarginV, Encoding\n"
         "Style: Whisper,DejaVu Sans,33,&H00FFFFFF,&H00FFFFFF,&H00271728,"
         "&H85000000,0,0,0,0,100,100,0,0,1,1.5,1.0,5,60,60,40,1\n"
-        f"Style: Accent,{fontname},{font_size},{accent},{accent},&H00221921,"
-        f"&H76000000,1,{italic},0,0,100,100,0,0,1,1.6,2,5,35,35,40,1\n"
+        f"Style: Accent,{fontname},{font_size},{accent},{accent},{font.outline_color},"
+        f"&H76000000,{font.bold},{italic},0,0,{font.scale_x},{font.scale_y},0,0,"
+        f"1,{font.outline},{font.shadow},5,35,35,40,1\n"
         f"Style: Hook,DejaVu Sans,55,{accent},{accent},&H00221921,"
         "&H85000000,1,0,0,0,100,100,0,0,1,2,2,5,50,50,40,1\n"
         "\n[Events]\n"
