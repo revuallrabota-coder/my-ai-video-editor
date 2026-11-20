@@ -43,6 +43,9 @@ jobs:
       - name: "Проверить правки распознавания и зум по фразам"
         run: python -m unittest -v test_speech_review.py
 
+      - name: "Проверить звук, эмодзи и хук в настоящем FFmpeg"
+        run: python -m unittest -v test_reels_effects.py
+
       - name: "Проверить анимацию одного слова и рендер"
         run: python -m unittest -v test_word_captions.py
 
