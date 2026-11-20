@@ -157,8 +157,13 @@
     <p>Выбери будущий стиль обработки изображения и звука.</p>
     <label class="field" for="camera">Динамика камеры</label>
     <select id="camera"><option>Стандарт — плавные зумы</option><option>Без динамики</option><option>Усиленная — больше зумов</option></select>
-    <label class="field" for="audio">Звук</label>
-    <select id="audio"><option>Как снято — исходная речь</option><option>Авто — выровнять громкость</option><option>Убрать фоновый шум</option></select>
+    <label class="field" for="audio">🎧 Улучшение звука</label>
+    <select id="audio">
+      <option value="balanced">Бережная очистка — рекомендую</option>
+      <option value="strong">Сильное шумоподавление — для шумной записи</option>
+      <option value="off">Оставить звук без изменений</option>
+    </select>
+    <p class="note">Уменьшаем постоянный фон, сглаживаем громкость речи и защищаем от перегрузки. Голос не заменяется. Сильная очистка иногда искажает речь.</p>
     <label class="field" for="filter">Фильтр</label>
     <select id="filter"><option>Без фильтра</option><option>Тёплый</option><option>Нежный</option><option>Холодный</option><option>Контрастный</option></select>
     <label class="field" for="speed">Скорость</label>
@@ -177,7 +182,7 @@
       <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
     </div>
     <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
-    <p class="note">Для теста референсного монтажа выбери режим reference в GitHub Actions. После сообщения бота сначала пришли РЕФЕРЕНС, затем после подтверждения СВОЙ ИСХОДНИК. Каждый файл до 20 МБ. Выбранные здесь файлы и параметры автоматически в Actions пока не передаются.</p>
+    <p class="note">Для теста выбери нужный режим в GitHub Actions, а в поле audio_profile поставь balanced (бережно), strong (сильнее) или off (без улучшения). По референсу сначала пришли пример, потом своё видео. Каждый файл до 20 МБ. Выбранные здесь настройки пока не передаются в Actions автоматически.</p>
     <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
   </section>
 </div>
@@ -215,6 +220,7 @@
       hookText:byId('hookText').value,
       camera:selectedText('camera'),
       audio:selectedText('audio'),
+      audioProfile:byId('audio').value,
       filter:selectedText('filter'),
       speed:Number(byId('speed').value)
     };
