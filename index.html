@@ -130,6 +130,16 @@
         <span class="big" id="sampleBig">СУБТИТРЫ</span>
       </div>
     </div>
+    <label class="field" for="captionDelay">Синхронизация: надпись позже голоса</label>
+    <select id="captionDelay">
+      <option value="0.0">Без задержки</option>
+      <option value="0.15">+0,15 секунды</option>
+      <option value="0.3" selected>+0,30 секунды — новый стандарт</option>
+      <option value="0.45">+0,45 секунды</option>
+      <option value="0.6">+0,60 секунды</option>
+      <option value="0.8">+0,80 секунды</option>
+    </select>
+    <p class="note">Если титры забегают вперёд речи, выбери +0,45 или +0,60. Скорость речи не меняется. В режиме 20 МБ команду можно поменять в чате: /sync 0.45.</p>
     <label class="field" for="subtitleStyle">Стиль субтитров</label>
     <select id="subtitleStyle">
       <option value="reference_dynamic" selected>🎬 Как в референсе: крупные/маленькие слова и плашки</option>
@@ -207,8 +217,16 @@
 
   <section class="card page" data-page="4">
     <h2>Готовим монтаж</h2>
-    <p>Проверь настройки. Если Render требует иностранную карту, используй запуск без карты через Cloudflare и GitHub Actions. Полностью автоматическая загрузка прямо из приложения остаётся отдельным серверным режимом.</p>
+    <p>Проверь настройки и выбери: загрузить оригинальный файл до 50 МБ из приложения через Cloudflare KV либо использовать прежний запуск на 20 МБ через Telegram. Без карты и без Render.</p>
     <div id="summary"></div>
+    <div class="alert" style="margin:16px 0">
+      <strong>🎞 Загрузить исходник прямо из приложения · до 50 МБ</strong>
+      <p class="note">Не нужен Render или иностранная карта. Видео отправляется частями в приватное хранилище Cloudflare KV, а смонтированный MP4 бот возвращает как файл в Telegram. <strong>Важно:</strong> сначала нужно подключить KV с именем UPLOADS и обновить код Worker по нашей инструкции. На iPad держи приложение открытым во время передачи файла.</p>
+      <button class="btn primary" id="upload50Button" type="button" style="width:100%;margin-top:10px">📤 Загрузить и смонтировать до 50 МБ</button>
+      <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
+      <p class="mini" id="upload50Status" role="status" aria-live="polite">Использует адрес Cloudflare из поля ниже.</p>
+      <p class="mini"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/CLOUDFLARE_50MB.md" target="_blank" rel="noopener noreferrer">Как один раз подключить хранилище KV на iPad</a></p>
+    </div>
     <div class="alert" style="margin:16px 0">
       <strong>🆓 Без банковской карты: Cloudflare + GitHub Actions</strong>
       <p class="note">Бесплатная альтернатива Render. Выбираешь стиль здесь, нажимаешь запуск, а когда наш Telegram-бот попросит видео, отправляешь ему исходник <strong>в чат до 20 МБ</strong>. Готовый ролик бот пришлёт обратно. Видео из поля выбора в приложении при этом <strong>не загружается</strong>: оно понадобится для будущего прямого сервера.</p>
@@ -286,7 +304,8 @@
       audioProfile:byId('audio').value,
       filter:selectedText('filter'),
       speed:Number(byId('speed').value),
-      exportQuality:byId('exportQuality').value
+      exportQuality:byId('exportQuality').value,
+      subtitleDelay:Number(byId('captionDelay').value)
     };
   }
   function row(key,value){
@@ -447,6 +466,88 @@
     }
   });
 
+
+  // Прямой безопасный входной файл до 50 MB через Cloudflare KV.
+  // Обычный Bot API не скачивает больше 20 MB: здесь он не используется
+  // для исходника. Размер частей 4 MB и поочерёдная отправка с iPad.
+  byId('upload50Button').addEventListener('click',async function(){
+    var btn=byId('upload50Button');
+    var status=byId('upload50Status');
+    var progress=byId('upload50Progress');
+    if(btn.disabled)return;
+    try{
+      var url=launcherInput.value.trim().replace(/\/+$/,'');
+      if(!/^https:\/\/[a-z0-9.-]+\.workers\.dev$/i.test(url)){
+        throw new Error('Сначала укажи адрес своего Cloudflare Worker ниже, без /health.');
+      }
+      var auth=telegramProof();
+      var videos=videoInput.files;
+      if(videos.length!==1)throw new Error('Выбери ровно один исходный видеофайл.');
+      if(ratio!=='9:16')throw new Error('Для Reels выбери вертикальный формат 9:16.');
+      if(byId('fontFile').files.length)throw new Error('Свой файл шрифта пока нельзя передать: выбери встроенный.');
+      var settings=buildRenderSettings();
+      if(settings.mode==='reference')throw new Error('Для первого теста 50 МБ выбери «Мой стиль» (без второго видео-референса).');
+      var file=videos[0];
+      if(file.size>50000000 || file.size<4096){
+        throw new Error('Для этого режима нужен видеофайл от 4 КБ до 50 МБ.');
+      }
+      if(settings.mode!=='cuts' && settings.speed!==1){
+        status.textContent='ℹ️ Для синхронизации текста лучше скорость 1.0.';
+      }
+      try{localStorage.setItem('personalEditorLauncher',url)}catch(ignore){}
+      btn.disabled=true;
+      progress.hidden=false;
+      progress.value=0;
+      async function request(path,method,body,isBinary){
+        var headers={'X-Telegram-Init-Data':auth};
+        if(!isBinary) headers['Content-Type']='application/json';
+        var response=await fetch(url+path,{
+          method:method,headers:headers,
+          body:body,cache:'no-store'
+        });
+        var data={};
+        try{data=await response.json()}catch(ignore){}
+        if(!response.ok)throw new Error(data.error||('Cloudflare ответил HTTP '+response.status));
+        return data;
+      }
+      status.textContent='Подготавливаю прямую загрузку 50 МБ…';
+      var start=await request('/upload/start','POST',
+        JSON.stringify({filename:file.name,size:file.size,settings:settings}),false);
+      var partSize=start.chunk_size;
+      var parts=start.parts;
+      var id=start.upload_id;
+      for(var i=0;i<parts;i++){
+        var a=i*partSize,b=Math.min(file.size,(i+1)*partSize);
+        // Blob.slice не держит весь файл в памяти iPad одновременно.
+        var chunk=file.slice(a,b);
+        await request('/upload/'+id+'/'+i,'PUT',chunk,true);
+        progress.value=Math.round((i+1)*100/parts);
+        status.textContent='📤 Загружено '+progress.value+'% · '+(i+1)+' из '+parts+' частей';
+      }
+      status.textContent='Проверяю целостность файла и запускаю GitHub Actions…';
+      var response;
+      for(var retries=0;retries<4;retries++){
+        try{
+          response=await request('/upload/'+id+'/finish','POST',
+            JSON.stringify({done:true}),false);
+          break;
+        }catch(err){
+          if(retries===3 || !String(err.message).includes('ещё не доступна'))throw err;
+          await new Promise(function(resolve){setTimeout(resolve,1500*(retries+1))});
+        }
+      }
+      status.textContent='✅ Видео '+Math.round(file.size/1000000)+
+        ' МБ передано без сжатия. GitHub Actions начинает монтаж. '+
+        'Теперь открой чат Telegram-бота, проверь текст и ответь /ok. '+
+        'Готовый MP4 бот пришлёт документом, чтобы не снижать качество.';
+      progress.value=100;
+    }catch(err){
+      status.textContent='⚠️ '+(err.message||err);
+    }finally{
+      btn.disabled=false;
+    }
+  });
+
   // Real rendering API. The backend verifies Telegram.WebApp.initData;
   // no GitHub token or Telegram bot token is ever present in the browser.
   var apiInput=byId('apiBase');
@@ -483,6 +584,7 @@
       filter_style:byId('filter').value,
       speed:s.speed,
       export_quality:s.exportQuality,
+      subtitle_delay:s.subtitleDelay,
       sound_effects:s.soundEffects?'soft':'off',
       emoji_mode:s.emoji?'on':'off',
       hook:s.hook?s.hookText:'',
