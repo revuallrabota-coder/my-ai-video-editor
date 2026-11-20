@@ -12,6 +12,7 @@ on:
           - auto
           - captions
           - cuts
+          - reference
       color:
         description: "Цвет субтитров (#RRGGBB)"
         required: true
@@ -19,7 +20,7 @@ on:
         type: string
 
 concurrency:
-  group: my-video-editor-bot
+  group: telegram-video-montage
   cancel-in-progress: false
 
 permissions:
@@ -50,7 +51,7 @@ jobs:
           python -m pip install "requests>=2.31,<3"
 
       - name: "Проверить синтаксис"
-        run: python -m py_compile bot_api_editor.py telegram_editor.py
+        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py
 
       - name: "Запустить тестовый монтаж"
         env:
