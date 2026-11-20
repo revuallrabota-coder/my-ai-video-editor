@@ -35,13 +35,14 @@ on:
         default: ""
         type: string
       camera_style:
-        description: "Движение камеры: выключено (стабильно) или мягкий зум"
+        description: "Приближение: как в примере, лёгкое или без зума"
         required: true
-        default: "off"
+        default: soft_punch
         type: choice
         options:
-          - "off"
+          - soft_punch
           - gentle
+          - "off"
       audio_profile:
         description: "Звук: очистка от шума и ровная громкость"
         required: true
