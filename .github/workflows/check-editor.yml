@@ -18,6 +18,10 @@ on:
       - "export_profiles.py"
       - "reference_dynamic_captions.py"
       - "test_reference_motion.py"
+      - "process_uploaded_video.py"
+      - "cloudflare_launcher.js"
+      - ".github/workflows/upload-video-50mb.yml"
+      - "CLOUDFLARE_50MB.md"
       - "Dockerfile"
       - "render.yaml"
       - "test_word_captions.py"
@@ -49,7 +53,10 @@ jobs:
       - name: "Зависимости для проверки"
         run: python -m pip install "telethon>=1.40,<2" "requests>=2.31,<3" "Pillow>=10,<13" -r requirements-api.txt
       - name: "Проверить синтаксис Python"
-        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py speech_review.py word_captions.py reels_effects.py font_presets.py editor_api.py export_profiles.py reference_dynamic_captions.py
+        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py speech_review.py word_captions.py reels_effects.py font_presets.py editor_api.py export_profiles.py reference_dynamic_captions.py process_uploaded_video.py
+      - name: "Проверить синтаксис Cloudflare Worker"
+        run: node --input-type=module --check < cloudflare_launcher.js
+
       - name: "Проверить правки распознавания и зум по фразам"
         run: python -m unittest -v test_speech_review.py
 
