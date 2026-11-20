@@ -417,7 +417,8 @@
     var status=byId('launchStatus');
     if(button.disabled)return;
     try{
-      var url=launcherInput.value.trim().replace(/\\/+$/,'');
+      var url=launcherInput.value.trim();
+      while(url.endsWith('/'))url=url.slice(0,-1);
       if(!/^https:\/\/[a-z0-9.-]+(?::443)?$/i.test(url)){
         throw new Error('Вставь HTTPS-адрес своего Cloudflare Worker, заканчивающийся .workers.dev');
       }
