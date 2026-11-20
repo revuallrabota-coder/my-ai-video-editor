@@ -37,7 +37,7 @@ class AudioPipelineTests(unittest.TestCase):
             for profile in ("off", "balanced", "strong"):
                 with self.subTest(profile=profile):
                     output = path / f"{profile}.mp4"
-                    base_video(source, output, [Segment(0, 1.4)], True, audio_profile=profile)
+                    base_video(source, output, [Segment(0, 1.4)], True, audio_profile=profile, quality="balanced")
                     duration, audio = duration_and_audio(output)
                     self.assertTrue(audio)
                     self.assertGreater(duration, 1.25)
@@ -48,7 +48,7 @@ class AudioPipelineTests(unittest.TestCase):
             chosen = path / "x11_warm.mp4"
             base_video(
                 source, chosen, [Segment(0, 1.4)], True,
-                audio_profile="balanced", speed=1.1, filter_style="warm",
+                audio_profile="balanced", speed=1.1, filter_style="warm", quality="balanced",
             )
             faster_duration, has_audio = duration_and_audio(chosen)
             self.assertTrue(has_audio)
