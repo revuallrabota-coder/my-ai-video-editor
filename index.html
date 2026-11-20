@@ -132,16 +132,17 @@
     </div>
     <label class="field" for="subtitleStyle">Стиль субтитров</label>
     <select id="subtitleStyle">
-      <option value="signature" selected>Розовый: по одному слову, плавное всплытие</option>
+      <option value="reference_dynamic" selected>🎬 Как в референсе: крупные/маленькие слова и плашки</option>
+      <option value="signature">Розовый: по одному слову, плавное всплытие</option>
       <option value="contrast">Контрастный: по одному слову</option>
       <option value="classic">Классический: по одному слову</option>
       <option value="signature_phrases">Розовый: старый вариант целыми фразами</option>
       <option value="contrast_phrases">Контрастный: старый вариант фразами</option>
       <option value="classic_phrases">Классический: старый вариант фразами</option>
     </select>
-    <p class="note">Для одного слова за раз выбери signature, contrast или classic. Для старой анимации фразами выбери вариант _phrases. Новые шрифты по присланному референсу: Bebas-стиль, Platform-стиль, Bubble, Script и Modern. Шрифты работают при рендере через GitHub Actions, а предпросмотр здесь приблизительный.</p>
+    <p class="note">Новый вариант reference_dynamic чередует крупные красные и маленькие белые слова, иногда добавляет полупрозрачную плашку и плавное движение. Для обычного одного слова за раз выбери signature, contrast или classic. Для старой анимации фразами выбери вариант _phrases. Новые шрифты по присланному референсу: Bebas-стиль, Platform-стиль, Bubble, Script и Modern. Шрифты работают при рендере через GitHub Actions, а предпросмотр здесь приблизительный.</p>
     <label class="field" for="color">Цвет главного слова</label>
-    <input type="color" id="color" value="#ebc0c8">
+    <input type="color" id="color" value="#f0443e">
     <div class="split">
       <div><label class="field" for="fontBig">Крупный шрифт</label>
         <select id="fontBig">
@@ -183,7 +184,7 @@
     <h2>Эффекты и фильтр</h2>
     <p>Выбери будущий стиль обработки изображения и звука.</p>
     <label class="field" for="camera">Динамика камеры</label>
-    <select id="camera"><option value="editorial" selected>Новый монтажный Zoom: крупный план с удержанием</option><option value="soft_punch">Старый плавный Zoom</option><option value="enhanced">Усиленный (старый)</option><option value="gentle">Очень мягкий одноразовый Zoom</option><option value="off">Без цифрового зума</option></select>
+    <select id="camera"><option value="cinematic_pan" selected>🎥 Плавный вправо-влево + смена крупности</option><option value="editorial">Монтажный Zoom: крупный план с удержанием</option><option value="soft_punch">Старый плавный Zoom</option><option value="enhanced">Усиленный (старый)</option><option value="gentle">Очень мягкий одноразовый Zoom</option><option value="off">Без цифрового зума</option></select>
     <label class="field" for="audio">🎧 Улучшение звука</label>
     <select id="audio">
       <option value="balanced">Бережная очистка — рекомендую</option>
@@ -195,6 +196,12 @@
     <select id="filter"><option value="none" selected>Без фильтра</option><option value="warm">Тёплый</option><option value="soft" disabled>Нежный — скоро</option><option value="cool" disabled>Холодный — скоро</option><option value="contrast" disabled>Контрастный — скоро</option></select>
     <label class="field" for="speed">Скорость</label>
     <select id="speed"><option value="1.0" selected>×1.0</option><option value="1.1">×1.1</option><option value="1.2">×1.2</option><option value="1.3">×1.3</option><option value="1.5">×1.5</option></select>
+    <label class="field" for="exportQuality">Качество готового видео</label>
+    <select id="exportQuality">
+      <option value="high" selected>Full HD · 1080×1920 · высокое качество</option>
+      <option value="balanced">720×1280 · быстрее для слабого сервера</option>
+    </select>
+    <p class="note">Full HD сохраняет больше деталей из качественного исходника, но дольше обрабатывается и требует мощного сервера. Если исходник 720p, увеличение разрешения не добавит настоящих деталей.</p>
     <div class="alert">Видео действительно обрабатывается сервером только после подключения backend на последнем шаге. Сам этот экран лишь настраивает монтаж.</div>
   </section>
 
@@ -226,7 +233,7 @@
       <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
     </div>
     <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
-    <p class="note">После подключения Render видео и выбранные настройки отправляются прямо на твой сервер. Исправление субтитров происходит здесь, а результат скачивается MP4. Без подключённого сервера доступен только предпросмотр и сохранение настроек. GitHub Actions остаётся запасным ручным способом. Сейчас работают вертикальный экспорт, поштучные либо фразовые субтитры, варианты Zoom, шрифты, фильтры, обработка голоса, простые эмодзи и звуковые акценты. Реалистичная AI-замена одежды или фона, добавление личных фотографий и загрузка собственных шрифтов пока не входят в этот серверный режим.</p>
+    <p class="note">Референсный типографический режим reference_dynamic, движение cinematic_pan и Full HD уже подключены к коду. После подключения Render видео и выбранные настройки отправляются прямо на твой сервер. Исправление субтитров происходит здесь, а результат скачивается MP4. Без подключённого сервера доступен только предпросмотр и сохранение настроек. GitHub Actions остаётся запасным ручным способом. Сейчас работают вертикальный экспорт, поштучные либо фразовые субтитры, варианты Zoom, шрифты, фильтры, обработка голоса, простые эмодзи и звуковые акценты. Реалистичная AI-замена одежды или фона, добавление личных фотографий и загрузка собственных шрифтов пока не входят в этот серверный режим.</p>
     <div class="alert"><strong>Первый тест:</strong> сервер ещё нужно развернуть на Render. Бесплатная конфигурация имеет ограниченные ресурсы и может прерывать длительный монтаж. Готовый MP4 пока скачивается в приложение/на устройство, а не отправляется автоматически сообщением в Telegram.</div>
   </section>
 </div>
@@ -269,7 +276,8 @@
       audio:selectedText('audio'),
       audioProfile:byId('audio').value,
       filter:selectedText('filter'),
-      speed:Number(byId('speed').value)
+      speed:Number(byId('speed').value),
+      exportQuality:byId('exportQuality').value
     };
   }
   function row(key,value){
@@ -291,7 +299,7 @@
     byId('next').hidden=current===4;
     if(current===4){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Видео',s.videoFiles.length+' шт.'],['Референс',s.referenceVideo||'нет'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed]].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Видео',s.videoFiles.length+' шт.'],['Референс',s.referenceVideo||'нет'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -351,7 +359,7 @@
     big.style.letterSpacing=chosenFont==='bebas'?'-0.9px':chosenFont==='platform'?'1.8px':'0px';
     big.style.transform=chosenFont==='bebas'?'scaleX(.8) scaleY(1.08)':chosenFont==='platform'?'scaleX(1.12)':'none';
     big.style.webkitTextStroke=chosenFont==='bubble'?'3px #201926':byId('outline').value+'px #211832';
-    if(byId('subtitleStyle').value.startsWith('contrast')){
+    if(byId('subtitleStyle').value.startsWith('contrast')||byId('subtitleStyle').value==='reference_dynamic'){
       big.style.color=byId('color').value.toLowerCase()==='#ebc0c8'?'#f0443e':byId('color').value;
     }else{
       big.style.color=byId('color').value;
@@ -426,6 +434,7 @@
       audio_profile:s.audioProfile,
       filter_style:byId('filter').value,
       speed:s.speed,
+      export_quality:s.exportQuality,
       sound_effects:s.soundEffects?'soft':'off',
       emoji_mode:s.emoji?'on':'off',
       hook:s.hook?s.hookText:'',
