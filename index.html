@@ -204,7 +204,7 @@
     <div id="summary"></div>
     <div class="alert" style="margin:16px 0">
       <strong>🎞 Настоящий монтаж через сервер</strong>
-      <p class="note">Сначала размести наш backend на Render и вставь HTTPS-адрес сервера. Этот адрес сохраняется только в браузере. <strong>Токен бота здесь вводить нельзя.</strong></p>
+      <p class="note">Сначала размести наш backend на Render и вставь HTTPS-адрес сервера. Адрес сервера сохраняется только в браузере на этом устройстве. <strong>Токен бота здесь вводить нельзя.</strong></p>
       <label class="field" for="apiBase">Адрес твоего сервера</label>
       <input id="apiBase" type="url" inputmode="url" placeholder="https://my-ai-video-editor-api.onrender.com" autocomplete="off" style="width:100%;max-width:100%">
       <div class="mini">Для работы открой Mini App через кнопку своего Telegram-бота. Первый тест: одно видео 10–20 секунд, желательно до 20 МБ.</div>
@@ -222,12 +222,12 @@
     <button class="btn primary" type="button" style="width:100%;margin:14px 0" id="saveButton">Скачать настройки</button>
     <div id="ownerIdCard" class="alert" hidden style="margin:12px 0">
       <strong>Твой Telegram ID: <span id="ownerIdValue"></span></strong>
-      <p style="margin:6px 0">Это число понадобится для секрета OWNER_TELEGRAM_ID на GitHub. Не путай с токеном бота.</p>
+      <p style="margin:6px 0">Это число нужно в защищённой переменной OWNER_TELEGRAM_ID сервера Render (и в GitHub Actions для старого теста). Не путай с токеном.</p>
       <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
     </div>
     <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
-    <p class="note">Для монтажа внутри Mini App выбери настройки выше и нажми «Монтировать» после подключения своего сервера. GitHub Actions остаётся запасным ручным способом. Раньше каждый запуск GitHub Actions можно было настроить по-разному: mode, subtitle_style, color, font_profile, caption_position, camera_style, video_speed, video_filter, audio_profile и hook_text. Параметры из записи «Чит-Кода» не закреплены как обязательные. Выбор на экране Mini App пока служит предпросмотром; в обработку передаются именно параметры запуска Actions. После отправки видео бот сначала пришлёт текст распознанной речи: /ok подтвердить, /fix ошибка=правильно исправить отдельное слово, /text ТВОЙ ПОЛНЫЙ ТЕКСТ заменить весь текст. Новый editorial Zoom меняет общий план на крупный при смене фразы и удерживает его, без циклической раскачки. Субтитры signature / contrast / classic появляются по одному слову. Варианты _phrases выводят прежние фразы целиком. Звуковые акценты, эмодзи и хук теперь реализованы через команды в Telegram: /effects, /sfx soft|punch|off, /emoji on|off, /hook start|end|both ТЕКСТ. Файлы и настройки из Mini App в обработчик пока не передаются автоматически. Вставки фото всё ещё не реализованы.</p>
-    <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
+    <p class="note">После подключения Render видео и выбранные настройки отправляются прямо на твой сервер. Исправление субтитров происходит здесь, а результат скачивается MP4. Без подключённого сервера доступен только предпросмотр и сохранение настроек. GitHub Actions остаётся запасным ручным способом. Сейчас работают вертикальный экспорт, поштучные либо фразовые субтитры, варианты Zoom, шрифты, фильтры, обработка голоса, простые эмодзи и звуковые акценты. Реалистичная AI-замена одежды или фона, добавление личных фотографий и загрузка собственных шрифтов пока не входят в этот серверный режим.</p>
+    <div class="alert"><strong>Первый тест:</strong> сервер ещё нужно развернуть на Render. Бесплатная конфигурация имеет ограниченные ресурсы и может прерывать длительный монтаж. Готовый MP4 пока скачивается в приложение/на устройство, а не отправляется автоматически сообщением в Telegram.</div>
   </section>
 </div>
 <footer class="footer"><div class="footer-inner"><button type="button" class="btn secondary" id="back" hidden>← Назад</button><button type="button" class="btn primary" id="next">Дальше →</button></div></footer>
