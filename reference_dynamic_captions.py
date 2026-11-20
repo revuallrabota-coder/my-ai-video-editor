@@ -51,6 +51,10 @@ def build_reference_dynamic_ass(
         "minimal": ("#FFFFFF","#EFEFEF"),
         "neon": ("#D7FF6C","#F3F7E7"),
         "pop": ("#FF7BB6","#FFF3F9"),
+        "old_money": ("#CEB68A","#FFF3E1"),
+        "vintage": ("#D79B6D","#F4DFC7"),
+        "street": ("#DEEF5A","#F5F5F0"),
+        "elegant": ("#F0DBDC","#FFFFFF"),
     }
     if caption_variant not in variants:
         raise ValueError("Неизвестный вариант оформления субтитров.")
