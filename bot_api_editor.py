@@ -119,6 +119,9 @@ def render_result(
     filter_style: str, caption_position: str, font_profile: str,
     reviewed_words: list[tuple[float, float, str]] | None,
     caption_animation: str = "word_pop",
+    sound_effects: str = "off",
+    emoji_mode: str = "off",
+    hook_position: str = "start",
 ) -> None:
     """Рендер только из одобренной версии текста."""
     try:
@@ -131,6 +134,8 @@ def render_result(
                 caption_position, font_profile,
                 words_override=reviewed_words,
                 caption_animation=caption_animation,
+                sound_effects=sound_effects, emoji_mode=emoji_mode,
+                hook_position=hook_position,
             )
             caption = (
                 "🎬 Монтаж готов! "
@@ -142,7 +147,7 @@ def render_result(
                 original_file, output_file, mode, color, audio_profile,
                 subtitle_style, hook, speed, filter_style,
                 caption_position, font_profile, reviewed_words,
-                caption_animation,
+                caption_animation, sound_effects, emoji_mode, hook_position,
             )
             caption = (
                 "✅ Готово! "
@@ -191,6 +196,9 @@ def main() -> None:
     if subtitle_style not in ("signature", "classic", "contrast"):
         raise ValueError("Неизвестный стиль субтитров.")
     hook = os.environ.get("HOOK_TEXT", "").strip()[:70]
+    hook_position = "start"
+    sound_effects = "soft" if mode in ("my_style", "reference") else "off"
+    emoji_mode = "on" if mode in ("my_style", "reference") else "off"
     camera_style = os.environ.get("CAMERA_STYLE", "editorial")
     if camera_style not in ("editorial", "enhanced", "soft_punch", "gentle", "off"):
         raise ValueError("Неверный режим камеры.")
@@ -237,6 +245,15 @@ def main() -> None:
             "и размером до 20 МБ.\n"
             "api_id и api_hash не нужны."
         )
+    prompt += (
+        "\n\n✨ Новые эффекты: /effects — посмотреть настройки."
+        "\n/sfx off|soft|punch — звуковые акценты."
+        "\n/emoji on|off — всплывающие эмодзи."
+        "\n/hook start ТЕКСТ — хук в начале на подложке."
+        "\n/hook end ТЕКСТ — хук в конце."
+        "\n/hook both ТЕКСТ — хук и там, и там."
+        "\n/hook off — выключить."
+    )
     send_text(token, owner_id, prompt)
     LOG.info("Ожидаем входящие видео от владельца, режим=%s, максимум 15 минут.", mode)
 
@@ -274,6 +291,66 @@ def main() -> None:
                 raw_text = str(message.get("text", "")).strip()
                 if raw_text == "/help":
                     send_text(token, chat_id, prompt)
+                    continue
+
+                # Управление эффектами внутри Telegram. Не требует
+                # дополнительных полей GitHub Actions (их лимит — 10).
+                low = raw_text.lower()
+                if low == "/effects":
+                    send_text(
+                        token, chat_id,
+                        "🎛 Эффекты текущего ролика:\n"
+                        f"Звуковые акценты: {sound_effects}\n"
+                        f"Эмодзи: {emoji_mode}\n"
+                        f"Хук: {hook_position} ({hook or 'текст не задан'})\n\n"
+                        "Команды:\n"
+                        "/sfx soft | /sfx punch | /sfx off\n"
+                        "/emoji on | /emoji off\n"
+                        "/hook start ТЕКСТ\n"
+                        "/hook end ТЕКСТ\n"
+                        "/hook both ТЕКСТ\n"
+                        "/hook off"
+                    )
+                    continue
+                if low.startswith("/sfx"):
+                    parts=low.split()
+                    if len(parts)!=2 or parts[1] not in ("off","soft","punch"):
+                        send_text(token,chat_id,"Выбери: /sfx off, /sfx soft или /sfx punch")
+                    else:
+                        sound_effects=parts[1]
+                        send_text(token,chat_id,f"🔊 Звуковые акценты: {sound_effects}")
+                    continue
+                if low.startswith("/emoji"):
+                    parts=low.split()
+                    if len(parts)!=2 or parts[1] not in ("on","off"):
+                        send_text(token,chat_id,"Выбери: /emoji on или /emoji off")
+                    else:
+                        emoji_mode=parts[1]
+                        send_text(token,chat_id,f"✨ Эмодзи: {emoji_mode}")
+                    continue
+                if low.startswith("/hook"):
+                    parts=raw_text.split(maxsplit=2)
+                    if len(parts)==2 and parts[1].lower()=="off":
+                        hook=""
+                        hook_position="off"
+                        send_text(token,chat_id,"Хук выключен.")
+                    elif (len(parts)==3 and parts[1].lower() in ("start","end","both")
+                          and parts[2].strip()):
+                        hook_position=parts[1].lower()
+                        hook=parts[2].strip()[:58]
+                        send_text(
+                            token,chat_id,
+                            "🪧 Хук установлен: "
+                            + ("в начале" if hook_position=="start" else
+                               "в конце" if hook_position=="end" else "в начале и конце")
+                            + "\n" + hook
+                        )
+                    else:
+                        send_text(
+                            token,chat_id,
+                            "Формат: /hook start ТЕКСТ, /hook end ТЕКСТ, "
+                            "/hook both ТЕКСТ или /hook off"
+                        )
                     continue
 
                 if pending_words is not None and pending_chat_id == chat_id:
@@ -316,6 +393,8 @@ def main() -> None:
                         filter_style=filter_style, caption_position=caption_position,
                         font_profile=font_profile, reviewed_words=reviewed_words,
                         caption_animation=caption_animation,
+                        sound_effects=sound_effects, emoji_mode=emoji_mode,
+                        hook_position=hook_position,
                     )
                     return
 
@@ -368,6 +447,8 @@ def main() -> None:
                             filter_style=filter_style, caption_position=caption_position,
                             font_profile=font_profile, reviewed_words=None,
                             caption_animation=caption_animation,
+                            sound_effects=sound_effects, emoji_mode=emoji_mode,
+                            hook_position=hook_position,
                         )
                         return
                     from telegram_editor import transcribe_words, duration_and_audio
