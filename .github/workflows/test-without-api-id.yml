@@ -1,0 +1,61 @@
+name: "🧪 Тест монтажа без API ID"
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Режим обработки"
+        required: true
+        default: auto
+        type: choice
+        options:
+          - auto
+          - captions
+          - cuts
+      color:
+        description: "Цвет субтитров (#RRGGBB)"
+        required: true
+        default: "#E8A0C0"
+        type: string
+
+concurrency:
+  group: my-video-editor-bot
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test-montage:
+    name: "🎞️ Монтаж через обычного Telegram-бота"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: "Получить код"
+        uses: actions/checkout@v4
+
+      - name: "Установить Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: "Установить FFmpeg"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+
+      - name: "Установить зависимости"
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install "requests>=2.31,<3"
+
+      - name: "Проверить синтаксис"
+        run: python -m py_compile bot_api_editor.py telegram_editor.py
+
+      - name: "Запустить тестовый монтаж"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          OWNER_TELEGRAM_ID: ${{ secrets.OWNER_TELEGRAM_ID }}
+          MONTAGE_MODE: ${{ inputs.mode }}
+          SUBTITLE_COLOR: ${{ inputs.color }}
+        run: python bot_api_editor.py
