@@ -13,11 +13,24 @@ on:
           - captions
           - cuts
       color:
-        description: "Цвет выделенных слов, например #E8A0C0"
+        description: "Цвет выделенных слов, например #EBC0C8"
         required: true
-        default: "#E8A0C0"
+        default: "#EBC0C8"
         type: string
 
+      subtitle_style:
+        description: "Субтитры по референсу или старые"
+        required: true
+        default: signature
+        type: choice
+        options:
+          - signature
+          - classic
+      hook_text:
+        description: "Заголовок вверху первые 5 секунд (необязательно)"
+        required: false
+        default: ""
+        type: string
       audio_profile:
         description: "Звук: очистка от шума и ровная громкость"
         required: true
@@ -52,7 +65,7 @@ jobs:
       - name: "Установить FFmpeg и кириллические шрифты"
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          sudo apt-get install -y ffmpeg fonts-dejavu-core fonts-liberation
 
       - name: "Установить бесплатные библиотеки"
         run: python -m pip install -r requirements.txt
@@ -69,4 +82,6 @@ jobs:
           MONTAGE_MODE: ${{ inputs.mode }}
           SUBTITLE_COLOR: ${{ inputs.color }}
           AUDIO_PROFILE: ${{ inputs.audio_profile }}
+          SUBTITLE_STYLE: ${{ inputs.subtitle_style }}
+          HOOK_TEXT: ${{ inputs.hook_text }}
         run: python telegram_editor.py
