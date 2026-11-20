@@ -128,7 +128,7 @@ def add_virtual_camera(source: Path, output: Path, cadence: float) -> None:
 
 def montage_by_reference(
     original: Path,
-    reference: Path,
+    reference: Path | None,
     output: Path,
     color: str = "#EBC0C8",
     audio_profile: str = "balanced",
@@ -136,7 +136,14 @@ def montage_by_reference(
     hook: str = "",
 ) -> dict:
     """Монтаж с нарезкой тишины, ритмом референса и живыми субтитрами."""
-    profile = analyze_reference(reference)
+    # Без второго файла используем постоянный темп из разобранного
+    # 50-секундного пользовательского референса: близкие планы, мягкое
+    # движение камеры, без резких ступенек.
+    profile = (
+        analyze_reference(reference)
+        if reference is not None
+        else ReferenceProfile(0, 2.90, 0.0, "фирменный")
+    )
     source_duration, source_has_audio = duration_and_audio(original)
     if not source_has_audio:
         raise ValueError("Для разговорного монтажа нужен исходный ролик с речью.")
