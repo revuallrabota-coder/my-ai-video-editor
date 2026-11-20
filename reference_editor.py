@@ -108,11 +108,14 @@ def speech_zoom_windows(
     """Выбирает начала фраз и паузы, а не механический таймер."""
     if duration < 2.5 or not words:
         return []
-    starts = [float(words[0][0])]
+    from signature_captions import split_groups
+    groups = split_groups(words)
+    # Начало смысловых коротких фраз + отчётливые паузы.
+    starts = [float(group[0][0]) for group in groups if group]
     for previous, current in zip(words, words[1:]):
         if current[0] - previous[1] >= 0.38:
             starts.append(float(current[0]))
-    candidates = [x for x in starts if 1.0 <= x <= duration - 1.7]
+    candidates = sorted(x for x in set(starts) if 1.0 <= x <= duration - 1.7)
     if not candidates:
         candidates = [min(1.4, duration / 4)]
     selected: list[tuple[float, float]] = []
