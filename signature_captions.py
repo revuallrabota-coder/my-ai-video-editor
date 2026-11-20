@@ -54,10 +54,10 @@ def split_groups(
             continue
         # Разбивка на 2-4 слова, соответствующая коротким фразам референса.
         if current and (
-            len(current) >= 5
-            or start - current[-1][1] >= 0.52
-            or end - current[0][0] > 2.75
-            or sum(len(w[2]) + 1 for w in current) + len(word) > 38
+            len(current) >= 3
+            or start - current[-1][1] >= 0.37
+            or end - current[0][0] > 1.8
+            or sum(len(w[2]) + 1 for w in current) + len(word) > 28
             or bool(re.search(r"[.!?]$", current[-1][2]))
         ):
             groups.append(current)
@@ -155,9 +155,9 @@ def build_signature_ass(
         if duration_ms < 220:
             continue
 
-        fade_in = min(310, max(100, round(duration_ms * 0.28)))
-        fade_out = min(240, max(70, round(duration_ms * 0.21)))
-        rise_ms = min(470, max(170, round(duration_ms * 0.47)))
+        fade_in = min(320, max(150, round(duration_ms * 0.32)))
+        fade_out = min(235, max(110, round(duration_ms * 0.22)))
+        rise_ms = min(520, max(240, round(duration_ms * 0.56)))
 
         main_index = pick_main_word(group)
         before = safe_text(" ".join(item[2] for item in group[:main_index]))
@@ -168,10 +168,10 @@ def build_signature_ass(
             # Небольшой подъём на 8 пикселей за 0.3–0.5 с,
             # кросс-фейд и масштабирование лишь на 3%.
             return (
-                r"{\an5\move(360," + str(target_y + 8) + ",360,"
+                r"{\an5\move(360," + str(target_y + 17) + ",360,"
                 + str(target_y) + ",0," + str(rise_ms) + ")"
                 r"\fad(" + str(fade_in) + "," + str(fade_out) + ")"
-                r"\fscx97\fscy97\blur0.35"
+                r"\fscx92\fscy92\blur0.45"
                 r"\t(0," + str(rise_ms) + r",0.65,\fscx100\fscy100)}"
                 + content
             )
@@ -184,10 +184,10 @@ def build_signature_ass(
             main = main.upper()
             size = 74 if len(main) <= 10 else 63 if len(main) <= 13 else 52
             hero = (
-                r"{\an5\move(360," + str(hero_y + 11) + ",360,"
+                r"{\an5\move(360," + str(hero_y + 24) + ",360,"
                 + str(hero_y) + ",0," + str(rise_ms) + ")"
                 r"\fad(" + str(fade_in) + "," + str(fade_out) + ")"
-                r"\fscx94\fscy94\blur0.4"
+                r"\fscx86\fscy86\blur0.55"
                 r"\t(0," + str(rise_ms) + r",0.65,\fscx100\fscy100)"
                 r"\fs" + str(size) + "}" + main
             )
