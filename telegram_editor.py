@@ -161,8 +161,8 @@ def base_video(
     profile = get_export_profile(quality)
     if not 0.8 <= speed <= 1.5:
         raise ValueError("Скорость должна быть от 0.8 до 1.5.")
-    if filter_style not in ("none", "warm"):
-        raise ValueError("Поддерживаются только фильтры none и warm.")
+    from video_filters import video_filter_chain
+    extra_filters = video_filter_chain(filter_style)
 
     filters: list[str] = []
     concat_inputs = ""
@@ -199,9 +199,8 @@ def base_video(
         f"pad={profile.dimensions}:(ow-iw)/2:(oh-ih)/2:color=0x1a1426,"
         "setsar=1,fps=30"
     )
-    if filter_style == "warm":
-        # Умеренный тёплый тон, без агрессивного изменения оттенка кожи.
-        video_filters += ",colorbalance=rs=0.045:gs=0.005:bs=-0.025"
+    if extra_filters:
+        video_filters += "," + extra_filters
     video_filters += ",format=yuv420p"
     filters.append(f"{video_source}{video_filters}[vout]")
 
