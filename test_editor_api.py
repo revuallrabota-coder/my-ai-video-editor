@@ -42,16 +42,20 @@ class MiniAppApiTests(unittest.TestCase):
     def test_bad_settings_rejected(self):
         defaults = validate_settings({})
         self.assertEqual(defaults["mode"], "my_style")
-        self.assertEqual(defaults["camera_style"], "editorial")
+        self.assertEqual(defaults["camera_style"], "cinematic_pan")
+        self.assertEqual(defaults["export_quality"], "high")
         self.assertEqual(defaults["font_profile"], "elegant")
         settings = validate_settings({
-            "mode":"reference", "camera_style":"enhanced",
-            "subtitle_style":"signature", "font_profile":"bubble",
+            "mode":"reference", "camera_style":"cinematic_pan",
+            "subtitle_style":"reference_dynamic", "font_profile":"bubble",
+            "export_quality":"balanced",
             "sound_effects":"soft", "emoji_mode":"on",
             "hook":"Найди ошибку", "hook_position":"end",
         })
         self.assertEqual(settings["hook_position"],"end")
         self.assertEqual(settings["font_profile"],"bubble")
+        self.assertEqual(settings["export_quality"],"balanced")
+        self.assertEqual(settings["subtitle_style"],"reference_dynamic")
         with self.assertRaises(HTTPException):
             validate_settings({"font_profile":"../../files"})
         with self.assertRaises(HTTPException):
@@ -60,6 +64,8 @@ class MiniAppApiTests(unittest.TestCase):
             validate_settings({"color":"red;rm -rf /"})
         with self.assertRaises(HTTPException):
             validate_settings({"camera_style":"arbitrary"})
+        with self.assertRaises(HTTPException):
+            validate_settings({"export_quality":"16k"})
 
 
 if __name__=="__main__":
