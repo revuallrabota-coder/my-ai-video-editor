@@ -249,8 +249,8 @@ def transcribe_words(
     from functools import lru_cache
     from faster_whisper import WhisperModel
 
-    if model_size not in ("small", "medium"):
-        raise ValueError("Поддерживаются модели small и medium.")
+    if model_size not in ("tiny", "base", "small", "medium"):
+        raise ValueError("Поддерживаются модели tiny, base, small и medium.")
     if language not in ("ru", "auto"):
         raise ValueError("Язык может быть ru или auto.")
 
