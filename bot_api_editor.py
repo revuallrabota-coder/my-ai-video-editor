@@ -133,16 +133,22 @@ def main() -> None:
     if subtitle_style not in ("signature", "classic", "contrast"):
         raise ValueError("Неизвестный стиль субтитров.")
     hook = os.environ.get("HOOK_TEXT", "").strip()[:70]
-    camera_style = os.environ.get("CAMERA_STYLE", "enhanced")
+    camera_style = os.environ.get("CAMERA_STYLE", "soft_punch")
     if camera_style not in ("enhanced", "soft_punch", "gentle", "off"):
         raise ValueError("Неверный режим камеры.")
     try:
-        speed = float(os.environ.get("VIDEO_SPEED", "1.1"))
+        speed = float(os.environ.get("VIDEO_SPEED", "1.0"))
     except ValueError:
         raise ValueError("Скорость видео должна быть числом.") from None
     if not 0.8 <= speed <= 1.5:
         raise ValueError("Допустимая скорость: от 0.8 до 1.5.")
-    filter_style = os.environ.get("VIDEO_FILTER", "warm")
+    filter_style = os.environ.get("VIDEO_FILTER", "none")
+    caption_position = os.environ.get("CAPTION_POSITION", "middle")
+    font_profile = os.environ.get("FONT_PROFILE", "elegant")
+    if caption_position not in ("top", "middle", "bottom"):
+        raise ValueError("Недопустимое положение субтитров.")
+    if font_profile not in ("elegant", "clean", "bold"):
+        raise ValueError("Недопустимый шрифт.")
     if filter_style not in ("none", "warm"):
         raise ValueError("Неизвестный фильтр видео.")
     if mode not in ("auto", "captions", "cuts", "reference", "my_style"):
@@ -255,7 +261,8 @@ def main() -> None:
                             original_file,
                             reference_file if mode == "reference" else None,
                             output_file, color, audio_profile, subtitle_style, hook,
-                            camera_style, speed, filter_style
+                            camera_style, speed, filter_style,
+                            caption_position, font_profile
                         )
                         if mode == "reference":
                             caption = (
@@ -274,7 +281,8 @@ def main() -> None:
                     else:
                         details = edit_video(
                             original_file, output_file, mode, color, audio_profile,
-                            subtitle_style, hook, speed, filter_style
+                            subtitle_style, hook, speed, filter_style,
+                            caption_position, font_profile
                         )
                         caption = (
                             "✅ Готово!\n"
