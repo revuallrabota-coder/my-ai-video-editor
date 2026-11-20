@@ -126,7 +126,7 @@ def main() -> None:
         raise RuntimeError("OWNER_TELEGRAM_ID должен быть числом.") from None
 
     mode = os.environ.get("MONTAGE_MODE", "auto")
-    color = os.environ.get("SUBTITLE_COLOR", "#E8A0C0")
+    color = os.environ.get("SUBTITLE_COLOR", "auto")
     audio_profile = os.environ.get("AUDIO_PROFILE", "balanced")
     audio_filterchain(audio_profile)  # early validation
     subtitle_style = os.environ.get("SUBTITLE_STYLE", "signature")
