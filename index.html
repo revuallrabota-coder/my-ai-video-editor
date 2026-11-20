@@ -94,6 +94,11 @@
     </label>
     <div class="mini" id="videoInfo">Видео пока не выбрано.</div>
     <video id="firstVideo" controls playsinline hidden></video>
+    <h3>Видео-референс (необязательно)</h3>
+    <p class="note">Если хочешь монтаж с похожим темпом, выбери пример для предпросмотра. Пока файлы отсюда не загружаются на сервер: в тестовом режиме их нужно будет отправить в чат бота отдельно.</p>
+    <input id="referenceVideo" type="file" accept="video/*">
+    <div class="mini" id="referenceInfo">Референс не выбран.</div>
+    <video id="referencePreview" controls playsinline hidden></video>
     <h3>Формат</h3>
     <div class="segmented">
       <button type="button" class="option selected" data-ratio="9:16">📱 Вертикально 9:16</button>
@@ -107,6 +112,7 @@
     <label class="option selected mode"><input type="radio" name="mode" value="Монтаж + субтитры" checked> ✂️ Монтаж + субтитры<small>Убрать паузы и дубли, добавить зумы и подписи.</small></label>
     <label class="option mode"><input type="radio" name="mode" value="Монтаж без субтитров"> 🎞️ Монтаж без субтитров<small>Только нарезка и движения камеры.</small></label>
     <label class="option mode"><input type="radio" name="mode" value="Только субтитры"> 💬 Только субтитры<small>Не резать видео, добавить оформление речи.</small></label>
+    <label class="option mode"><input type="radio" name="mode" value="По референсу"> 🎬 Монтаж по референсу<small>Первый этап: ритм смен кадров из видео-примера, зумы и субтитры. Для запуска выбери reference в GitHub Actions и отправь два видео в чат.</small></label>
     <h3>Свои фото в ролик</h3>
     <input type="file" id="photos" accept="image/*" multiple>
     <div class="note" id="photoInfo">Можно выбрать до 30 фото.</div>
@@ -171,7 +177,7 @@
       <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
     </div>
     <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
-    <p class="note">Пока это отдельный ручной запуск через GitHub, без api_id и api_hash. Для теста нужно видео до 20 МБ. Настройки с экрана автоматически в Actions не передаются. Запусти задачу, дождись сообщения от бота «Монтажёр запущен!», затем отправь новое видео в чат.</p>
+    <p class="note">Для теста референсного монтажа выбери режим reference в GitHub Actions. После сообщения бота сначала пришли РЕФЕРЕНС, затем после подтверждения СВОЙ ИСХОДНИК. Каждый файл до 20 МБ. Выбранные здесь файлы и параметры автоматически в Actions пока не передаются.</p>
     <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
   </section>
 </div>
@@ -192,6 +198,7 @@
   function getSettings(){
     return {
       videoFiles:Array.from(videoInput.files).map(function(f){return {name:f.name,sizeBytes:f.size}}),
+      referenceVideo:byId('referenceVideo').files[0] ? byId('referenceVideo').files[0].name : null,
       photos:Array.from(photoInput.files).map(function(f){return f.name}),
       ratio:ratio,
       mode:document.querySelector('input[name="mode"]:checked').value,
@@ -231,7 +238,7 @@
     byId('next').hidden=current===4;
     if(current===4){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Видео',s.videoFiles.length+' шт.'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed]].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Видео',s.videoFiles.length+' шт.'],['Референс',s.referenceVideo||'нет'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed]].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -245,6 +252,16 @@
       el.hidden=!previewUrl;
       if(previewUrl){el.src=previewUrl;el.load()}else{el.removeAttribute('src')}
     });
+  });
+  var referenceUrl=null;
+  byId('referenceVideo').addEventListener('change',function(){
+    var f=byId('referenceVideo').files[0];
+    byId('referenceInfo').textContent=f?'Референс: '+f.name+' ('+fmtBytes(f.size)+')':'Референс не выбран.';
+    if(referenceUrl)URL.revokeObjectURL(referenceUrl);
+    referenceUrl=f?URL.createObjectURL(f):null;
+    var player=byId('referencePreview');
+    player.hidden=!referenceUrl;
+    if(referenceUrl){player.src=referenceUrl;player.load()}else{player.removeAttribute('src')}
   });
   photoInput.addEventListener('change',function(){
     byId('photoInfo').textContent=photoInput.files.length+' фото из 30';
