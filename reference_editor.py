@@ -276,8 +276,13 @@ def montage_by_reference(
     font_profile: str = "elegant",
     words_override: list[tuple[float, float, str]] | None = None,
     caption_animation: str = "word_pop",
+    sound_effects: str = "off",
+    emoji_mode: str = "off",
+    hook_position: str = "start",
 ) -> dict:
     """Монтаж с нарезкой тишины, ритмом референса и живыми субтитрами."""
+    from reels_effects import apply_effects, validate_effects
+    validate_effects(sound_effects, emoji_mode, hook_position)
     # Без второго файла используем постоянный темп из разобранного
     # 50-секундного пользовательского референса: близкие планы, мягкое
     # движение камеры, без резких ступенек.
@@ -295,6 +300,7 @@ def montage_by_reference(
         joined = folder / "joined.mp4"
         dynamic = folder / "dynamic.mp4"
         subtitles = folder / "subtitles.ass"
+        subtitled = folder / "subtitled.mp4"
         base_video(
             original, joined, kept, source_has_audio,
             audio_profile=audio_profile, speed=speed, filter_style=filter_style,
@@ -315,15 +321,22 @@ def montage_by_reference(
             caption_position=caption_position, font_profile=font_profile,
             words_override=words,
             caption_animation=caption_animation,
+            hook_position=hook_position,
         )
         if count:
-            burn_subtitles(dynamic, subtitles, output)
+            burn_subtitles(dynamic, subtitles, subtitled)
         else:
-            dynamic.replace(output)
+            dynamic.replace(subtitled)
+        effect_stats = apply_effects(
+            subtitled, output, words,
+            sound=sound_effects, emoji=emoji_mode,
+            caption_position=caption_position,
+        )
     return {
         "before": round(source_duration, 1),
         "after": round(sum(s.end - s.start for s in kept) / speed, 1),
         "subtitle_events": count,
+        **effect_stats,
         "reference_scene_changes": profile.scene_changes,
         "reference_pace_seconds": profile.seconds_per_change,
         "reference_dynamics": profile.dynamics,
