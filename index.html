@@ -165,6 +165,13 @@
     <p>Мы сохраним твои настройки. Позже к этой странице подключится обработка видео.</p>
     <div id="summary"></div>
     <button class="btn primary" type="button" style="width:100%;margin:14px 0" id="saveButton">Скачать настройки</button>
+    <div id="ownerIdCard" class="alert" hidden style="margin:12px 0">
+      <strong>Твой Telegram ID: <span id="ownerIdValue"></span></strong>
+      <p style="margin:6px 0">Это число понадобится для секрета OWNER_TELEGRAM_ID на GitHub. Не путай с токеном бота.</p>
+      <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
+    </div>
+    <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/montage.yml" target="_blank" rel="noopener noreferrer">▶️ Запустить монтаж через GitHub Actions</a></p>
+    <p class="note">Пока это отдельный запуск через GitHub. Параметры с экрана автоматически в Actions не передаются: выбери режим и цвет там же. Отправляй видео боту, только когда задание перейдёт в состояние «Ожидание видео».</p>
     <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
   </section>
 </div>
@@ -281,6 +288,17 @@
     var a=document.createElement('a');a.href=url;a.download='montage-settings.json';document.body.appendChild(a);a.click();a.remove();
     setTimeout(function(){URL.revokeObjectURL(url)},5000);
   });
+  // Telegram добавляет ID пользователя только при открытии мини-приложения в чате.
+  var ownerId=tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id;
+  if(ownerId){
+    byId('ownerIdValue').textContent=String(ownerId);
+    byId('ownerIdCard').hidden=false;
+    byId('copyOwnerId').addEventListener('click',function(){
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(String(ownerId)).then(function(){alert('ID скопирован')}).catch(function(){alert('Скопируй ID вручную: '+ownerId)});
+      }else{alert('Скопируй ID вручную: '+ownerId)}
+    });
+  }
   updateSample();draw();
 })();
 </script>
