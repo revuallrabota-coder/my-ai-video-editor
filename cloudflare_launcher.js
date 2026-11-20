@@ -13,6 +13,12 @@ const ORIGIN = "https://revuallrabota-coder.github.io";
 const GITHUB_API =
   "https://api.github.com/repos/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml/dispatches";
 
+const GITHUB_UPLOAD_API =
+  "https://api.github.com/repos/revuallrabota-coder/my-ai-video-editor/actions/workflows/upload-video-50mb.yml/dispatches";
+const MAX_UPLOAD_BYTES = 50_000_000; // 50 MB, decimal
+const UPLOAD_PART_BYTES = 4_000_000;
+const UPLOAD_TTL = 3 * 60 * 60; // 3h automatic deletion if runner fails
+
 const CHOICES = {
   mode: ["my_style", "auto", "captions", "cuts", "reference"],
   subtitle_style: ["reference_dynamic", "signature", "contrast", "classic",
@@ -32,8 +38,8 @@ function json(value, status = 200, origin = ORIGIN) {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
       "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Headers": "Content-Type",
-      "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, X-Telegram-Init-Data",
+      "Access-Control-Allow-Methods": "POST, GET, PUT, DELETE, OPTIONS",
       "Vary": "Origin"
     }
   });
@@ -127,6 +133,227 @@ async function validateTelegram(initData, token, owner) {
   }
 }
 
+
+function verifiedWorkerSettings(config) {
+  const original = workflowInputs({
+    ...config,
+    hook: "",
+    hook_position: "start"
+  });
+  if (original.mode === "reference") {
+    throw new Error("Загрузка 50 МБ пока работает в режиме «Мой стиль», без отдельного референса.");
+  }
+  const hook = String(config.hook ?? "").trim().slice(0, 58);
+  const position = String(config.hook_position ?? "off");
+  if (!["off", "start", "end", "both"].includes(position)) {
+    throw new Error("Неверное положение хука.");
+  }
+  const sound = String(config.sound_effects ?? "soft");
+  if (!["off", "soft", "punch"].includes(sound)) {
+    throw new Error("Неверный звуковой эффект.");
+  }
+  const emoji = String(config.emoji_mode ?? "on");
+  if (!["off", "on"].includes(emoji)) {
+    throw new Error("Неверный режим эмодзи.");
+  }
+  const quality = String(config.export_quality ?? "high");
+  if (!["high", "balanced"].includes(quality)) {
+    throw new Error("Недопустимое качество.");
+  }
+  const delay = Number(config.subtitle_delay ?? 0.30);
+  if (!Number.isFinite(delay) || delay < -0.5 || delay > 1.5) {
+    throw new Error("Синхронизация титров: от -0.5 до +1.5 сек.");
+  }
+  return {
+    mode: original.mode,
+    color: original.color,
+    subtitle_style: original.subtitle_style,
+    camera_style: original.camera_style,
+    video_speed: original.video_speed,
+    video_filter: original.video_filter,
+    caption_position: original.caption_position,
+    font_profile: original.font_profile,
+    audio_profile: original.audio_profile,
+    sound_effects: sound,
+    emoji_mode: emoji,
+    hook: position === "off" ? "" : hook,
+    hook_position: position,
+    export_quality: quality,
+    subtitle_delay: delay
+  };
+}
+
+function uploadKey(id, part) {
+  return "user-video:" + id + ":" + part;
+}
+
+function idMatches(id) {
+  return /^[a-f0-9-]{36}$/.test(id);
+}
+
+async function githubDispatch(endpoint, token, inputs) {
+  if (!token) throw new Error("В Cloudflare не найден GITHUB_PAT.");
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Authorization": "Bearer " + token,
+      "Accept": "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "personal-telegram-video-editor"
+    },
+    body: JSON.stringify({ ref: "main", inputs })
+  });
+  if (!response.ok) {
+    throw new Error("GitHub Actions не запущен (HTTP " + response.status + ").");
+  }
+}
+
+async function workerUploadRoute(request, env, path) {
+  if (!env.UPLOADS) {
+    return json({error:"Для видео 50 МБ подключи KV namespace к Worker под именем UPLOADS."},503);
+  }
+  const internal = path.startsWith("/internal/upload/");
+  if (internal) {
+    const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer /,"");
+    if (!bearer || !env.TELEGRAM_BOT_TOKEN ||
+        !equalHex(bearer, env.TELEGRAM_BOT_TOKEN)) {
+      return json({error:"Unauthorized"},401);
+    }
+    const match = path.match(/^\/internal\/upload\/([a-f0-9-]{36})(?:\/(manifest|chunk\/\d+|release))?$/);
+    if (!match || !idMatches(match[1])) return json({error:"Not found"},404);
+    const id = match[1], operation=match[2] ?? "manifest";
+    const meta = await env.UPLOADS.get(uploadKey(id,"meta"),"json");
+    if (!meta || meta.state !== "queued") {
+      return json({error:"Upload metadata is not yet available"},409);
+    }
+    if (request.method === "GET" && operation === "manifest") {
+      return json({
+        id, size:meta.size, parts:meta.parts, original_name:meta.original_name,
+        settings:meta.settings, chunk_size:UPLOAD_PART_BYTES
+      });
+    }
+    const cm = operation.match(/^chunk\/(\d+)$/);
+    if (request.method === "GET" && cm) {
+      const index = Number(cm[1]);
+      if (index < 0 || index >= meta.parts) return json({error:"Bad index"},400);
+      const buffer = await env.UPLOADS.get(uploadKey(id,index),"arrayBuffer");
+      if (!buffer) return json({error:"Chunk temporarily unavailable"},409);
+      return new Response(buffer, {
+        headers: {
+          "Content-Type":"application/octet-stream",
+          "Cache-Control":"no-store"
+        }
+      });
+    }
+    if (request.method === "DELETE" && operation === "release") {
+      await Promise.all(
+        Array.from({length:meta.parts},(_,i)=>env.UPLOADS.delete(uploadKey(id,i)))
+      );
+      await env.UPLOADS.delete(uploadKey(id,"meta"));
+      return json({released:true});
+    }
+    return json({error:"Unknown internal route"},404);
+  }
+
+  // Every upload operation verifies signed Telegram initData.
+  // The file is NEVER public: only the actual Telegram owner can upload.
+  const initData = request.headers.get("X-Telegram-Init-Data");
+  try {
+    await validateTelegram(initData, env.TELEGRAM_BOT_TOKEN, env.OWNER_TELEGRAM_ID);
+  } catch (err) {
+    return json({error:String(err.message ?? err)},403);
+  }
+  if (request.method === "POST" && path === "/upload/start") {
+    let payload;
+    try { payload = await request.json(); }
+    catch { return json({error:"Неверный запрос на загрузку"},400); }
+    const size=Number(payload.size);
+    if (!Number.isSafeInteger(size) || size < 4096 || size > MAX_UPLOAD_BYTES) {
+      return json({error:"Максимум 50 МБ для одного видео."},413);
+    }
+    const original=String(payload.filename ?? "");
+    if (!/\.(mp4|mov|m4v|webm|mkv)$/i.test(original)) {
+      return json({error:"Поддерживается видео MP4, MOV, M4V, WEBM или MKV."},400);
+    }
+    let settings;
+    try {settings=verifiedWorkerSettings(payload.settings ?? {});}
+    catch(err){return json({error:String(err.message ?? err)},400);}
+    const id=crypto.randomUUID();
+    const parts=Math.ceil(size/UPLOAD_PART_BYTES);
+    await env.UPLOADS.put(
+      uploadKey(id,"meta"),
+      JSON.stringify({id,size,parts,original_name:original.slice(-120),
+        settings,state:"uploading",created:Date.now()}),
+      {expirationTtl:UPLOAD_TTL}
+    );
+    return json({upload_id:id,chunk_size:UPLOAD_PART_BYTES,parts},201);
+  }
+
+  const partPath=path.match(/^\/upload\/([a-f0-9-]{36})\/(\d+)$/);
+  if (request.method === "PUT" && partPath) {
+    const id=partPath[1],index=Number(partPath[2]);
+    const meta=await env.UPLOADS.get(uploadKey(id,"meta"),"json");
+    if (!meta || meta.state !== "uploading") {
+      return json({error:"Загрузка не найдена или уже завершена."},409);
+    }
+    if (!Number.isSafeInteger(index) || index < 0 || index >= meta.parts) {
+      return json({error:"Неверный номер части."},400);
+    }
+    const expected=Math.min(UPLOAD_PART_BYTES,meta.size-index*UPLOAD_PART_BYTES);
+    const length=Number(request.headers.get("Content-Length") ?? 0);
+    if (length && length !== expected) {
+      return json({error:"Часть файла неверного размера."},400);
+    }
+    const buffer=await request.arrayBuffer();
+    if (buffer.byteLength !== expected) {
+      return json({error:"Часть файла не полностью загружена."},400);
+    }
+    await env.UPLOADS.put(uploadKey(id,index),buffer,{expirationTtl:UPLOAD_TTL});
+    return json({uploaded:index+1,total:meta.parts});
+  }
+
+  const finish=path.match(/^\/upload\/([a-f0-9-]{36})\/finish$/);
+  if (request.method === "POST" && finish) {
+    const id=finish[1];
+    const meta=await env.UPLOADS.get(uploadKey(id,"meta"),"json");
+    if (!meta || meta.state !== "uploading") {
+      return json({error:"Загрузка не найдена или уже запущена."},409);
+    }
+    // Confirm all parts have reached KV before launching GitHub.
+    // KV is eventually consistent; retry in app when replicas lag.
+    for (let i=0;i<meta.parts;i++) {
+      const buffer=await env.UPLOADS.get(uploadKey(id,i),"arrayBuffer");
+      const expected=Math.min(UPLOAD_PART_BYTES,meta.size-i*UPLOAD_PART_BYTES);
+      if (!buffer || buffer.byteLength !== expected) {
+        return json({error:"Часть "+(i+1)+" ещё не доступна в хранилище; повтори запуск."},409);
+      }
+    }
+    await env.UPLOADS.put(
+      uploadKey(id,"meta"),
+      JSON.stringify({...meta,state:"queued"}),
+      {expirationTtl:UPLOAD_TTL}
+    );
+    try {
+      await githubDispatch(GITHUB_UPLOAD_API,env.GITHUB_PAT,{
+        upload_id:id,
+        worker_url:new URL(request.url).origin
+      });
+    } catch(err) {
+      await env.UPLOADS.put(
+        uploadKey(id,"meta"),
+        JSON.stringify({...meta,state:"uploading"}),
+        {expirationTtl:UPLOAD_TTL}
+      );
+      return json({error:String(err.message ?? err)},502);
+    }
+    return json({
+      started:true,
+      message:"50 МБ переданы. GitHub скачает видео частями, смонтирует ролик и отправит MP4 в Telegram."
+    },202);
+  }
+  return json({error:"Неизвестный маршрут загрузки"},404);
+}
+
 export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
@@ -134,9 +361,18 @@ export default {
     if (request.method === "GET" && path === "/health") {
       return json({ status: "online", mode: "github-actions-launcher" });
     }
+    if (path.startsWith("/internal/upload/")) {
+      return workerUploadRoute(request, env, path);
+    }
     const origin = request.headers.get("Origin");
     if (origin !== ORIGIN) return json({ error: "Неверный источник запроса." }, 403, "null");
     if (request.method === "OPTIONS") return json({}, 200);
+    if (path.startsWith("/upload/")) {
+      try { return await workerUploadRoute(request, env, path); }
+      catch(err) {
+        return json({error:"Ошибка загрузки: "+String(err.message ?? err)},500);
+      }
+    }
     if (request.method !== "POST" || path !== "/launch") {
       return json({ error: "Маршрут не найден." }, 404);
     }
@@ -161,7 +397,7 @@ export default {
         headers: {
           "Authorization": "Bearer " + env.GITHUB_PAT,
           "Accept": "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2026-03-10",
+          "X-GitHub-Api-Version": "2022-11-28",
           "User-Agent": "personal-telegram-video-editor"
         },
         body: JSON.stringify({ ref: "main", inputs })
