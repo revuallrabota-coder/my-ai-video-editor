@@ -130,10 +130,10 @@ def main() -> None:
     audio_profile = os.environ.get("AUDIO_PROFILE", "balanced")
     audio_filterchain(audio_profile)  # early validation
     subtitle_style = os.environ.get("SUBTITLE_STYLE", "signature")
-    if subtitle_style not in ("signature", "classic"):
+    if subtitle_style not in ("signature", "classic", "contrast"):
         raise ValueError("Неизвестный стиль субтитров.")
     hook = os.environ.get("HOOK_TEXT", "").strip()[:70]
-    camera_style = os.environ.get("CAMERA_STYLE", "gentle")
+    camera_style = os.environ.get("CAMERA_STYLE", "off")
     if camera_style not in ("gentle", "off"):
         raise ValueError("Режим камеры должен быть gentle или off.")
     if mode not in ("auto", "captions", "cuts", "reference", "my_style"):
