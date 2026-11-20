@@ -15,9 +15,9 @@ on:
           - cuts
           - reference
       color:
-        description: "Цвет субтитров (#RRGGBB)"
+        description: "Цвет: auto (по стилю) или #RRGGBB"
         required: true
-        default: "#EBC0C8"
+        default: "auto"
         type: string
 
       subtitle_style:
