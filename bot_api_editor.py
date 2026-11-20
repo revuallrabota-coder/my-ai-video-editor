@@ -133,13 +133,20 @@ def main() -> None:
     if subtitle_style not in ("signature", "classic"):
         raise ValueError("Неизвестный стиль субтитров.")
     hook = os.environ.get("HOOK_TEXT", "").strip()[:70]
-    if mode not in ("auto", "captions", "cuts", "reference"):
+    if mode not in ("auto", "captions", "cuts", "reference", "my_style"):
         raise RuntimeError("Неизвестный режим обработки.")
 
     # Старые сообщения не используем. Отправляй файлы только после приглашения.
     recent = call_api(token, "getUpdates", {"offset": -1, "limit": 1, "timeout": 0})
     offset = recent[-1]["update_id"] + 1 if recent else None
-    if mode == "reference":
+    if mode == "my_style":
+        prompt = (
+            "💗 Режим «Мой стиль» запущен!\n"
+            "Пришли ОДНО новое исходное видео до 20 МБ и 2 минут.\n"
+            "Я сделаю плавные приближения, всплывающие розовые субтитры "
+            "и улучшу звучание твоей речи. Референс повторно присылать не нужно."
+        )
+    elif mode == "reference":
         prompt = (
             "🎬 Режим «По референсу» запущен!\n\n"
             "Шаг 1 из 2: пришли СЕЙЧАС видео-референс до 20 МБ "
@@ -231,19 +238,26 @@ def main() -> None:
                 send_text(token, chat_id, "🎧 Исходник получен. Делаю монтаж и улучшаю звучание речи…")
                 try:
                     download_video(token, media["file_id"], original_file)
-                    if mode == "reference":
+                    if mode in ("reference", "my_style"):
                         details = montage_by_reference(
-                            original_file, reference_file, output_file, color, audio_profile,
-                            subtitle_style, hook
+                            original_file,
+                            reference_file if mode == "reference" else None,
+                            output_file, color, audio_profile, subtitle_style, hook
                         )
-                        caption = (
-                            "✅ Первая версия монтажа по референсу готова!\n"
-                            f"Видео: {details['before']} → {details['after']} сек.\n"
-                            f"В референсе обнаружено смен кадров: {details['reference_scene_changes']}.\n"
-                            f"Ритм приближений: ~{details['reference_pace_seconds']} сек.\n"
-                            "Твоя речь сохранена.\n"
-                            "Это подбор темпа, не точное копирование графики и переходов."
-                        )
+                        if mode == "reference":
+                            caption = (
+                                "✅ Монтаж по референсу готов!\n"
+                                f"Видео: {details['before']} → {details['after']} сек.\n"
+                                f"Ритм: ~{details['reference_pace_seconds']} сек.\n"
+                                "Мягкие приближения и всплывающие субтитры.\n"
+                                "Не копируются все сторонние вставки и эффекты."
+                            )
+                        else:
+                            caption = (
+                                "💗 Reels в твоём стиле готов!\n"
+                                f"Видео: {details['before']} → {details['after']} сек.\n"
+                                "Плавные зумы, двухуровневые субтитры и твой голос."
+                            )
                     else:
                         details = edit_video(
                             original_file, output_file, mode, color, audio_profile,
