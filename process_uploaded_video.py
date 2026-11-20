@@ -228,6 +228,13 @@ def main() -> None:
             sound=str(config.get("sound_effects","soft"))
             emoji=str(config.get("emoji_mode","on"))
             subtitle_style=style
+            caption_extras = dict(
+                small_font_profile=str(config.get("small_font_profile","modern")),
+                caption_variant=str(config.get("caption_variant","editorial")),
+                background_style=str(config.get("background_style","occasional")),
+                animation_style=str(config.get("animation_style","float")),
+                subtitle_sfx=str(config.get("subtitle_sfx","soft")),
+            )
             if mode in ("my_style", "reference"):
                 from reference_editor import montage_by_reference
                 montage_by_reference(
@@ -244,6 +251,7 @@ def main() -> None:
                     sound_effects=sound,emoji_mode=emoji,
                     hook_position=str(config.get("hook_position","off")),
                     quality=quality,subtitle_delay=delay,
+                    **caption_extras,
                 )
             else:
                 from telegram_editor import edit_video
@@ -257,6 +265,7 @@ def main() -> None:
                     words,animation,sound,emoji,
                     str(config.get("hook_position","off")),
                     quality,delay,
+                    **caption_extras,
                 )
             if not out.is_file() or out.stat().st_size < 1000:
                 raise RuntimeError("FFmpeg не создал готовый MP4.")
