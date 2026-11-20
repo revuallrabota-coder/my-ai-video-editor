@@ -109,10 +109,10 @@
   <section class="card page" data-page="1">
     <h2>Что делаем</h2>
     <p>Выбери один вариант обработки.</p>
-    <label class="option selected mode"><input type="radio" name="mode" value="Монтаж + субтитры" checked> ✂️ Монтаж + субтитры<small>Убрать паузы и дубли, добавить зумы и подписи.</small></label>
+    <label class="option mode"><input type="radio" name="mode" value="Монтаж + субтитры"> ✂️ Монтаж + субтитры<small>Убрать долгие паузы и добавить подписи. Без смыслового анализа дублей.</small></label>
     <label class="option mode"><input type="radio" name="mode" value="Монтаж без субтитров"> 🎞️ Монтаж без субтитров<small>Только нарезка и движения камеры.</small></label>
     <label class="option mode"><input type="radio" name="mode" value="Только субтитры"> 💬 Только субтитры<small>Не резать видео, добавить оформление речи.</small></label>
-    <label class="option mode"><input type="radio" name="mode" value="Мой стиль"> 💗 Мой стиль — один исходник<small>По сохранённому референсу: мягкие зумы, розовые всплывающие субтитры и чистый голос. Выбери my_style в GitHub Actions, отправь одно видео.</small></label>
+    <label class="option selected mode"><input type="radio" name="mode" value="Мой стиль" checked> 💗 Мой стиль — один исходник<small>По сохранённому референсу: мягкие зумы, розовые всплывающие субтитры и чистый голос. Выбери my_style в GitHub Actions, отправь одно видео.</small></label>
     <label class="option mode"><input type="radio" name="mode" value="По референсу"> 🎬 Монтаж по референсу<small>Первый этап: ритм смен кадров из видео-примера, зумы и субтитры. Для запуска выбери reference в GitHub Actions и отправь два видео в чат.</small></label>
     <h3>Свои фото в ролик</h3>
     <input type="file" id="photos" accept="image/*" multiple>
@@ -126,8 +126,8 @@
       <div class="caption-bg"></div>
       <video id="captionVideo" muted loop playsinline hidden></video>
       <div class="sample" id="sample">
-        <span class="big" id="sampleBig">НАЙДИ ОШИБКУ</span>
-        <span class="small">за три секунды</span>
+        <span class="small">мягко всплывающие</span>
+        <span class="big" id="sampleBig">СУБТИТРЫ</span>
       </div>
     </div>
     <label class="field" for="subtitleStyle">Стиль субтитров</label>
@@ -307,7 +307,7 @@
     byId('sample').style.top=positions[byId('position').value]||'60%';
     big.style.webkitTextStroke=byId('outline').value+'px #211832';
     big.style.textShadow='0 2px '+(Number(byId('shadow').value)+2)+'px #000a';
-    big.textContent=byId('hookText').value.trim() || 'НАЙДИ ОШИБКУ';
+    big.textContent=byId('hookText').value.trim() || 'СУБТИТРЫ';
     byId('outlineValue').textContent=byId('outline').value;
     byId('shadowValue').textContent=byId('shadow').value;
   }
