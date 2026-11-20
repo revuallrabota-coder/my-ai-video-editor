@@ -118,6 +118,7 @@ def render_result(
     subtitle_style: str, hook: str, camera_style: str, speed: float,
     filter_style: str, caption_position: str, font_profile: str,
     reviewed_words: list[tuple[float, float, str]] | None,
+    caption_animation: str = "word_pop",
 ) -> None:
     """Рендер только из одобренной версии текста."""
     try:
@@ -129,6 +130,7 @@ def render_result(
                 camera_style, speed, filter_style,
                 caption_position, font_profile,
                 words_override=reviewed_words,
+                caption_animation=caption_animation,
             )
             caption = (
                 "🎬 Монтаж готов! "
@@ -140,6 +142,7 @@ def render_result(
                 original_file, output_file, mode, color, audio_profile,
                 subtitle_style, hook, speed, filter_style,
                 caption_position, font_profile, reviewed_words,
+                caption_animation,
             )
             caption = (
                 "✅ Готово! "
@@ -180,9 +183,12 @@ def main() -> None:
     subtitle_style = os.environ.get("SUBTITLE_STYLE", "signature")
     if subtitle_style not in ("signature", "classic", "contrast"):
         raise ValueError("Неизвестный стиль субтитров.")
+    caption_animation = os.environ.get("CAPTION_ANIMATION", "word_pop")
+    if caption_animation not in ("word_pop", "phrase_float"):
+        raise ValueError("Неизвестный режим появления слов.")
     hook = os.environ.get("HOOK_TEXT", "").strip()[:70]
-    camera_style = os.environ.get("CAMERA_STYLE", "soft_punch")
-    if camera_style not in ("enhanced", "soft_punch", "gentle", "off"):
+    camera_style = os.environ.get("CAMERA_STYLE", "editorial")
+    if camera_style not in ("editorial", "enhanced", "soft_punch", "gentle", "off"):
         raise ValueError("Неверный режим камеры.")
     try:
         speed = float(os.environ.get("VIDEO_SPEED", "1.0"))
@@ -209,7 +215,7 @@ def main() -> None:
         prompt = (
             "💗 Режим «Мой стиль» запущен!\n"
             "Пришли ОДНО новое исходное видео до 20 МБ и 2 минут.\n"
-            "Я сделаю плавные приближения, всплывающие розовые субтитры "
+            "Я сделаю смену крупности и анимированные субтитры "
             "и улучшу звучание твоей речи. Референс повторно присылать не нужно."
         )
     elif mode == "reference":
@@ -305,6 +311,7 @@ def main() -> None:
                         hook=hook, camera_style=camera_style, speed=speed,
                         filter_style=filter_style, caption_position=caption_position,
                         font_profile=font_profile, reviewed_words=reviewed_words,
+                        caption_animation=caption_animation,
                     )
                     return
 
@@ -356,6 +363,7 @@ def main() -> None:
                             hook=hook, camera_style=camera_style, speed=speed,
                             filter_style=filter_style, caption_position=caption_position,
                             font_profile=font_profile, reviewed_words=None,
+                            caption_animation=caption_animation,
                         )
                         return
                     from telegram_editor import transcribe_words, duration_and_audio
