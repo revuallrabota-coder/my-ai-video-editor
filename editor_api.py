@@ -134,8 +134,8 @@ def validate_settings(config: dict) -> dict:
     mode = option("mode", {"my_style","auto","captions","cuts","reference"}, "my_style")
     style = option(
         "subtitle_style",
-        {"signature","contrast","classic","signature_phrases",
-         "contrast_phrases","classic_phrases"},
+        {"reference_dynamic","signature","contrast","classic",
+         "signature_phrases","contrast_phrases","classic_phrases"},
         "signature",
     )
     font = option("font_profile", {
@@ -161,8 +161,8 @@ def validate_settings(config: dict) -> dict:
         "color": color, "speed": speed,
         "filter_style": option("filter_style", {"warm","none"}, "none"),
         "camera_style": option("camera_style", {
-            "editorial","enhanced","soft_punch","gentle","off",
-        }, "editorial"),
+            "cinematic_pan","editorial","enhanced","soft_punch","gentle","off",
+        }, "cinematic_pan"),
         "audio_profile": option("audio_profile", {
             "balanced","strong","off",
         }, "balanced"),
@@ -170,6 +170,7 @@ def validate_settings(config: dict) -> dict:
             "top","middle","bottom",
         }, "middle"),
         "hook": hook_text,
+        "export_quality": option("export_quality", {"high","balanced"}, "high"),
         "sound_effects": sound,
         "emoji_mode": emoji,
         "hook_position": hook_position,
@@ -237,6 +238,7 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 words_override=words, caption_animation=animation,
                 sound_effects=s["sound_effects"], emoji_mode=s["emoji_mode"],
                 hook_position=s["hook_position"],
+                quality=s["export_quality"],
             )
         else:
             from telegram_editor import edit_video
@@ -246,6 +248,7 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 s["caption_position"], s["font_profile"], words,
                 animation, s["sound_effects"], s["emoji_mode"],
                 s["hook_position"],
+                s["export_quality"],
             )
         if not output.is_file() or output.stat().st_size < 100:
             raise RuntimeError("Обработчик не создал готовый MP4.")
