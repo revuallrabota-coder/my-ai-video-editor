@@ -315,6 +315,10 @@ def write_ass(
     words_override: list[tuple[float, float, str]] | None = None,
     caption_animation: str = "word_pop",
     hook_position: str = "start",
+    small_font_profile: str = "modern",
+    caption_variant: str = "editorial",
+    background_style: str = "occasional",
+    animation_style: str = "float",
 ) -> int:
     words = words_override if words_override is not None else transcribe_words(video_path)
     from reels_effects import add_hook_to_ass
@@ -338,6 +342,10 @@ def write_ass(
         content, count = build_reference_dynamic_ass(
             words, color=color,
             caption_position=caption_position, font_profile=font_profile,
+            small_font_profile=small_font_profile,
+            caption_variant=caption_variant,
+            background_style=background_style,
+            animation_style=animation_style,
         )
         return save_subtitles(content)
 
@@ -447,6 +455,11 @@ def edit_video(
     hook_position: str = "start",
     quality: str = "high",
     subtitle_delay: float = 0.30,
+    small_font_profile: str = "modern",
+    caption_variant: str = "editorial",
+    background_style: str = "occasional",
+    animation_style: str = "float",
+    subtitle_sfx: str = "off",
 ) -> dict:
     from reels_effects import apply_effects, validate_effects
     from speech_review import map_words_to_ranges, shift_word_timestamps
@@ -479,6 +492,10 @@ def edit_video(
                 caption_position=caption_position, font_profile=font_profile,
                 words_override=words, caption_animation=caption_animation,
                 hook_position=hook_position,
+                small_font_profile=small_font_profile,
+                caption_variant=caption_variant,
+                background_style=background_style,
+                animation_style=animation_style,
             )
             if subtitle_events:
                 burn_subtitles(work, ass, staged, quality=quality)
@@ -493,6 +510,7 @@ def edit_video(
             staged, output, words,
             sound=sound_effects, emoji=emoji_mode,
             caption_position=caption_position, quality=quality,
+            caption_sound=subtitle_sfx,
         )
     return {
         "before": round(duration, 1),
