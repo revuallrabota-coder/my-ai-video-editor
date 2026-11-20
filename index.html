@@ -79,7 +79,7 @@
       <div class="logo">🎬</div>
       <div><h1>Мой AI Монтажёр</h1><div class="tiny">Твои видео. Твой стиль.</div></div>
     </div>
-    <span class="tiny">Версия 0.1</span>
+    <span class="tiny">Reels Studio</span>
   </div>
   <div class="progress" id="progress"></div>
 
@@ -120,8 +120,17 @@
   </section>
 
   <section class="card page" data-page="2">
-    <h2>Оформление подписей</h2>
-    <p>Теперь можно выводить **ровно одно слово за раз**, с мягким всплытием, или сохранить прежние субтитры целыми фразами. Предпросмотр условный.</p>
+    <h2>Шрифты и субтитры</h2>
+    <p>Выбери готовый стиль или настрой крупные и мелкие надписи отдельно. Предпросмотр показывает приблизительный вид.</p>
+    <label class="field" for="reelsPreset">Готовый стиль Reels</label>
+    <select id="reelsPreset">
+      <option value="editorial" selected>🎬 Editorial — как в референсе</option>
+      <option value="old_money">🤎 Old Money — сдержанная роскошь</option>
+      <option value="vintage">🎞️ Vintage — плёночная эстетика</option>
+      <option value="street">🖤 Street — уличная типографика</option>
+      <option value="elegant">✨ Elegant — элегантный минимализм</option>
+      <option value="custom">⚙️ Свой набор — выбрать всё отдельно</option>
+    </select>
     <div class="previewbox">
       <div class="caption-bg"></div>
       <video id="captionVideo" muted loop playsinline hidden></video>
@@ -151,7 +160,19 @@
       <option value="classic_phrases">Классический: старый вариант фразами</option>
     </select>
     <p class="note">Новый вариант reference_dynamic чередует крупные красные и маленькие белые слова, иногда добавляет полупрозрачную плашку и плавное движение. Для обычного одного слова за раз выбери signature, contrast или classic. Для старой анимации фразами выбери вариант _phrases. Новые шрифты по присланному референсу: Bebas-стиль, Platform-стиль, Bubble, Script и Modern. Шрифты работают при рендере через GitHub Actions, а предпросмотр здесь приблизительный.</p>
-    <label class="field" for="color">Цвет главного слова</label>
+    <label class="field" for="captionVariant">Вариант цвета и оформления надписей</label>
+    <select id="captionVariant">
+      <option value="editorial" selected>Editorial — красный + белый</option>
+      <option value="old_money">Old Money — песочный + кремовый</option>
+      <option value="vintage">Vintage — терракотовый + бежевый</option>
+      <option value="street">Street — лаймовый + молочный</option>
+      <option value="elegant">Elegant — жемчужный + белый</option>
+      <option value="luxe">Luxe — кофейный</option>
+      <option value="minimal">Minimal — белый</option>
+      <option value="neon">Neon — яркий</option>
+      <option value="pop">Pop — розовый</option>
+    </select>
+    <label class="field" for="color">Цвет крупного слова — можно изменить</label>
     <input type="color" id="color" value="#f0443e">
     <div class="split">
       <div><label class="field" for="fontBig">Крупный шрифт</label>
@@ -164,11 +185,47 @@
           <option value="bubble">Bubble — округлый стикер с обводкой</option>
           <option value="script">Script — декоративный курсив</option>
           <option value="modern">Modern — строгий современный</option>
+          <option value="old_money">Old Money — классическая антиква</option>
+          <option value="vintage">Vintage — ретро курсив</option>
+          <option value="street">Street — плотный графичный</option>
+          <option value="refined">Elegant — утончённый современный</option>
         </select></div>
       <div><label class="field" for="fontSmall">Мелкий шрифт</label>
-        <select id="fontSmall"><option>Классика</option><option>Тонкий</option><option>Журнал</option><option>Минимал</option></select></div>
+        <select id="fontSmall">
+          <option value="modern" selected>Modern — тонкий современный</option>
+          <option value="clean">Clean — простой и читаемый</option>
+          <option value="elegant">Elegant — журнальная классика</option>
+          <option value="bold">Bold — плотный</option>
+          <option value="bebas">Bebas — узкий</option>
+          <option value="platform">Platform — широкий</option>
+          <option value="bubble">Bubble — округлый</option>
+          <option value="script">Script — лёгкий курсив</option>
+          <option value="old_money">Old Money — тонкая антиква</option>
+          <option value="vintage">Vintage — ретро подпись</option>
+          <option value="street">Street — графичный</option>
+          <option value="refined">Elegant — изящный</option>
+        </select></div>
     </div>
-    <label class="field" for="fontFile">Свой шрифт (необязательно)</label>
+    <div class="split">
+      <div>
+        <label class="field" for="captionAnimation">Как появляется текст</label>
+        <select id="captionAnimation">
+          <option value="float" selected>Плавно всплывает</option>
+          <option value="pop">Мягкий Pop</option>
+          <option value="slide">Плавно сбоку</option>
+        </select>
+      </div>
+      <div>
+        <label class="field" for="captionBackground">Подложка для титров</label>
+        <select id="captionBackground">
+          <option value="occasional" selected>Иногда, прозрачная</option>
+          <option value="frequent">Часто, прозрачная</option>
+          <option value="always">Почти всегда</option>
+          <option value="off">Без подложки</option>
+        </select>
+      </div>
+    </div>
+    <label class="field" for="fontFile">Свой шрифт (пока не используется в монтаже)</label>
     <input id="fontFile" type="file" accept=".ttf,.otf">
     <label class="field" for="position">Где стоят подписи</label>
     <select id="position"><option value="middle" selected>Средняя часть кадра</option><option value="top">Верхняя часть кадра</option><option value="bottom">Нижняя часть кадра</option></select>
@@ -177,7 +234,18 @@
     <label class="field" for="shadow">Мягкая тень: <span id="shadowValue">2</span></label>
     <input id="shadow" type="range" min="0" max="10" value="2">
     <label class="option"><input id="emoji" type="checkbox" checked> ✨ Эмодзи к ключевым словам</label>
-    <label class="option"><input id="soundfx" type="checkbox" checked> 🔊 Мягкие звуковые акценты</label>
+    <label class="field" for="soundfx">🔊 Звуковые акценты на ключевых словах</label>
+    <select id="soundfx">
+      <option value="soft" selected>Тихие мягкие акценты</option>
+      <option value="punch">Чуть выразительнее</option>
+      <option value="off">Без акцентов</option>
+    </select>
+    <label class="field" for="subtitleSfx">🎵 Звук появления субтитров</label>
+    <select id="subtitleSfx">
+      <option value="soft" selected>Нежный тихий Pop</option>
+      <option value="tick">Короткий мягкий Tick</option>
+      <option value="off">Без звука</option>
+    </select>
     <label class="option"><input id="hook" type="checkbox"> 🪧 Показать хук на полупрозрачной подложке</label>
     <label class="field" for="hookPosition">Где показать хук</label>
     <select id="hookPosition">
@@ -187,7 +255,7 @@
     </select>
     <label class="field" for="hookText">Текст хука (свой текст)</label>
     <input id="hookText" type="text" maxlength="58" placeholder="Например: Найди ошибку за 3 секунды!">
-    <p class="note">В тестовой версии эти флажки работают через команды в Telegram: /sfx soft, /emoji on, /hook end ТВОЙ ТЕКСТ. Настройки этого экрана пока не отправляются на сервер автоматически.</p>
+    <p class="note">Шрифты, эмодзи, плавные анимации, звук и подложки передаются в новый режим загрузки до 50 МБ. Для старого режима через чат доступны не все настройки.</p>
   </section>
 
   <section class="card page" data-page="3">
@@ -203,7 +271,21 @@
     </select>
     <p class="note">Уменьшаем постоянный фон, сглаживаем громкость речи и защищаем от перегрузки. Голос не заменяется. Сильная очистка иногда искажает речь.</p>
     <label class="field" for="filter">Фильтр</label>
-    <select id="filter"><option value="none" selected>Без фильтра</option><option value="warm">Тёплый</option><option value="soft" disabled>Нежный — скоро</option><option value="cool" disabled>Холодный — скоро</option><option value="contrast" disabled>Контрастный — скоро</option></select>
+    <select id="filter">
+      <option value="none" selected>Без фильтра — точный цвет ногтей</option>
+      <option value="old_money">🤎 Old Money — дорогой сдержанный тон</option>
+      <option value="vintage">🎞️ Vintage — тёплая плёночная эстетика</option>
+      <option value="street">🖤 Street — контрастный уличный</option>
+      <option value="elegant">✨ Elegant — мягкий элегантный</option>
+      <option value="warm">Тёплый</option>
+      <option value="soft">Нежный</option>
+      <option value="cool">Холодный</option>
+      <option value="contrast">Контрастный</option>
+      <option value="clean">Clean Studio — чистый свет</option>
+      <option value="film">Film — мягкий кинотон</option>
+      <option value="matte">Matte — приглушённый</option>
+    </select>
+    <p class="note">Для маникюра, где важен точный оттенок гель-лака, выбирай «Без фильтра» или Clean Studio.</p>
     <label class="field" for="speed">Скорость</label>
     <select id="speed"><option value="1.0" selected>×1.0</option><option value="1.1">×1.1</option><option value="1.2">×1.2</option><option value="1.3">×1.3</option><option value="1.5">×1.5</option></select>
     <label class="field" for="exportQuality">Качество готового видео</label>
@@ -290,12 +372,17 @@
       subtitleStyle:byId('subtitleStyle').value,
       largeFont:byId('fontBig').value,
       smallFont:byId('fontSmall').value,
+      reelsPreset:byId('reelsPreset').value,
+      captionVariant:byId('captionVariant').value,
+      captionAnimation:byId('captionAnimation').value,
+      captionBackground:byId('captionBackground').value,
+      subtitleSfx:byId('subtitleSfx').value,
       customFont:byId('fontFile').files[0] ? byId('fontFile').files[0].name : null,
       captionPosition:byId('position').value,
       outline:Number(byId('outline').value),
       shadow:Number(byId('shadow').value),
       emoji:byId('emoji').checked,
-      soundEffects:byId('soundfx').checked,
+      soundEffects:byId('soundfx').value,
       hook:byId('hook').checked,
       hookPosition:byId('hookPosition').value,
       hookText:byId('hookText').value,
@@ -632,6 +719,11 @@
       subtitle_style:s.subtitleStyle,
       color:s.subtitleColor,
       font_profile:s.largeFont,
+      small_font_profile:s.smallFont,
+      caption_variant:s.captionVariant,
+      background_style:s.captionBackground,
+      animation_style:s.captionAnimation,
+      subtitle_sfx:s.subtitleSfx,
       caption_position:s.captionPosition,
       camera_style:s.cameraStyle,
       audio_profile:s.audioProfile,
@@ -639,7 +731,7 @@
       speed:s.speed,
       export_quality:s.exportQuality,
       subtitle_delay:s.subtitleDelay,
-      sound_effects:s.soundEffects?'soft':'off',
+      sound_effects:s.soundEffects,
       emoji_mode:s.emoji?'on':'off',
       hook:s.hook?s.hookText:'',
       hook_position:s.hook?s.hookPosition:'off'
