@@ -112,6 +112,54 @@ def select_video(message: dict) -> dict | None:
     return None
 
 
+def render_result(
+    token: str, chat_id: int, original_file: Path, reference_file: Path,
+    output_file: Path, *, mode: str, color: str, audio_profile: str,
+    subtitle_style: str, hook: str, camera_style: str, speed: float,
+    filter_style: str, caption_position: str, font_profile: str,
+    reviewed_words: list[tuple[float, float, str]] | None,
+) -> None:
+    """Рендер только из одобренной версии текста."""
+    try:
+        if mode in ("reference", "my_style"):
+            details = montage_by_reference(
+                original_file,
+                reference_file if mode == "reference" else None,
+                output_file, color, audio_profile, subtitle_style, hook,
+                camera_style, speed, filter_style,
+                caption_position, font_profile,
+                words_override=reviewed_words,
+            )
+            caption = (
+                "🎬 Монтаж готов! "
+                f"Длительность: {details['before']} → {details['after']} сек.\n"
+                "Голос сохранён, субтитры из подтверждённого текста."
+            )
+        else:
+            details = edit_video(
+                original_file, output_file, mode, color, audio_profile,
+                subtitle_style, hook, speed, filter_style,
+                caption_position, font_profile, reviewed_words,
+            )
+            caption = (
+                "✅ Готово! "
+                f"Длительность: {details['before']} → {details['after']} сек.\n"
+                "Субтитры из подтверждённого текста."
+            )
+        send_result(token, chat_id, output_file, caption)
+        LOG.info("Готовое видео отправлено")
+    except ValueError as err:
+        send_text(token, chat_id, "⚠️ " + str(err)[:300])
+        LOG.warning("Ошибка исходника/настроек: %s", err)
+    except Exception:
+        LOG.exception("Не удалось выполнить монтаж")
+        send_text(
+            token, chat_id,
+            "⚠️ Не удалось смонтировать ролик. Проверь журнал "
+            "«Запустить тестовый монтаж» в GitHub Actions."
+        )
+
+
 def main() -> None:
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     owner = os.environ.get("OWNER_TELEGRAM_ID")
@@ -190,6 +238,8 @@ def main() -> None:
         original_file = folder / "original.mp4"
         output_file = folder / "ready.mp4"
         has_reference = False
+        pending_words = None
+        pending_chat_id = None
 
         end = time.monotonic() + WAIT_SECONDS
         while time.monotonic() < end:
@@ -215,6 +265,39 @@ def main() -> None:
                 if raw_text == "/help":
                     send_text(token, chat_id, prompt)
                     continue
+
+                if pending_words is not None and pending_chat_id == chat_id:
+                    if raw_text.lower() == "/ok":
+                        reviewed_words = pending_words
+                    elif raw_text.lower().startswith("/text "):
+                        from speech_review import align_corrected_words
+                        from telegram_editor import duration_and_audio
+                        seconds, _ = duration_and_audio(original_file)
+                        try:
+                            reviewed_words = align_corrected_words(
+                                pending_words, raw_text[6:].strip(), seconds
+                            )
+                        except ValueError as err:
+                            send_text(token, chat_id, "⚠️ " + str(err))
+                            continue
+                    else:
+                        if raw_text:
+                            send_text(
+                                token, chat_id,
+                                "Ответь /ok или пришли полную исправленную "
+                                "расшифровку: /text ТВОЯ РЕЧЬ"
+                            )
+                        continue
+                    send_text(token, chat_id, "✅ Текст принят. Монтирую видео…")
+                    render_result(
+                        token, chat_id, original_file, reference_file,
+                        output_file, mode=mode, color=color,
+                        audio_profile=audio_profile, subtitle_style=subtitle_style,
+                        hook=hook, camera_style=camera_style, speed=speed,
+                        filter_style=filter_style, caption_position=caption_position,
+                        font_profile=font_profile, reviewed_words=reviewed_words,
+                    )
+                    return
 
                 media = select_video(message)
                 if media is None:
@@ -253,55 +336,62 @@ def main() -> None:
                         send_text(token, chat_id, "⚠️ Не удалось прочитать референс. Пришли другой файл MP4/MOV.")
                     continue
 
-                send_text(token, chat_id, "🎧 Исходник получен. Делаю монтаж и улучшаю звучание речи…")
+                # До рендера показываем настоящую расшифровку речи.
                 try:
                     download_video(token, media["file_id"], original_file)
-                    if mode in ("reference", "my_style"):
-                        details = montage_by_reference(
-                            original_file,
-                            reference_file if mode == "reference" else None,
-                            output_file, color, audio_profile, subtitle_style, hook,
-                            camera_style, speed, filter_style,
-                            caption_position, font_profile
+                    if mode == "cuts":
+                        render_result(
+                            token, chat_id, original_file, reference_file,
+                            output_file, mode=mode, color=color,
+                            audio_profile=audio_profile, subtitle_style=subtitle_style,
+                            hook=hook, camera_style=camera_style, speed=speed,
+                            filter_style=filter_style, caption_position=caption_position,
+                            font_profile=font_profile, reviewed_words=None,
                         )
-                        if mode == "reference":
-                            caption = (
-                                "✅ Монтаж по референсу готов!\n"
-                                f"Видео: {details['before']} → {details['after']} сек.\n"
-                                f"Ритм: ~{details['reference_pace_seconds']} сек.\n"
-                                "Мягкие приближения и всплывающие субтитры.\n"
-                                "Не копируются все сторонние вставки и эффекты."
-                            )
-                        else:
-                            caption = (
-                                "💗 Reels в твоём стиле готов!\n"
-                                f"Видео: {details['before']} → {details['after']} сек.\n"
-                                "Плавные зумы, двухуровневые субтитры и твой голос."
-                            )
-                    else:
-                        details = edit_video(
-                            original_file, output_file, mode, color, audio_profile,
-                            subtitle_style, hook, speed, filter_style,
-                            caption_position, font_profile
-                        )
-                        caption = (
-                            "✅ Готово!\n"
-                            f"Видео: {details['before']} → {details['after']} сек.\n"
-                            "Оригинальная речь сохранена."
-                        )
-                    send_result(token, chat_id, output_file, caption)
-                    LOG.info("Готовое видео отправлено.")
-                except ValueError as err:
-                    send_text(token, chat_id, "⚠️ " + str(err)[:300])
-                    LOG.warning("Некорректный исходный файл: %s", err)
-                except Exception:
-                    LOG.exception("Не удалось выполнить монтаж")
+                        return
+                    from telegram_editor import transcribe_words, duration_and_audio
+                    from speech_review import plain_transcript
+                    duration_and_audio(original_file)
                     send_text(
                         token, chat_id,
-                        "⚠️ Монтаж не завершён. Открой журнал этого запуска "
-                        "в GitHub Actions, там виден проблемный шаг."
+                        "🎧 Видео получено. Распознаю речь более точной "
+                        "моделью. Сначала пришлю текст для проверки."
                     )
-                return
+                    pending_words = transcribe_words(
+                        original_file, model_size="medium", language="ru"
+                    )
+                    pending_chat_id = chat_id
+                    draft = plain_transcript(pending_words)
+                    if draft:
+                        msg = (
+                            "📝 Черновик субтитров:\n\n" + draft[:3000]
+                            + ("\n\n(Часть текста скрыта.)" if len(draft) > 3000 else "")
+                        )
+                    else:
+                        msg = "⚠️ Речь не удалось уверенно разобрать."
+                    send_text(token, chat_id, msg)
+                    send_text(
+                        token, chat_id,
+                        "Проверь слова ДО монтажа:\n"
+                        "/ok — всё верно;\n"
+                        "/text ТВОЙ ПОЛНЫЙ ТЕКСТ — исправить ошибки.\n\n"
+                        "После подтверждения наложу анимацию и сделаю зум. "
+                        "При больших исправлениях таймкоды приблизительные. "
+                        "На ответ даётся 15 минут."
+                    )
+                    end = time.monotonic() + WAIT_SECONDS
+                except ValueError as err:
+                    send_text(token, chat_id, "⚠️ " + str(err)[:300])
+                    return
+                except Exception:
+                    LOG.exception("Ошибка распознавания речи")
+                    send_text(
+                        token, chat_id,
+                        "⚠️ Не удалось распознать речь. Открой журнал "
+                        "GitHub Actions. Монтаж не запущен."
+                    )
+                    return
+                continue
         LOG.info("Превышено время ожидания.")
         send_text(
             token, owner_id,
