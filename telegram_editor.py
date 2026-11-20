@@ -154,8 +154,9 @@ def base_video(
     speed: float = 1.0,
     filter_style: str = "none",
     quality: str = "high",
+    intermediate: bool = False,
 ) -> None:
-    """Собрать видео с выбранным разрешением без принудительного 720p."""
+    """Собрать видео без потерь от лишнего сжатия на промежуточном этапе."""
     from export_profiles import get_export_profile
     profile = get_export_profile(quality)
     if not 0.8 <= speed <= 1.5:
@@ -208,7 +209,8 @@ def base_video(
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(path), "-filter_complex", ";".join(filters),
         "-map", "[vout]", "-c:v", "libx264", "-preset", profile.preset,
-        "-crf", str(profile.crf), "-pix_fmt", "yuv420p",
+        "-crf", str(min(12, profile.crf) if intermediate else profile.crf),
+        "-pix_fmt", "yuv420p",
     ]
     if has_audio:
         args.extend(["-map", audio_source, "-c:a", "aac", "-b:a", profile.audio_bitrate])
@@ -445,9 +447,10 @@ def edit_video(
     emoji_mode: str = "off",
     hook_position: str = "start",
     quality: str = "high",
+    subtitle_delay: float = 0.30,
 ) -> dict:
     from reels_effects import apply_effects, validate_effects
-    from speech_review import map_words_to_ranges
+    from speech_review import map_words_to_ranges, shift_word_timestamps
     validate_effects(sound_effects, emoji_mode, hook_position)
 
     duration, has_audio = duration_and_audio(original)
@@ -460,13 +463,15 @@ def edit_video(
         base_video(
             original, work, ranges, has_audio,
             audio_profile=audio_profile, speed=speed, filter_style=filter_style,
-            quality=quality,
+            quality=quality, intermediate=True,
         )
         words = (
             map_words_to_ranges(words_override, ranges, speed)
             if words_override is not None else
             (transcribe_words(work) if has_audio and mode != "cuts" else [])
         )
+        work_duration, _ = duration_and_audio(work)
+        words = shift_word_timestamps(words, subtitle_delay, work_duration)
         subtitle_events = 0
         if mode != "cuts" and has_audio:
             ass = folder / "captions.ass"
@@ -494,6 +499,7 @@ def edit_video(
         "before": round(duration, 1),
         "after": round(sum(s.end-s.start for s in ranges) / speed, 1),
         "subtitle_events": subtitle_events,
+        "subtitle_delay": round(subtitle_delay, 2),
         **effect_stats,
     }
 
