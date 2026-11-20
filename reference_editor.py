@@ -327,6 +327,11 @@ def montage_by_reference(
     hook_position: str = "start",
     quality: str = "high",
     subtitle_delay: float = 0.30,
+    small_font_profile: str = "modern",
+    caption_variant: str = "editorial",
+    background_style: str = "occasional",
+    animation_style: str = "float",
+    subtitle_sfx: str = "off",
 ) -> dict:
     """Монтаж с точной синхронизацией речи, динамичным кадром и титрами."""
     from reels_effects import apply_effects, validate_effects
@@ -377,6 +382,10 @@ def montage_by_reference(
             words_override=words,
             caption_animation=caption_animation,
             hook_position=hook_position,
+            small_font_profile=small_font_profile,
+            caption_variant=caption_variant,
+            background_style=background_style,
+            animation_style=animation_style,
         )
         add_virtual_camera(
             joined, dynamic, profile.seconds_per_change,
@@ -388,6 +397,7 @@ def montage_by_reference(
             dynamic, output, words,
             sound=sound_effects, emoji=emoji_mode,
             caption_position=caption_position, quality=quality,
+            caption_sound=subtitle_sfx,
         )
     return {
         "before": round(source_duration, 1),
