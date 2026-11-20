@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 
-from speech_review import align_corrected_words, map_words_to_ranges, plain_transcript
+from speech_review import align_corrected_words, apply_word_fixes, map_words_to_ranges, plain_transcript
 from reference_editor import speech_zoom_windows, smooth_zoom_expression
 from telegram_editor import Segment
 
@@ -26,6 +26,14 @@ class TranscriptReviewTests(unittest.TestCase):
             result=align_corrected_words(source,"Добрый солнечный день",duration=1.5)
             self.assertEqual(plain_transcript(result),"Добрый солнечный день")
             self.assertTrue(all(a < b for a,b,_ in result))
+
+    def test_targeted_fixes_keep_original_timing(self) -> None:
+        original = [(0.1,0.3,"гелак"),(0.31,0.68,"получается"),(0.7,1.1,"плохой")]
+        corrected = apply_word_fixes(original,"гелак=гель-лак; плохой=неровный")
+        self.assertEqual(plain_transcript(corrected),"гель-лак получается неровный")
+        self.assertEqual(corrected[0][0:2], original[0][0:2])
+        with self.assertRaises(ValueError):
+            apply_word_fixes(original, "несуществующее=правильно")
 
     def test_cut_and_speed_timestamp_mapping(self) -> None:
         source=[
