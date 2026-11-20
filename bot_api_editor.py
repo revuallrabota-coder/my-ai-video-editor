@@ -133,9 +133,9 @@ def main() -> None:
     if subtitle_style not in ("signature", "classic", "contrast"):
         raise ValueError("Неизвестный стиль субтитров.")
     hook = os.environ.get("HOOK_TEXT", "").strip()[:70]
-    camera_style = os.environ.get("CAMERA_STYLE", "off")
-    if camera_style not in ("gentle", "off"):
-        raise ValueError("Режим камеры должен быть gentle или off.")
+    camera_style = os.environ.get("CAMERA_STYLE", "soft_punch")
+    if camera_style not in ("soft_punch", "gentle", "off"):
+        raise ValueError("Режим камеры должен быть soft_punch, gentle или off.")
     if mode not in ("auto", "captions", "cuts", "reference", "my_style"):
         raise RuntimeError("Неизвестный режим обработки.")
 
