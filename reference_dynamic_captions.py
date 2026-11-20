@@ -44,7 +44,8 @@ def build_reference_dynamic_ass(
     font = choose_font(font_profile)
     primary = ass_color("#F0443E" if color == "auto" else color)
     white = "&H00FFFFFF&"
-    ybase = {"top": 425, "middle": 740, "bottom": 940}[caption_position]
+    # Безопасная зона Reels: не прячем текст под нижние кнопки/описание.
+    ybase = {"top": 410, "middle": 720, "bottom": 860}[caption_position]
     header = (
         "[Script Info]\nScriptType: v4.00+\n"
         "PlayResX: 720\nPlayResY: 1280\n"
@@ -74,8 +75,33 @@ def build_reference_dynamic_ass(
         context = others[:31] if group_id % 2 == 0 else ""
         emphasized[seq+main] = (group_id, context)
         seq += len(group)
+    # Маленькие служебные слова не должны мелькать по 0.1-0.2 секунды.
+    # Объединяем до трёх подряд в одну читаемую мини-фразу. Крупные
+    # смысловые слова остаются отдельными анимированными акцентами.
+    timed = word_events(words)
+    readable: list[tuple[int, float, float, str]] = []
+    i = 0
+    while i < len(timed):
+        begin, end, word = timed[i]
+        start_index = i
+        if i in emphasized:
+            readable.append((i, begin, end, word))
+            i += 1
+            continue
+        pieces = [word]
+        j = i + 1
+        while j < len(timed) and j not in emphasized and len(pieces) < 3:
+            nxt_start, nxt_end, nxt_word = timed[j]
+            if nxt_start - end > 0.19 or nxt_end - begin > 1.0:
+                break
+            pieces.append(nxt_word)
+            end = nxt_end
+            j += 1
+        readable.append((start_index, begin, end, " ".join(pieces)))
+        i = j
+
     lines: list[str] = []
-    for index, (begin, end, word) in enumerate(word_events(words)):
+    for index, begin, end, word in readable:
         if end - begin < 0.065:
             continue
         group_id, contextual = emphasized.get(index, (-1, ""))
@@ -94,9 +120,9 @@ def build_reference_dynamic_ass(
             (34, 42, 32, 45, 36)[index % 5]
         )
         if len(word) > 12:
-            size = max(37, round(size*.78))
+            size = max(32 if not strong else 37, round(size*.78))
         if len(word) > 17:
-            size = min(size, 49)
+            size = min(size, 44 if strong else 33)
         delta = 24 if strong else 12
         scale = 88 if strong else 96
         shown = safe_text(word).strip()[:42]
