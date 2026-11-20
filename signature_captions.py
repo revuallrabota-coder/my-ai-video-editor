@@ -126,54 +126,62 @@ def build_signature_ass(
     events: list[str] = []
     groups = split_groups(words)
     # Позиция постоянная: субтитры не скачут по экрану между репликами.
-    small_y = 754
-    hero_y = 810
+    # Трёхуровневая композиция с референса:
+    # белый верхний текст / крупное розовое слово / белый нижний текст.
+    top_y = 736
+    hero_y = 794
+    bottom_y = 851
     for index, group in enumerate(groups):
-        # Одна строка живёт всю ФРАЗУ, а не мигает на каждом слове.
-        # Небольшой перекрёстный fade соседних фраз сглаживает смену.
         start = max(0.0, group[0][0] - 0.10)
-        end = group[-1][1] + 0.35
+        end = group[-1][1] + 0.32
         if index + 1 < len(groups):
             following = groups[index + 1][0][0]
-            end = min(end, max(start + 0.22, following + 0.075))
+            end = min(end, max(start + 0.24, following + 0.06))
         duration_ms = max(1, round((end - start) * 1000))
         if duration_ms < 220:
             continue
 
-        # Для коротких фраз не даём анимации занять всё время показа.
-        fade_in = min(280, max(75, round(duration_ms * 0.25)))
-        fade_out = min(230, max(70, round(duration_ms * 0.21)))
-        rise_ms = min(460, max(180, round(duration_ms * 0.5)))
+        fade_in = min(310, max(100, round(duration_ms * 0.28)))
+        fade_out = min(240, max(70, round(duration_ms * 0.21)))
+        rise_ms = min(470, max(170, round(duration_ms * 0.47)))
 
         main_index = pick_main_word(group)
-        main_word = safe_text(group[main_index][2]).strip(" ,.")
-        other = safe_text(" ".join(
-            w[2] for i, w in enumerate(group) if i != main_index
-        ))
+        before = safe_text(" ".join(item[2] for item in group[:main_index]))
+        main = safe_text(group[main_index][2]).strip(" ,.")
+        after = safe_text(" ".join(item[2] for item in group[main_index + 1:]))
 
-        # Никакого скачка на 25 пикселей и резкого увеличения на 14%:
-        # всего 7–11 пикселей подъёма и 4–6% изменения масштаба.
-        if other:
-            small = (
-                r"{\an5\move(360,761,360," + str(small_y) + ",0," + str(rise_ms) + ")"
+        def animate_line(content: str, target_y: int) -> str:
+            # Небольшой подъём на 8 пикселей за 0.3–0.5 с,
+            # кросс-фейд и масштабирование лишь на 3%.
+            return (
+                r"{\an5\move(360," + str(target_y + 8) + ",360,"
+                + str(target_y) + ",0," + str(rise_ms) + ")"
                 r"\fad(" + str(fade_in) + "," + str(fade_out) + ")"
                 r"\fscx97\fscy97\blur0.35"
                 r"\t(0," + str(rise_ms) + r",0.65,\fscx100\fscy100)}"
-                + other
+                + content
             )
-            events.append(event(0, start, end, "Whisper", small))
 
-        if main_word:
-            word = main_word.upper()
-            size = 74 if len(word) <= 10 else 63 if len(word) <= 13 else 52
+        if before:
+            events.append(event(
+                0, start, end, "Whisper", animate_line(before, top_y)
+            ))
+        if main:
+            main = main.upper()
+            size = 74 if len(main) <= 10 else 63 if len(main) <= 13 else 52
             hero = (
-                r"{\an5\move(360,821,360," + str(hero_y) + ",0," + str(rise_ms) + ")"
+                r"{\an5\move(360," + str(hero_y + 11) + ",360,"
+                + str(hero_y) + ",0," + str(rise_ms) + ")"
                 r"\fad(" + str(fade_in) + "," + str(fade_out) + ")"
                 r"\fscx94\fscy94\blur0.4"
                 r"\t(0," + str(rise_ms) + r",0.65,\fscx100\fscy100)"
-                r"\fs" + str(size) + "}" + word
+                r"\fs" + str(size) + "}" + main
             )
             events.append(event(1, start, end, "Accent", hero))
+        if after:
+            events.append(event(
+                0, start, end, "Whisper", animate_line(after, bottom_y)
+            ))
 
     hook = safe_text(hook)[:70]
     if hook and groups:
