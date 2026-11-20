@@ -35,14 +35,32 @@ on:
         default: ""
         type: string
       camera_style:
-        description: "Приближение: как в примере, лёгкое или без зума"
+        description: "Камера: усиленная (как на записи), стандарт или без зума"
         required: true
-        default: soft_punch
+        default: enhanced
         type: choice
         options:
+          - enhanced
           - soft_punch
           - gentle
           - "off"
+      video_speed:
+        description: "Скорость видео, включая речь"
+        required: true
+        default: "1.1"
+        type: choice
+        options:
+          - "1.0"
+          - "1.1"
+          - "1.2"
+      video_filter:
+        description: "Цветокоррекция"
+        required: true
+        default: warm
+        type: choice
+        options:
+          - warm
+          - none
       audio_profile:
         description: "Звук: очистка от шума и ровная громкость"
         required: true
@@ -96,5 +114,7 @@ jobs:
           AUDIO_PROFILE: ${{ inputs.audio_profile }}
           SUBTITLE_STYLE: ${{ inputs.subtitle_style }}
           CAMERA_STYLE: ${{ inputs.camera_style }}
+          VIDEO_SPEED: ${{ inputs.video_speed }}
+          VIDEO_FILTER: ${{ inputs.video_filter }}
           HOOK_TEXT: ${{ inputs.hook_text }}
         run: python bot_api_editor.py
