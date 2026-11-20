@@ -16,7 +16,7 @@ from urllib.parse import quote
 
 import requests
 
-from bot_api_editor import call_api, render_result, send_text
+from bot_api_editor import call_api, send_result, send_text
 from speech_review import (
     align_corrected_words, apply_word_fixes, plain_transcript,
 )
@@ -101,6 +101,36 @@ def release_upload(worker_url: str, upload_id: str, token: str) -> None:
         )
     except requests.RequestException:
         LOG.warning("KV cleanup unavailable; keys have automatic TTL.")
+
+
+def publish_large_mp4(worker_url: str, upload_id: str, token: str, file: Path) -> None:
+    """Keep the original-quality output in private KV instead of recompressing."""
+    size=file.stat().st_size
+    if size>250_000_000:
+        raise ValueError("Готовый MP4 больше 250 МБ: временное хранилище переполнится.")
+    url=worker_url.rstrip("/")+"/internal/upload/"+upload_id+"/result"
+    headers={"Authorization":"Bearer "+token}
+    chunk_size=4_000_000
+    parts=(size+chunk_size-1)//chunk_size
+    with requests.Session() as session:
+        response=session.post(url+"/start",headers=headers,json={"size":size},timeout=40)
+        response.raise_for_status()
+        with file.open("rb") as stream:
+            for i in range(parts):
+                data=stream.read(chunk_size)
+                response=session.put(
+                    url+"/"+str(i),headers=headers,data=data,timeout=(20,120)
+                )
+                response.raise_for_status()
+                LOG.info("Secure output uploaded part %d/%d",i+1,parts)
+        for attempt in range(10):
+            response=session.post(url+"/finish",headers=headers,timeout=50)
+            if response.ok:
+                return
+            if response.status_code!=409:
+                response.raise_for_status()
+            time.sleep(min(3+attempt*2,15))
+        raise RuntimeError("Не удалось проверить MP4 в KV после передачи.")
 
 
 def wait_for_transcript_review(
@@ -192,23 +222,67 @@ def main() -> None:
             style=selected_style.removesuffix("_phrases")
             if style not in ("reference_dynamic","signature","contrast","classic"):
                 raise ValueError("Недопустимый стиль субтитров.")
-            render_result(
-                token,owner,source,reference,out,
-                mode=mode,color=str(config.get("color","auto")),
-                audio_profile=str(config.get("audio_profile","balanced")),
-                subtitle_style=style,hook=str(config.get("hook","")),
-                camera_style=str(config.get("camera_style","cinematic_pan")),
-                speed=float(config.get("video_speed","1.0")),
-                filter_style=str(config.get("video_filter","none")),
-                caption_position=str(config.get("caption_position","middle")),
-                font_profile=str(config.get("font_profile","elegant")),
-                reviewed_words=words,caption_animation=animation,
-                sound_effects=str(config.get("sound_effects","soft")),
-                emoji_mode=str(config.get("emoji_mode","on")),
-                hook_position=str(config.get("hook_position","off")),
-                quality=str(config.get("export_quality","high")),
-                subtitle_delay=delay,
-            )
+            quality=str(config.get("export_quality","high"))
+            audio_profile=str(config.get("audio_profile","balanced"))
+            color=str(config.get("color","auto"))
+            sound=str(config.get("sound_effects","soft"))
+            emoji=str(config.get("emoji_mode","on"))
+            subtitle_style=style
+            if mode in ("my_style", "reference"):
+                from reference_editor import montage_by_reference
+                montage_by_reference(
+                    source,None,out,color=color,
+                    audio_profile=audio_profile,subtitle_style=subtitle_style,
+                    hook=str(config.get("hook","")),
+                    camera_style=str(config.get("camera_style","cinematic_pan")),
+                    speed=float(config.get("video_speed","1.0")),
+                    filter_style=str(config.get("video_filter","none")),
+                    caption_position=str(config.get("caption_position","middle")),
+                    font_profile=str(config.get("font_profile","elegant")),
+                    words_override=words,
+                    caption_animation=animation,
+                    sound_effects=sound,emoji_mode=emoji,
+                    hook_position=str(config.get("hook_position","off")),
+                    quality=quality,subtitle_delay=delay,
+                )
+            else:
+                from telegram_editor import edit_video
+                edit_video(
+                    source,out,mode,color,audio_profile,subtitle_style,
+                    str(config.get("hook","")),
+                    float(config.get("video_speed","1.0")),
+                    str(config.get("video_filter","none")),
+                    str(config.get("caption_position","middle")),
+                    str(config.get("font_profile","elegant")),
+                    words,animation,sound,emoji,
+                    str(config.get("hook_position","off")),
+                    quality,delay,
+                )
+            if not out.is_file() or out.stat().st_size < 1000:
+                raise RuntimeError("FFmpeg не создал готовый MP4.")
+            if out.stat().st_size<=48_000_000:
+                send_result(
+                    token,owner,out,
+                    "🎬 Reels готов! Субтитры привязаны к речи, Full HD "
+                    "и монтаж сохранены в MP4."
+                )
+            else:
+                send_text(
+                    token,owner,
+                    "🎞 Ролик смонтирован в высоком качестве ("+
+                    str(round(out.stat().st_size/1_000_000,1))+
+                    " МБ). Он больше лимита отправки Telegram, "
+                    "поэтому сохраняю оригинальный MP4 для скачивания "
+                    "через мини-приложение."
+                )
+                publish_large_mp4(worker_url,upload_id,token,out)
+                send_text(
+                    token,owner,
+                    "✅ MP4 готов! Открой своё Telegram Mini App, "
+                    "перейди к последнему экрану и нажми "
+                    "«Проверить готовность / скачать Full HD»."
+                )
+
         except Exception as exc:
             LOG.exception("Private upload montage failed")
             send_text(
