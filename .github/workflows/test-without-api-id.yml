@@ -35,9 +35,9 @@ on:
         default: ""
         type: string
       camera_style:
-        description: "Камера: усиленная (как на записи), стандарт или без зума"
+        description: "Камера: усиленная, стандартная, мягкая или без зума"
         required: true
-        default: enhanced
+        default: soft_punch
         type: choice
         options:
           - enhanced
@@ -47,7 +47,7 @@ on:
       video_speed:
         description: "Скорость видео, включая речь"
         required: true
-        default: "1.1"
+        default: "1.0"
         type: choice
         options:
           - "1.0"
@@ -56,11 +56,29 @@ on:
       video_filter:
         description: "Цветокоррекция"
         required: true
-        default: warm
+        default: none
         type: choice
         options:
           - warm
           - none
+      caption_position:
+        description: "Расположение субтитров"
+        required: true
+        default: middle
+        type: choice
+        options:
+          - top
+          - middle
+          - bottom
+      font_profile:
+        description: "Шрифт акцентных слов"
+        required: true
+        default: elegant
+        type: choice
+        options:
+          - elegant
+          - clean
+          - bold
       audio_profile:
         description: "Звук: очистка от шума и ровная громкость"
         required: true
@@ -116,5 +134,7 @@ jobs:
           CAMERA_STYLE: ${{ inputs.camera_style }}
           VIDEO_SPEED: ${{ inputs.video_speed }}
           VIDEO_FILTER: ${{ inputs.video_filter }}
+          CAPTION_POSITION: ${{ inputs.caption_position }}
+          FONT_PROFILE: ${{ inputs.font_profile }}
           HOOK_TEXT: ${{ inputs.hook_text }}
         run: python bot_api_editor.py
