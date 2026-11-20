@@ -133,6 +133,9 @@ def main() -> None:
     if subtitle_style not in ("signature", "classic"):
         raise ValueError("Неизвестный стиль субтитров.")
     hook = os.environ.get("HOOK_TEXT", "").strip()[:70]
+    camera_style = os.environ.get("CAMERA_STYLE", "gentle")
+    if camera_style not in ("gentle", "off"):
+        raise ValueError("Режим камеры должен быть gentle или off.")
     if mode not in ("auto", "captions", "cuts", "reference", "my_style"):
         raise RuntimeError("Неизвестный режим обработки.")
 
@@ -242,7 +245,8 @@ def main() -> None:
                         details = montage_by_reference(
                             original_file,
                             reference_file if mode == "reference" else None,
-                            output_file, color, audio_profile, subtitle_style, hook
+                            output_file, color, audio_profile, subtitle_style, hook,
+                            camera_style
                         )
                         if mode == "reference":
                             caption = (
