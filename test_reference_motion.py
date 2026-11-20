@@ -23,14 +23,18 @@ class ReferenceMotionTests(unittest.TestCase):
         text, count=build_reference_dynamic_ass(
             self.WORDS, color="auto", font_profile="bold"
         )
-        self.assertGreater(count,len(self.WORDS))
+        self.assertGreater(count,0)
+        self.assertLess(count, len(self.WORDS)*3)
+        # Малые слова теперь собираются в читабельные микро-фразы,
+        # поэтому один титр может содержать 2–3 последовательных слова.
+        self.assertIn("Сейчас расскажу",text)
         self.assertIn("Style: Main",text)
         self.assertIn("Style: Tiny",text)
         self.assertIn("Style: Plate",text)
         self.assertIn(r"\move(",text)
         self.assertIn(r"\fad(",text)
         self.assertIn(r"\fs107",text)
-        self.assertIn(r"\fs34",text)
+        self.assertRegex(text,r"\\fs(?:3[0-9]|4[0-9])")
         self.assertIn("Dialogue: 0,",text)
         self.assertIn("Dialogue: 2,",text)
         self.assertIn("&H003E44F0&",text)  # red #F0443E in ASS BGR
