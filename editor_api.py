@@ -139,15 +139,15 @@ def validate_settings(config: dict) -> dict:
         "signature",
     )
     font = option("font_profile", {
-        "elegant","clean","bold","bebas","platform","bubble","script","modern",
+        "elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined",
     }, "elegant")
     choose_font(font)
     small_font = option("small_font_profile",{
-        "elegant","clean","bold","bebas","platform","bubble","script","modern",
+        "elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined",
     },"modern")
     choose_font(small_font)
     caption_variant=option("caption_variant",{
-        "editorial","luxe","minimal","neon","pop"
+        "editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant"
     },"editorial")
     background_style=option("background_style",{
         "off","occasional","frequent","always"
@@ -185,7 +185,7 @@ def validate_settings(config: dict) -> dict:
         "subtitle_sfx":subtitle_sfx,
         "color": color, "speed": speed,
         "filter_style": option("filter_style", {
-            "none","warm","soft","cool","contrast","clean","film","matte",
+            "none","warm","soft","cool","contrast","clean","film","matte","old_money","vintage","street","elegant",
         }, "none"),
         "camera_style": option("camera_style", {
             "cinematic_pan","editorial","enhanced","soft_punch","gentle","off",
