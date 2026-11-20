@@ -100,11 +100,57 @@ def _smoothstep(t: str, offset: int, frames: int) -> str:
     return f"({x}*{x}*(3-2*{x}))"
 
 
+def speech_zoom_windows(
+    words: list[tuple[float, float, str]],
+    duration: float,
+    *, max_count: int = 18,
+) -> list[tuple[float, float]]:
+    """Выбирает начала фраз и паузы, а не механический таймер."""
+    if duration < 2.5 or not words:
+        return []
+    starts = [float(words[0][0])]
+    for previous, current in zip(words, words[1:]):
+        if current[0] - previous[1] >= 0.38:
+            starts.append(float(current[0]))
+    candidates = [x for x in starts if 1.0 <= x <= duration - 1.7]
+    if not candidates:
+        candidates = [min(1.4, duration / 4)]
+    selected: list[tuple[float, float]] = []
+    last = -10.0
+    for t in candidates:
+        if t - last < 5.0:
+            continue
+        if len(selected) >= max_count:
+            break
+        selected.append((t, min(duration - 0.35, t + 3.6)))
+        last = t
+    return selected
+
+
+def smooth_zoom_expression(
+    windows: list[tuple[float, float]],
+    amplitude: float,
+) -> str:
+    """Выражение FFmpeg с плавным ускорением и замедлением."""
+    def ramp(frame: int, count: int = 18) -> str:
+        ratio = f"max(0,min(1,(on-{frame})/{count}))"
+        return f"({ratio}*{ratio}*(3-2*{ratio}))"
+    if not windows:
+        return "min(1.04,1+on*0.0001)"
+    parts = []
+    for begin, end in windows:
+        start_frame = max(0, round(begin * 30))
+        end_frame = max(start_frame + 20, round(end * 30))
+        parts.append(f"{amplitude:.3f}*({ramp(start_frame)}-{ramp(end_frame)})")
+    return "1+" + "+".join(parts)
+
+
 def add_virtual_camera(
     source: Path,
     output: Path,
     cadence: float,
     camera_style: str = "soft_punch",
+    words: list[tuple[float, float, str]] | None = None,
 ) -> None:
     """Плавные приближения с задержками на крупном плане.
 
@@ -129,6 +175,12 @@ def add_virtual_camera(
         return
     if camera_style == "gentle":
         zoom = "min(1.025,1+on*0.00012)"
+    elif words:
+        duration, _ = duration_and_audio(source)
+        windows = speech_zoom_windows(words, duration)
+        amplitude = 0.20 if camera_style == "enhanced" else 0.16
+        zoom = smooth_zoom_expression(windows, amplitude)
+        LOG.info("Speech-aware zooms: %d intervals", len(windows))
     else:
         # Плавная монтажная смена крупности (вместо «дышащего» зума).
         # Период 13 сек, за одну серию: широкий -> близкий -> широкий.
@@ -176,6 +228,7 @@ def montage_by_reference(
     filter_style: str = "none",
     caption_position: str = "middle",
     font_profile: str = "elegant",
+    words_override: list[tuple[float, float, str]] | None = None,
 ) -> dict:
     """Монтаж с нарезкой тишины, ритмом референса и живыми субтитрами."""
     # Без второго файла используем постоянный темп из разобранного
@@ -199,10 +252,21 @@ def montage_by_reference(
             original, joined, kept, source_has_audio,
             audio_profile=audio_profile, speed=speed, filter_style=filter_style,
         )
-        add_virtual_camera(joined, dynamic, profile.seconds_per_change, camera_style=camera_style)
+        from speech_review import map_words_to_ranges
+        from telegram_editor import transcribe_words
+
+        if words_override is not None:
+            words = map_words_to_ranges(words_override, kept, speed)
+        else:
+            words = transcribe_words(joined)
+        add_virtual_camera(
+            joined, dynamic, profile.seconds_per_change,
+            camera_style=camera_style, words=words,
+        )
         count = write_ass(
             dynamic, subtitles, color, style=subtitle_style, hook=hook,
             caption_position=caption_position, font_profile=font_profile,
+            words_override=words,
         )
         if count:
             burn_subtitles(dynamic, subtitles, output)
