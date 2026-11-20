@@ -11,6 +11,8 @@ on:
       - "test_speech_review.py"
       - "word_captions.py"
       - "test_word_captions.py"
+      - "reels_effects.py"
+      - "test_reels_effects.py"
       - "test_audio_pipeline.py"
       - "signature_captions.py"
       - "test_signature_captions.py"
@@ -33,11 +35,11 @@ jobs:
         with:
           python-version: "3.11"
       - name: "Шрифт для крупного розового курсива"
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-liberation fonts-dejavu-core
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-liberation fonts-dejavu-core fonts-noto-color-emoji
       - name: "Зависимости для проверки"
-        run: python -m pip install "telethon>=1.40,<2" "requests>=2.31,<3"
+        run: python -m pip install "telethon>=1.40,<2" "requests>=2.31,<3" "Pillow>=10,<13"
       - name: "Проверить синтаксис Python"
-        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py speech_review.py word_captions.py
+        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py speech_review.py word_captions.py reels_effects.py
       - name: "Проверить правки распознавания и зум по фразам"
         run: python -m unittest -v test_speech_review.py
 
