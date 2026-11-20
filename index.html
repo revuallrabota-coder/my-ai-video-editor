@@ -298,53 +298,44 @@
   </section>
 
   <section class="card page" data-page="4">
-    <h2>Готовим монтаж</h2>
-    <p>Проверь настройки и выбери: загрузить оригинальный файл до 50 МБ из приложения через Cloudflare KV либо использовать прежний запуск на 20 МБ через Telegram. Без карты и без Render.</p>
+    <h2>Готовим Reels</h2>
+    <p>Проверь выбранные параметры и запускай монтаж одной кнопкой. Стили и фильтры применяются к видео в обработчике GitHub Actions.</p>
     <div id="summary"></div>
     <div class="alert" style="margin:16px 0">
-      <strong>🎞 Загрузить исходник прямо из приложения · до 50 МБ</strong>
-      <p class="note">Не нужен Render или иностранная карта. Видео отправляется частями в приватное хранилище Cloudflare KV, а смонтированный MP4 бот возвращает как файл в Telegram. <strong>Важно:</strong> сначала нужно подключить KV с именем UPLOADS и обновить код Worker по нашей инструкции. На iPad держи приложение открытым во время передачи файла.</p>
-      <button class="btn primary" id="upload50Button" type="button" style="width:100%;margin-top:10px">📤 Загрузить и смонтировать до 50 МБ</button>
+      <strong>🎬 Монтаж Reels · до 50 МБ</strong>
+      <p class="note">Исходник загрузится из приложения частями. После этого бот пришлёт черновик речи на проверку, затем готовый MP4 без дополнительного сжатия в Telegram.</p>
+      <label class="field" for="launcherBase">Адрес Cloudflare (настраивается один раз)</label>
+      <input id="launcherBase" type="url" inputmode="url" autocomplete="off" placeholder="https://твой-worker.workers.dev" style="width:100%;max-width:100%">
+      <button class="btn primary" id="upload50Button" type="button" style="width:100%;margin-top:12px">🎬 Смонтировать Reels</button>
       <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
-      <p class="mini" id="upload50Status" role="status" aria-live="polite">Использует адрес Cloudflare из поля ниже.</p>
-      <button class="btn" id="checkUploadedResult" type="button" style="width:100%;margin-top:8px">⬇️ Проверить готовность / скачать Full HD</button>
-      <p class="mini"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/CLOUDFLARE_50MB.md" target="_blank" rel="noopener noreferrer">Как один раз подключить хранилище KV на iPad</a></p>
+      <p class="mini" id="upload50Status" role="status" aria-live="polite">Поддержка до 50 МБ требует подключённого Cloudflare KV. Видео сохраняем в Full HD.</p>
+      <button class="btn secondary" id="checkUploadedResult" type="button" style="width:100%;margin-top:8px" hidden>⬇️ Скачать готовое Full HD</button>
+      <details style="margin-top:12px">
+        <summary style="cursor:pointer;font-weight:650">Первое подключение Cloudflare · инструкция</summary>
+        <p class="note">Нужно один раз привязать KV-хранилище под именем <strong>UPLOADS</strong> и опубликовать новый код Worker.</p>
+        <p class="note"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/CLOUDFLARE_50MB.md" target="_blank" rel="noopener noreferrer">Как включить загрузку до 50 МБ на iPad</a></p>
+      </details>
     </div>
-    <div class="alert" style="margin:16px 0">
-      <strong>🆓 Без банковской карты: Cloudflare + GitHub Actions</strong>
-      <p class="note">Бесплатная альтернатива Render. Выбираешь стиль здесь, нажимаешь запуск, а когда наш Telegram-бот попросит видео, отправляешь ему исходник <strong>в чат до 20 МБ</strong>. Готовый ролик бот пришлёт обратно. Видео из поля выбора в приложении при этом <strong>не загружается</strong>: оно понадобится для будущего прямого сервера.</p>
-      <label class="field" for="launcherBase">Адрес твоего Cloudflare Worker</label>
-      <input id="launcherBase" type="url" inputmode="url" autocomplete="off" placeholder="https://my-video-editor.ИМЯ.workers.dev" style="width:100%;max-width:100%">
-      <button class="btn primary" id="launchWithoutCard" type="button" style="width:100%;margin-top:12px">▶️ Запустить монтаж без карты</button>
-      <p class="mini" id="launchStatus" role="status" aria-live="polite">Для этой кнопки нужно один раз создать бесплатный Cloudflare Worker и указать его HTTPS-адрес.</p>
-      <p class="mini"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/CLOUDFLARE_NO_CARD.md" target="_blank" rel="noopener noreferrer">Инструкция подключения Cloudflare на iPad</a></p>
-    </div>
-    <div class="alert" style="margin:16px 0">
-      <strong>🎞 Настоящий монтаж через сервер</strong>
-      <p class="note">Сначала размести наш backend на Render и вставь HTTPS-адрес сервера. Адрес сервера сохраняется только в браузере на этом устройстве. <strong>Токен бота здесь вводить нельзя.</strong></p>
-      <label class="field" for="apiBase">Адрес твоего сервера</label>
-      <input id="apiBase" type="url" inputmode="url" placeholder="https://my-ai-video-editor-api.onrender.com" autocomplete="off" style="width:100%;max-width:100%">
-      <div class="mini">Для работы открой Mini App через кнопку своего Telegram-бота. Первый тест: одно видео 10–20 секунд, желательно до 20 МБ.</div>
-      <button class="btn primary" type="button" style="width:100%;margin-top:12px" id="startRender">🎬 Монтировать видео</button>
-      <p class="mini" id="renderStatus" role="status" aria-live="polite">Сервер пока не подключён.</p>
-      <progress id="uploadProgress" max="100" value="0" style="width:100%" hidden></progress>
+    <!-- Скрытые элементы прежних прототипов сохраняют совместимость JS,
+         но не мешают пользователю десятком дублирующих кнопок. -->
+    <div id="legacyControls" hidden aria-hidden="true">
+      <button id="launchWithoutCard" type="button">Старый запуск GitHub Actions</button>
+      <p id="launchStatus"></p>
+      <input id="apiBase" type="url" autocomplete="off">
+      <button id="startRender" type="button">Старый запуск сервера</button>
+      <p id="renderStatus"></p>
+      <progress id="uploadProgress" max="100" value="0"></progress>
       <div id="reviewPanel" hidden>
-        <h3>📝 Проверь распознанные слова</h3>
-        <p class="note">Если ИИ ошибся, исправь текст ниже. После подтверждения он попадёт в субтитры.</p>
-        <textarea id="reviewTranscript" rows="5" style="width:100%;font:inherit;border:1px solid #d9c9e6;border-radius:12px;padding:10px"></textarea>
-        <button class="btn primary" id="confirmTranscript" type="button" style="width:100%;margin:12px 0">✅ Продолжить монтаж</button>
+        <textarea id="reviewTranscript"></textarea>
+        <button id="confirmTranscript" type="button">Подтвердить текст</button>
       </div>
-      <button class="btn primary" id="downloadResult" type="button" style="width:100%" hidden>⬇️ Скачать готовый MP4</button>
+      <button id="downloadResult" type="button" hidden>Скачать MP4</button>
+      <button id="saveButton" type="button">Скачать настройки</button>
+      <div id="ownerIdCard" hidden>
+        <span id="ownerIdValue"></span>
+        <button id="copyOwnerId" type="button">Скопировать ID</button>
+      </div>
     </div>
-    <button class="btn primary" type="button" style="width:100%;margin:14px 0" id="saveButton">Скачать настройки</button>
-    <div id="ownerIdCard" class="alert" hidden style="margin:12px 0">
-      <strong>Твой Telegram ID: <span id="ownerIdValue"></span></strong>
-      <p style="margin:6px 0">Это число нужно в защищённой переменной OWNER_TELEGRAM_ID сервера Render (и в GitHub Actions для старого теста). Не путай с токеном.</p>
-      <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
-    </div>
-    <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
-    <p class="note">Референсный типографический режим reference_dynamic, движение cinematic_pan и Full HD уже подключены к коду. После подключения Render видео и выбранные настройки отправляются прямо на твой сервер. Исправление субтитров происходит здесь, а результат скачивается MP4. Без подключённого сервера доступен только предпросмотр и сохранение настроек. GitHub Actions остаётся запасным ручным способом. Сейчас работают вертикальный экспорт, поштучные либо фразовые субтитры, варианты Zoom, шрифты, фильтры, обработка голоса, простые эмодзи и звуковые акценты. Реалистичная AI-замена одежды или фона, добавление личных фотографий и загрузка собственных шрифтов пока не входят в этот серверный режим.</p>
-    <div class="alert"><strong>Первый тест:</strong> сервер ещё нужно развернуть на Render. Бесплатная конфигурация имеет ограниченные ресурсы и может прерывать длительный монтаж. Готовый MP4 пока скачивается в приложение/на устройство, а не отправляется автоматически сообщением в Telegram.</div>
   </section>
 </div>
 <footer class="footer"><div class="footer-inner"><button type="button" class="btn secondary" id="back" hidden>← Назад</button><button type="button" class="btn primary" id="next">Дальше →</button></div></footer>
