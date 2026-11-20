@@ -151,6 +151,12 @@ def validate_settings(config: dict) -> dict:
         raise HTTPException(400, "Неверная скорость.") from None
     if not 0.8 <= speed <= 1.5:
         raise HTTPException(400, "Скорость должна быть между 0.8 и 1.5.")
+    try:
+        subtitle_delay = float(config.get("subtitle_delay", 0.30))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Неверная синхронизация субтитров.") from None
+    if not -0.5 <= subtitle_delay <= 1.5:
+        raise HTTPException(400, "Сдвиг титров от -0.5 до +1.5 секунды.")
     hook_text = str(config.get("hook", "")).strip()[:58]
     sound = option("sound_effects", {"off","soft","punch"}, "off")
     emoji = option("emoji_mode", {"off","on"}, "off")
@@ -170,6 +176,7 @@ def validate_settings(config: dict) -> dict:
             "top","middle","bottom",
         }, "middle"),
         "hook": hook_text,
+        "subtitle_delay": subtitle_delay,
         "export_quality": option("export_quality", {"high","balanced"}, "high"),
         "sound_effects": sound,
         "emoji_mode": emoji,
@@ -239,6 +246,7 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 sound_effects=s["sound_effects"], emoji_mode=s["emoji_mode"],
                 hook_position=s["hook_position"],
                 quality=s["export_quality"],
+                subtitle_delay=s["subtitle_delay"],
             )
         else:
             from telegram_editor import edit_video
@@ -248,7 +256,7 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 s["caption_position"], s["font_profile"], words,
                 animation, s["sound_effects"], s["emoji_mode"],
                 s["hook_position"],
-                s["export_quality"],
+                s["export_quality"], s["subtitle_delay"],
             )
         if not output.is_file() or output.stat().st_size < 100:
             raise RuntimeError("Обработчик не создал готовый MP4.")
