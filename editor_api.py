@@ -142,6 +142,22 @@ def validate_settings(config: dict) -> dict:
         "elegant","clean","bold","bebas","platform","bubble","script","modern",
     }, "elegant")
     choose_font(font)
+    small_font = option("small_font_profile",{
+        "elegant","clean","bold","bebas","platform","bubble","script","modern",
+    },"modern")
+    choose_font(small_font)
+    caption_variant=option("caption_variant",{
+        "editorial","luxe","minimal","neon","pop"
+    },"editorial")
+    background_style=option("background_style",{
+        "off","occasional","frequent","always"
+    },"occasional")
+    animation_style=option("animation_style",{
+        "float","pop","slide"
+    },"float")
+    subtitle_sfx=option("subtitle_sfx",{
+        "off","soft","tick"
+    },"soft")
     color = str(config.get("color", "auto"))
     if color != "auto" and not re.fullmatch(r"#[a-fA-F0-9]{6}", color):
         raise HTTPException(400, "Цвет должен быть auto или #RRGGBB")
@@ -164,8 +180,13 @@ def validate_settings(config: dict) -> dict:
     validate_effects(sound, emoji, hook_position)
     return {
         "mode": mode, "subtitle_style": style, "font_profile": font,
+        "small_font_profile":small_font,"caption_variant":caption_variant,
+        "background_style":background_style,"animation_style":animation_style,
+        "subtitle_sfx":subtitle_sfx,
         "color": color, "speed": speed,
-        "filter_style": option("filter_style", {"warm","none"}, "none"),
+        "filter_style": option("filter_style", {
+            "none","warm","soft","cool","contrast","clean","film","matte",
+        }, "none"),
         "camera_style": option("camera_style", {
             "cinematic_pan","editorial","enhanced","soft_punch","gentle","off",
         }, "cinematic_pan"),
@@ -247,6 +268,11 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 hook_position=s["hook_position"],
                 quality=s["export_quality"],
                 subtitle_delay=s["subtitle_delay"],
+                small_font_profile=s["small_font_profile"],
+                caption_variant=s["caption_variant"],
+                background_style=s["background_style"],
+                animation_style=s["animation_style"],
+                subtitle_sfx=s["subtitle_sfx"],
             )
         else:
             from telegram_editor import edit_video
@@ -257,6 +283,8 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 animation, s["sound_effects"], s["emoji_mode"],
                 s["hook_position"],
                 s["export_quality"], s["subtitle_delay"],
+                s["small_font_profile"], s["caption_variant"],
+                s["background_style"], s["animation_style"], s["subtitle_sfx"],
             )
         if not output.is_file() or output.stat().st_size < 100:
             raise RuntimeError("Обработчик не создал готовый MP4.")
