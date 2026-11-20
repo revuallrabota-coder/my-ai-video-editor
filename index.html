@@ -85,12 +85,12 @@
 
   <section class="card page active" data-page="0">
     <h2>Загрузить видео</h2>
-    <p>Выбери одно или несколько исходных видео, снятых на iPad или телефон.</p>
+    <p>Выбери одно исходное видео с iPad или телефона, до 50 МБ. Референс ниже необязателен и не заменяет исходник.</p>
     <label class="upload">
       <div class="emoji">📎</div>
       <strong>Выбрать видео</strong>
       <small>Открывается файловый менеджер устройства</small>
-      <input type="file" id="videos" accept="video/*" multiple>
+      <input type="file" id="videos" accept="video/*">
     </label>
     <div class="mini" id="videoInfo">Видео пока не выбрано.</div>
     <video id="firstVideo" controls playsinline hidden></video>
@@ -406,13 +406,16 @@
     byId('next').hidden=current===4;
     if(current===4){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Видео',s.videoFiles.length+' шт.'],['Референс',s.referenceVideo||'нет'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Исходник',s.videoFiles.length?(s.videoFiles[0].name+' · '+fmtBytes(s.videoFiles[0].sizeBytes)):'не выбран'],['Референс',s.referenceVideo||'нет'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
   videoInput.addEventListener('change',function(){
     var files=Array.from(videoInput.files);
-    byId('videoInfo').textContent=files.length?files.length+' видео, '+fmtBytes(files.reduce(function(sum,f){return sum+f.size},0))+'. Первый файл: '+files[0].name:'Видео пока не выбрано.';
+    var source=files[0];
+    byId('videoInfo').textContent=source?
+      ('Исходник: '+source.name+' · '+fmtBytes(source.size)+(source.size>50000000?' ⚠️ Больше 50 МБ, выбери меньший файл.':'')):
+      'Исходное видео пока не выбрано. Нажми «Выбрать видео» выше.';
     if(previewUrl)URL.revokeObjectURL(previewUrl);
     previewUrl=files.length?URL.createObjectURL(files[0]):null;
     ['firstVideo','captionVideo'].forEach(function(id){
@@ -616,14 +619,17 @@
       }
       var auth=telegramProof();
       var videos=videoInput.files;
-      if(videos.length!==1)throw new Error('Выбери ровно один исходный видеофайл.');
+      if(videos.length!==1)throw new Error('Исходник не выбран. Нажми «Назад» и на первом экране «Выбрать видео». В поле «Видео-референс» загружать исходник не нужно.');
       if(ratio!=='9:16')throw new Error('Для Reels выбери вертикальный формат 9:16.');
       if(byId('fontFile').files.length)throw new Error('Свой файл шрифта пока нельзя передать: выбери встроенный.');
       var settings=buildRenderSettings();
       if(settings.mode==='reference')throw new Error('Для первого теста 50 МБ выбери «Мой стиль» (без второго видео-референса).');
       var file=videos[0];
-      if(file.size>50000000 || file.size<4096){
-        throw new Error('Для этого режима нужен видеофайл от 4 КБ до 50 МБ.');
+      if(file.size>50000000){
+        throw new Error('Исходник «'+file.name+'» весит '+fmtBytes(file.size)+'. Максимум 50 МБ. Выбери другой файл или экспортируй его размером до 50 МБ.');
+      }
+      if(file.size<4096){
+        throw new Error('Файл «'+file.name+'» пустой или меньше 4 КБ. Выбери настоящий видеофайл в разделе «Выбрать видео».');
       }
       if(settings.mode!=='cuts' && settings.speed!==1){
         status.textContent='ℹ️ Для синхронизации текста лучше скорость 1.0.';
