@@ -9,6 +9,8 @@ on:
       - "bot_api_editor.py"
       - "speech_review.py"
       - "test_speech_review.py"
+      - "word_captions.py"
+      - "test_word_captions.py"
       - "test_audio_pipeline.py"
       - "signature_captions.py"
       - "test_signature_captions.py"
@@ -35,9 +37,12 @@ jobs:
       - name: "Зависимости для проверки"
         run: python -m pip install "telethon>=1.40,<2" "requests>=2.31,<3"
       - name: "Проверить синтаксис Python"
-        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py speech_review.py
+        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py speech_review.py word_captions.py
       - name: "Проверить правки распознавания и зум по фразам"
         run: python -m unittest -v test_speech_review.py
+
+      - name: "Проверить анимацию одного слова и рендер"
+        run: python -m unittest -v test_word_captions.py
 
       - name: "Проверить красные акценты и белые подписи"
         run: python -m unittest -v test_contrast_captions.py
@@ -69,7 +74,7 @@ jobs:
               ], check=True)
               profile = analyze_reference(source)
               assert 0.9 <= profile.seconds_per_change <= 4.5
-              for camera_style in ("off", "gentle", "soft_punch", "enhanced"):
+              for camera_style in ("off", "gentle", "soft_punch", "enhanced", "editorial"):
                   add_virtual_camera(source, ready, profile.seconds_per_change, camera_style=camera_style)
                   duration, has_audio = duration_and_audio(ready)
                   assert 1.7 < duration < 2.3
