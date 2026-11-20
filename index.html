@@ -298,18 +298,13 @@
     var styles={elegant:'Georgia, serif',clean:'Arial, sans-serif',bold:'Arial Black, Arial, sans-serif'};
     big.style.fontFamily=styles[byId('fontBig').value]||'Arial,sans-serif';
     big.style.fontWeight=byId('fontBig').value==='clean'?'500':'900';
-    if(byId('subtitleStyle').value==='signature'){
-      big.style.fontFamily='Georgia, "Times New Roman", serif';
-      big.style.fontWeight='700';
-      big.style.fontStyle='italic';
-      big.style.color=byId('color').value;
-    }else if(byId('subtitleStyle').value==='contrast'){
-      big.style.fontFamily='Arial, sans-serif';
-      big.style.fontWeight='900';
-      big.style.fontStyle='normal';
-      big.style.color='#f0443e';
+    var chosenFont=byId('fontBig').value;
+    big.style.fontFamily=styles[chosenFont]||'Georgia, serif';
+    big.style.fontWeight=chosenFont==='clean'?'600':'900';
+    big.style.fontStyle=chosenFont==='elegant'?'italic':'normal';
+    if(byId('subtitleStyle').value==='contrast'){
+      big.style.color=byId('color').value.toLowerCase()==='#ebc0c8'?'#f0443e':byId('color').value;
     }else{
-      big.style.fontStyle='normal';
       big.style.color=byId('color').value;
     }
     var positions={top:'32%',middle:'62%',bottom:'78%'};
