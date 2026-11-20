@@ -297,9 +297,12 @@ def submit(
 ):
     owner = authenticated_user(x_telegram_init_data)
     try:
-        config = validate_settings(json.loads(settings))
+        parsed = json.loads(settings)
     except json.JSONDecodeError:
         raise HTTPException(400, "Неверные настройки.") from None
+    if not isinstance(parsed, dict):
+        raise HTTPException(400, "Настройки должны быть объектом.")
+    config = validate_settings(parsed)
     with LOCK:
         cleanup()
         if any(j.status in ("queued","transcribing","rendering","needs_review")
