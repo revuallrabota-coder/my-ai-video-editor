@@ -139,12 +139,21 @@
       <option value="contrast_phrases">Контрастный: старый вариант фразами</option>
       <option value="classic_phrases">Классический: старый вариант фразами</option>
     </select>
-    <p class="note">Для одного слова за раз выбери signature, contrast или classic. Для старой анимации фразами выбери вариант с припиской _phrases. Выбор рабочего варианта делается в GitHub Actions.</p>
+    <p class="note">Для одного слова за раз выбери signature, contrast или classic. Для старой анимации фразами выбери вариант _phrases. Новые шрифты по присланному референсу: Bebas-стиль, Platform-стиль, Bubble, Script и Modern. Шрифты работают при рендере через GitHub Actions, а предпросмотр здесь приблизительный.</p>
     <label class="field" for="color">Цвет главного слова</label>
     <input type="color" id="color" value="#ebc0c8">
     <div class="split">
       <div><label class="field" for="fontBig">Крупный шрифт</label>
-        <select id="fontBig"><option value="elegant">Элегантный курсив</option><option value="clean">Минималистичный</option><option value="bold">Плотный акцент</option></select></div>
+        <select id="fontBig">
+          <option value="elegant">Элегантный курсив</option>
+          <option value="clean">Минималистичный</option>
+          <option value="bold">Плотный акцент</option>
+          <option value="bebas">Bebas-стиль — высокий узкий</option>
+          <option value="platform">Platform-стиль — широкий жирный</option>
+          <option value="bubble">Bubble — округлый стикер с обводкой</option>
+          <option value="script">Script — декоративный курсив</option>
+          <option value="modern">Modern — строгий современный</option>
+        </select></div>
       <div><label class="field" for="fontSmall">Мелкий шрифт</label>
         <select id="fontSmall"><option>Классика</option><option>Тонкий</option><option>Журнал</option><option>Минимал</option></select></div>
     </div>
@@ -306,13 +315,25 @@
   });
   function updateSample(){
     var big=byId('sampleBig'); big.style.color=byId('color').value;
-    var styles={elegant:'Georgia, serif',clean:'Arial, sans-serif',bold:'Arial Black, Arial, sans-serif'};
+    var styles={
+      elegant:'Georgia, serif',
+      clean:'Arial, sans-serif',
+      bold:'Arial Black, Arial, sans-serif',
+      bebas:'Impact, "Arial Narrow", sans-serif',
+      platform:'Arial Black, Arial, sans-serif',
+      bubble:'"Arial Rounded MT Bold", Trebuchet MS, sans-serif',
+      script:'Georgia, "Times New Roman", serif',
+      modern:'Arial, sans-serif'
+    };
     big.style.fontFamily=styles[byId('fontBig').value]||'Arial,sans-serif';
     big.style.fontWeight=byId('fontBig').value==='clean'?'500':'900';
     var chosenFont=byId('fontBig').value;
     big.style.fontFamily=styles[chosenFont]||'Georgia, serif';
     big.style.fontWeight=chosenFont==='clean'?'600':'900';
-    big.style.fontStyle=chosenFont==='elegant'?'italic':'normal';
+    big.style.fontStyle=(chosenFont==='elegant'||chosenFont==='script')?'italic':'normal';
+    big.style.letterSpacing=chosenFont==='bebas'?'-0.9px':chosenFont==='platform'?'1.8px':'0px';
+    big.style.transform=chosenFont==='bebas'?'scaleX(.8) scaleY(1.08)':chosenFont==='platform'?'scaleX(1.12)':'none';
+    big.style.webkitTextStroke=chosenFont==='bubble'?'3px #201926':byId('outline').value+'px #211832';
     if(byId('subtitleStyle').value.startsWith('contrast')){
       big.style.color=byId('color').value.toLowerCase()==='#ebc0c8'?'#f0443e':byId('color').value;
     }else{
@@ -320,7 +341,7 @@
     }
     var positions={top:'32%',middle:'62%',bottom:'78%'};
     byId('sample').style.top=positions[byId('position').value]||'60%';
-    big.style.webkitTextStroke=byId('outline').value+'px #211832';
+    if(chosenFont!=='bubble')big.style.webkitTextStroke=byId('outline').value+'px #211832';
     big.style.textShadow='0 2px '+(Number(byId('shadow').value)+2)+'px #000a';
     big.textContent=byId('hookText').value.trim() || 'СУБТИТРЫ';
     byId('outlineValue').textContent=byId('outline').value;
