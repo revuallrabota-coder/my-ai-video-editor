@@ -323,7 +323,7 @@ def write_ass(
         )
         complete = add_hook_to_ass(
             content, hook, position=hook_position, duration=seconds,
-            color=accent_color,
+            color=accent_color, font_profile=font_profile,
         )
         output_ass.write_text(complete, encoding="utf-8")
         return sum(line.startswith("Dialogue: ") for line in complete.splitlines())
