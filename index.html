@@ -133,6 +133,7 @@
     <label class="field" for="subtitleStyle">Стиль субтитров</label>
     <select id="subtitleStyle">
       <option value="signature" selected>Мой стиль — розовый курсив и мягкое всплытие</option>
+      <option value="contrast">Контрастный — красные акценты и белые фразы</option>
       <option value="classic">Старый стиль — выделение слов</option>
     </select>
     <p class="note">Постоянный шаблон по твоему референсу: мелкий белый текст над крупным розовым словом. В GitHub Actions выбирай subtitle_style = signature.</p>
@@ -189,7 +190,7 @@
       <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
     </div>
     <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
-    <p class="note">Для обычного нового Reels выбирай mode = my_style и subtitle_style = signature в GitHub Actions: отправь ОДНО видео, повторять референс не нужно. Необязательный заголовок вводится в hook_text. Звук: audio_profile = balanced, strong или off. Для другого референса выбери mode = reference и отправь ДВА видео. Файлы до 20 МБ. Настройки мини-приложения в Actions пока не передаются автоматически.</p>
+    <p class="note">В GitHub Actions: mode = my_style. subtitle_style = signature — мягкий розовый стиль из первого референса; contrast — красно-белые акценты, как в показанном ролике. camera_style = off отключает искусственные зумы и тряску. Звук: audio_profile = balanced либо strong. Отправь ОДНО видео до 20 МБ в чат после сообщения бота. Настройки Mini App пока не передаются в Actions автоматически.</p>
     <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
   </section>
 </div>
@@ -252,7 +253,7 @@
     byId('next').hidden=current===4;
     if(current===4){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Видео',s.videoFiles.length+' шт.'],['Референс',s.referenceVideo||'нет'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='signature'?'Мой стиль':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed]].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Видео',s.videoFiles.length+' шт.'],['Референс',s.referenceVideo||'нет'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed]].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -300,8 +301,15 @@
       big.style.fontFamily='Georgia, "Times New Roman", serif';
       big.style.fontWeight='700';
       big.style.fontStyle='italic';
+      big.style.color=byId('color').value;
+    }else if(byId('subtitleStyle').value==='contrast'){
+      big.style.fontFamily='Arial, sans-serif';
+      big.style.fontWeight='900';
+      big.style.fontStyle='normal';
+      big.style.color='#f0443e';
     }else{
       big.style.fontStyle='normal';
+      big.style.color=byId('color').value;
     }
     var positions={auto:'60%',top:'18%',middle:'48%',bottom:'78%'};
     byId('sample').style.top=positions[byId('position').value]||'60%';
