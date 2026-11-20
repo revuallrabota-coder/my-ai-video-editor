@@ -117,7 +117,7 @@ jobs:
       - name: "Установить FFmpeg"
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core fonts-liberation
+          sudo apt-get install -y ffmpeg fonts-dejavu-core fonts-liberation fonts-noto-color-emoji
 
       - name: "Установить зависимости"
         run: |
@@ -125,7 +125,7 @@ jobs:
           python -m pip install "requests>=2.31,<3"
 
       - name: "Проверить синтаксис"
-        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py word_captions.py speech_review.py
+        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py word_captions.py speech_review.py reels_effects.py
 
       - name: "Запустить тестовый монтаж"
         env:
