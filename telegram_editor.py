@@ -123,8 +123,36 @@ def get_keep_ranges(path: Path, duration: float, has_audio: bool) -> list[Segmen
     return ranges_to_keep(parse_silences(result.stderr, duration), duration)
 
 
-def base_video(path: Path, output: Path, ranges: list[Segment], has_audio: bool) -> None:
-    """Точный покадровый монтаж с сохранением исходного аудио."""
+def audio_filterchain(profile: str) -> str:
+    """Без платных API: чистка фона, сглаживание скачков и громкость речи.
+
+    balanced — бережно, по умолчанию; strong — более агрессивно;
+    off — пропуск любых эффектов (сохранение оригинальной дорожки).
+    """
+    if profile == "off":
+        return ""
+    if profile == "balanced":
+        return (
+            "highpass=f=85,lowpass=f=13500,"
+            "afftdn=nr=12:nf=-38:tn=1,"
+            "acompressor=threshold=0.1:ratio=2:attack=15:release=180:makeup=1,"
+            "loudnorm=I=-16:TP=-1.5:LRA=11"
+        )
+    if profile == "strong":
+        return (
+            "highpass=f=95,lowpass=f=12000,"
+            "afftdn=nr=20:nf=-35:tn=1,"
+            "acompressor=threshold=0.08:ratio=2.6:attack=12:release=210:makeup=1,"
+            "loudnorm=I=-16:TP=-1.5:LRA=11"
+        )
+    raise ValueError("Неизвестный режим улучшения звука.")
+
+
+def base_video(
+    path: Path, output: Path, ranges: list[Segment], has_audio: bool,
+    audio_profile: str = "balanced",
+) -> None:
+    """Покадровый монтаж с сохранением речи и необязательным шумоподавлением."""
     filters: list[str] = []
     concat_inputs = ""
     for idx, fragment in enumerate(ranges):
@@ -136,6 +164,12 @@ def base_video(path: Path, output: Path, ranges: list[Segment], has_audio: bool)
             concat_inputs += f"[a{idx}]"
     if has_audio:
         filters.append(f"{concat_inputs}concat=n={len(ranges)}:v=1:a=1[vjoined][ajoined]")
+        sound_filters = audio_filterchain(audio_profile)
+        if sound_filters:
+            filters.append(f"[ajoined]{sound_filters}[aclean]")
+            audio_output = "[aclean]"
+        else:
+            audio_output = "[ajoined]"
     else:
         filters.append(f"{concat_inputs}concat=n={len(ranges)}:v=1:a=0[vjoined]")
     filters.append(
@@ -150,7 +184,7 @@ def base_video(path: Path, output: Path, ranges: list[Segment], has_audio: bool)
         "-crf", "22", "-pix_fmt", "yuv420p",
     ]
     if has_audio:
-        args.extend(["-map", "[ajoined]", "-c:a", "aac", "-b:a", "160k"])
+        args.extend(["-map", audio_output, "-c:a", "aac", "-b:a", "160k"])
     else:
         args.append("-an")
     args.extend(["-movflags", "+faststart", str(output)])
@@ -254,13 +288,16 @@ def burn_subtitles(input_path: Path, ass_path: Path, output_path: Path) -> None:
     execute(args)
 
 
-def edit_video(original: Path, output: Path, mode: str, color: str) -> dict:
+def edit_video(
+    original: Path, output: Path, mode: str, color: str,
+    audio_profile: str = "balanced",
+) -> dict:
     duration, has_audio = duration_and_audio(original)
     ranges = ([Segment(0.0, duration)] if mode == "captions"
               else get_keep_ranges(original, duration, has_audio))
     with tempfile.TemporaryDirectory(prefix="editor_") as directory:
         work = Path(directory) / "joined.mp4"
-        base_video(original, work, ranges, has_audio)
+        base_video(original, work, ranges, has_audio, audio_profile=audio_profile)
         subtitle_events = 0
         if mode != "cuts" and has_audio:
             ass = Path(directory) / "captions.ass"
@@ -291,6 +328,8 @@ async def main() -> None:
     owner_id = int(os.environ["OWNER_TELEGRAM_ID"])
     mode = os.environ.get("MONTAGE_MODE", "auto")
     color = os.environ.get("SUBTITLE_COLOR", DEFAULT_COLOR)
+    audio_profile = os.environ.get("AUDIO_PROFILE", "balanced")
+    audio_filterchain(audio_profile)  # early validation
     if mode not in ("auto", "captions", "cuts"):
         raise ValueError("Неподдерживаемый режим.")
     done = asyncio.Event()
@@ -335,7 +374,7 @@ async def main() -> None:
                     if original.stat().st_size > MAX_BYTES:
                         raise ValueError("Файл больше 1 ГБ.")
                     await event.respond("✂️ Нарезаю видео и оформляю субтитры. Оригинальная речь сохранится.")
-                    details = await asyncio.to_thread(edit_video, original, result, mode, color)
+                    details = await asyncio.to_thread(edit_video, original, result, mode, color, audio_profile)
                     await client.send_file(
                         event.chat_id, str(result), supports_streaming=True,
                         caption=(
