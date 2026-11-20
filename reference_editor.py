@@ -94,27 +94,44 @@ def analyze_reference(path: Path) -> ReferenceProfile:
     )
 
 
-def add_virtual_camera(source: Path, output: Path, cadence: float) -> None:
-    """Непрерывное мягкое приближение-отдаление в темпе референса.
+def add_virtual_camera(
+    source: Path,
+    output: Path,
+    cadence: float,
+    camera_style: str = "gentle",
+) -> None:
+    """Устранить искусственную тряску от повторного zoompan.
 
-    Добавляет аккуратное движение камеры без резких скачков
-    и без изменения последовательности речи и кадров.
+    Раньше зум качался туда-сюда каждые 4-5 секунд и мелко
+    дрожал из-за пересчёта центрирования. Теперь только ОДНО
+    непрерывное, очень медленное приближение, максимум 2.5%.
+    При camera_style='off' эффект полностью выключается.
+    Движение исходной камеры это не стабилизирует.
     """
-    # Плавный, непрерывный зум: в отличие от старого ступенчатого
-    # переключения, косинусная огибающая имеет нулевую скорость
-    # в начале и конце каждого приближения.
-    #
-    # Амплитуда намеренно небольшая: для лица, рук и маникюра
-    # агрессивный зум выглядит нервно.
-    period = max(45, min(165, int(round(30 * cadence * 1.6))))
-    amplitude = 0.065 if cadence < 1.6 else 0.050 if cadence < 3.0 else 0.040
-    zoom = f"1.02+{amplitude:.3f}*(1-cos(2*PI*on/{period}))/2"
+    if camera_style not in ("gentle", "off"):
+        raise ValueError("Неизвестный режим камеры.")
+
+    if camera_style == "off":
+        # Уже кадрировано в base_video: не пересчитываем/не увеличиваем
+        # изображение второй раз, чтобы исключить дополнительные подёргивания.
+        execute([
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", str(source),
+            "-map", "0:v:0", "-map", "0:a:0?",
+            "-c:v", "copy", "-c:a", "copy",
+            "-movflags", "+faststart", str(output),
+        ])
+        return
+
+    # Предсказуемая монотонная траектория, а не циклический zoom.
+    # Первые ~7 сек медленно растёт от 1.00 до 1.025, дальше остаётся
+    # неизменным. Центр кадра фиксирован, без случайных смещений.
+    zoom = "min(1.025,1+on*0.00012)"
     vf = (
-        "scale=900:1600,setsar=1,fps=30,"
+        "scale=900:1600:flags=lanczos,setsar=1,fps=30,"
         f"zoompan=z='{zoom}':"
-        "x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':"
-        "d=1:s=720x1280:fps=30,"
-        "format=yuv420p"
+        "x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':"
+        "d=1:s=720x1280:fps=30,format=yuv420p"
     )
     execute([
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
@@ -134,6 +151,7 @@ def montage_by_reference(
     audio_profile: str = "balanced",
     subtitle_style: str = "signature",
     hook: str = "",
+    camera_style: str = "gentle",
 ) -> dict:
     """Монтаж с нарезкой тишины, ритмом референса и живыми субтитрами."""
     # Без второго файла используем постоянный темп из разобранного
@@ -154,7 +172,7 @@ def montage_by_reference(
         dynamic = folder / "dynamic.mp4"
         subtitles = folder / "subtitles.ass"
         base_video(original, joined, kept, source_has_audio, audio_profile=audio_profile)
-        add_virtual_camera(joined, dynamic, profile.seconds_per_change)
+        add_virtual_camera(joined, dynamic, profile.seconds_per_change, camera_style=camera_style)
         count = write_ass(dynamic, subtitles, color, style=subtitle_style, hook=hook)
         if count:
             burn_subtitles(dynamic, subtitles, output)
