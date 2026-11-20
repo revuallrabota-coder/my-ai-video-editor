@@ -235,28 +235,82 @@ def ass_color(hex_color: str) -> str:
     return f"&H{rgb[4:6]}{rgb[2:4]}{rgb[0:2]}&".upper()
 
 
+def transcribe_words(
+    video_path: Path,
+    model_size: str = "small",
+    language: str = "ru",
+) -> list[tuple[float, float, str]]:
+    """Более точная расшифровка речи для предварительной проверки.
+
+    В отличие от старой base-модели: small/medium, подсказка русского
+    языка и предварительная очистка аудио перед распознаванием.
+    Только локальное распознавание: никаких внешних платных API.
+    """
+    from functools import lru_cache
+    from faster_whisper import WhisperModel
+
+    if model_size not in ("small", "medium"):
+        raise ValueError("Поддерживаются модели small и medium.")
+    if language not in ("ru", "auto"):
+        raise ValueError("Язык может быть ru или auto.")
+
+    @lru_cache(maxsize=2)
+    def load_model(name: str):
+        return WhisperModel(name, device="cpu", compute_type="int8")
+
+    duration, has_audio = duration_and_audio(video_path)
+    if not has_audio:
+        return []
+
+    with tempfile.TemporaryDirectory(prefix="recognition_") as tmp:
+        cleaned = Path(tmp) / "speech.wav"
+        # Для распознавания используем очищенную дорожку, но
+        # исходная речь в готовом видео сохраняется, не заменяется.
+        execute([
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", str(video_path), "-vn", "-ac", "1", "-ar", "16000",
+            "-af", "highpass=f=80,lowpass=f=7500,afftdn=nr=10:nf=-40",
+            "-c:a", "pcm_s16le", str(cleaned),
+        ])
+        LOG.info("Whisper %s, язык=%s: распознавание речи", model_size, language)
+        model = load_model(model_size)
+        segments, info = model.transcribe(
+            str(cleaned),
+            language=None if language == "auto" else language,
+            beam_size=5,
+            best_of=5,
+            vad_filter=True,
+            vad_parameters={"min_silence_duration_ms": 450},
+            word_timestamps=True,
+            condition_on_previous_text=False,
+            no_speech_threshold=0.6,
+        )
+        result: list[tuple[float, float, str]] = []
+        for segment in segments:
+            if segment.words:
+                for token in segment.words:
+                    word = clean_ass_text(token.word)
+                    if word and token.end > token.start:
+                        result.append((float(token.start),float(token.end),word))
+            elif segment.text.strip():
+                result.append((float(segment.start),float(segment.end),clean_ass_text(segment.text)))
+        # Убираем явные дубли по почти одинаковым временным отметкам.
+        deduplicated = []
+        for item in result:
+            if deduplicated and abs(item[0]-deduplicated[-1][0]) < 0.035 and item[2] == deduplicated[-1][2]:
+                continue
+            deduplicated.append(item)
+        LOG.info("Распознано слов/фраз: %d", len(deduplicated))
+        return deduplicated
+
+
 def write_ass(
     video_path: Path, output_ass: Path, color: str,
     style: str = "signature", hook: str = "",
     caption_position: str = "middle", font_profile: str = "elegant",
+    words_override: list[tuple[float, float, str]] | None = None,
 ) -> int:
-    from faster_whisper import WhisperModel
-
-    LOG.info("Распознаём оригинальную речь (бесплатная локальная модель).")
-    model = WhisperModel("base", device="cpu", compute_type="int8")
-    segments, _ = model.transcribe(
-        str(video_path), beam_size=3, vad_filter=True,
-        word_timestamps=True, condition_on_previous_text=False,
-    )
-    words = []
-    for segment in segments:
-        if segment.words:
-            for word in segment.words:
-                text = clean_ass_text(word.word)
-                if text and word.end > word.start:
-                    words.append((float(word.start), float(word.end), text))
-        elif segment.text.strip():
-            words.append((float(segment.start), float(segment.end), clean_ass_text(segment.text)))
+    words = words_override if words_override is not None else transcribe_words(video_path)
 
     if style == "signature":
         from signature_captions import build_signature_ass
@@ -344,6 +398,7 @@ def edit_video(
     filter_style: str = "none",
     caption_position: str = "middle",
     font_profile: str = "elegant",
+    words_override: list[tuple[float, float, str]] | None = None,
 ) -> dict:
     duration, has_audio = duration_and_audio(original)
     ranges = ([Segment(0.0, duration)] if mode == "captions"
@@ -360,6 +415,10 @@ def edit_video(
             subtitle_events = write_ass(
                 work, ass, color, style=subtitle_style, hook=hook,
                 caption_position=caption_position, font_profile=font_profile,
+                words_override=(
+                    __import__("speech_review").map_words_to_ranges(words_override, ranges, speed)
+                    if words_override is not None else None
+                ),
             )
             if subtitle_events:
                 burn_subtitles(work, ass, output)
