@@ -121,7 +121,7 @@
 
   <section class="card page" data-page="2">
     <h2>Оформление подписей</h2>
-    <p>Большое слово выделяется цветом, остальные остаются белыми. Предпросмотр здесь условный, это не готовый монтаж.</p>
+    <p>Теперь можно выводить **ровно одно слово за раз**, с мягким всплытием, или сохранить прежние субтитры целыми фразами. Предпросмотр условный.</p>
     <div class="previewbox">
       <div class="caption-bg"></div>
       <video id="captionVideo" muted loop playsinline hidden></video>
@@ -132,11 +132,14 @@
     </div>
     <label class="field" for="subtitleStyle">Стиль субтитров</label>
     <select id="subtitleStyle">
-      <option value="signature" selected>Мой стиль — розовый курсив и мягкое всплытие</option>
-      <option value="contrast">Контрастный — красные акценты и белые фразы</option>
-      <option value="classic">Старый стиль — выделение слов</option>
+      <option value="signature" selected>Розовый: по одному слову, плавное всплытие</option>
+      <option value="contrast">Контрастный: по одному слову</option>
+      <option value="classic">Классический: по одному слову</option>
+      <option value="signature_phrases">Розовый: старый вариант целыми фразами</option>
+      <option value="contrast_phrases">Контрастный: старый вариант фразами</option>
+      <option value="classic_phrases">Классический: старый вариант фразами</option>
     </select>
-    <p class="note">Постоянный шаблон по твоему референсу: мелкий белый текст над крупным розовым словом. В GitHub Actions выбирай subtitle_style = signature.</p>
+    <p class="note">Для одного слова за раз выбери signature, contrast или classic. Для старой анимации фразами выбери вариант с припиской _phrases. Выбор рабочего варианта делается в GitHub Actions.</p>
     <label class="field" for="color">Цвет главного слова</label>
     <input type="color" id="color" value="#ebc0c8">
     <div class="split">
@@ -164,7 +167,7 @@
     <h2>Эффекты и фильтр</h2>
     <p>Выбери будущий стиль обработки изображения и звука.</p>
     <label class="field" for="camera">Динамика камеры</label>
-    <select id="camera"><option value="soft_punch" selected>Стандарт — плавные приближения</option><option value="enhanced">Усиленная — чаще и ближе</option><option value="gentle">Очень мягкое однократное приближение</option><option value="off">Без цифрового зума</option></select>
+    <select id="camera"><option value="editorial" selected>Новый монтажный Zoom: крупный план с удержанием</option><option value="soft_punch">Старый плавный Zoom</option><option value="enhanced">Усиленный (старый)</option><option value="gentle">Очень мягкий одноразовый Zoom</option><option value="off">Без цифрового зума</option></select>
     <label class="field" for="audio">🎧 Улучшение звука</label>
     <select id="audio">
       <option value="balanced">Бережная очистка — рекомендую</option>
@@ -190,7 +193,7 @@
       <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
     </div>
     <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
-    <p class="note">Каждый запуск GitHub Actions можно настроить по-разному: mode, subtitle_style, color, font_profile, caption_position, camera_style, video_speed, video_filter, audio_profile и hook_text. Параметры из записи «Чит-Кода» не закреплены как обязательные. Выбор на экране Mini App пока служит предпросмотром; в обработку передаются именно параметры запуска Actions. После отправки видео бот сначала пришлёт текст распознанной речи: /ok подтвердить, /fix ошибка=правильно исправить отдельное слово, /text ТВОЙ ПОЛНЫЙ ТЕКСТ заменить весь текст. Зум теперь привязан к паузам и фразам. Вставки своих фото, эмодзи и звуковые акценты пока не реализованы.</p>
+    <p class="note">Каждый запуск GitHub Actions можно настроить по-разному: mode, subtitle_style, color, font_profile, caption_position, camera_style, video_speed, video_filter, audio_profile и hook_text. Параметры из записи «Чит-Кода» не закреплены как обязательные. Выбор на экране Mini App пока служит предпросмотром; в обработку передаются именно параметры запуска Actions. После отправки видео бот сначала пришлёт текст распознанной речи: /ok подтвердить, /fix ошибка=правильно исправить отдельное слово, /text ТВОЙ ПОЛНЫЙ ТЕКСТ заменить весь текст. Новый editorial Zoom меняет общий план на крупный при смене фразы и удерживает его, без циклической раскачки. Субтитры signature / contrast / classic появляются по одному слову. Варианты _phrases выводят прежние фразы целиком. Вставки фото, эмодзи и звуковые акценты пока не реализованы.</p>
     <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
   </section>
 </div>
@@ -302,7 +305,7 @@
     big.style.fontFamily=styles[chosenFont]||'Georgia, serif';
     big.style.fontWeight=chosenFont==='clean'?'600':'900';
     big.style.fontStyle=chosenFont==='elegant'?'italic':'normal';
-    if(byId('subtitleStyle').value==='contrast'){
+    if(byId('subtitleStyle').value.startsWith('contrast')){
       big.style.color=byId('color').value.toLowerCase()==='#ebc0c8'?'#f0443e':byId('color').value;
     }else{
       big.style.color=byId('color').value;
