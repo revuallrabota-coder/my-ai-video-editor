@@ -180,12 +180,16 @@ def main() -> None:
     color = os.environ.get("SUBTITLE_COLOR", "auto")
     audio_profile = os.environ.get("AUDIO_PROFILE", "balanced")
     audio_filterchain(audio_profile)  # early validation
-    subtitle_style = os.environ.get("SUBTITLE_STYLE", "signature")
+    selected_subtitle_style = os.environ.get("SUBTITLE_STYLE", "signature")
+    # GitHub Actions ограничивает число отдельных полей формы.
+    # Одна настройка выбирает и палитру, и способ появления текста.
+    caption_animation = (
+        "phrase_float" if selected_subtitle_style.endswith("_phrases")
+        else "word_pop"
+    )
+    subtitle_style = selected_subtitle_style.removesuffix("_phrases")
     if subtitle_style not in ("signature", "classic", "contrast"):
         raise ValueError("Неизвестный стиль субтитров.")
-    caption_animation = os.environ.get("CAPTION_ANIMATION", "word_pop")
-    if caption_animation not in ("word_pop", "phrase_float"):
-        raise ValueError("Неизвестный режим появления слов.")
     hook = os.environ.get("HOOK_TEXT", "").strip()[:70]
     camera_style = os.environ.get("CAMERA_STYLE", "editorial")
     if camera_style not in ("editorial", "enhanced", "soft_punch", "gentle", "off"):
