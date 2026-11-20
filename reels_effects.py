@@ -30,8 +30,15 @@ EMOJI_WORDS = (
     ("секунд", "⏱"), ("врем", "⏱"),
     ("провер", "✅"), ("правильн", "✅"),
     ("ужас", "😱"), ("кошмар", "😱"),
+    ("скидк", "🏷️"), ("цен", "💰"), ("выгод", "💰"),
+    ("секрет", "🔐"), ("проблем", "⚠️"), ("результат", "🎯"),
+    ("клиент", "❤️"), ("обуч", "🎓"), ("урок", "🎓"),
+    ("дизайн", "🎨"), ("покрыт", "💅"), ("цвет", "🎨"),
+    ("новинк", "🆕"), ("тренд", "🔥"), ("успех", "🏆"),
+    ("сравн", "⚖️"), ("наход", "🔎"),
 )
 _ALLOWED_SFX = {"off", "soft", "punch"}
+_ALLOWED_CAPTION_SFX = {"off", "soft", "tick"}
 _ALLOWED_EMOJI = {"on", "off"}
 _ALLOWED_HOOK = {"start", "end", "both", "off"}
 
@@ -74,6 +81,32 @@ def pick_cues(words: Sequence[Word], duration: float, *, limit: int = 10) -> lis
                 last = t
                 if len(result) >= min(6, limit):
                     break
+    return result
+
+
+def pick_caption_cues(
+    words: Sequence[Word], duration: float, *,
+    style: str = "soft", limit: int = 22,
+) -> list[tuple[float, str | None]]:
+    """Очень тихие аудио-сигналы на переходах слов, а не на каждом слове."""
+    if style not in ("soft", "tick"):
+        raise ValueError("Звук субтитров: soft или tick.")
+    if duration <= 0:
+        return []
+    minimum_gap = 2.0 if style == "soft" else 1.35
+    last = -10.0
+    result = []
+    for start, end, word in sorted(words, key=lambda w: w[0]):
+        t = max(0.0,float(start))
+        clean = re.sub(r"[^а-яёa-z0-9]", "", word.lower())
+        if len(clean) < 4 or t < 0.25 or t > duration - 0.25:
+            continue
+        if t-last < minimum_gap:
+            continue
+        result.append((t,None))
+        last = t
+        if len(result) >= limit:
+            break
     return result
 
 
@@ -146,10 +179,11 @@ def make_sfx_track(
     rate: int = 48000,
 ) -> None:
     """Тихие короткие собственные pop-звуки, не подавляющие речь."""
-    if intensity not in ("soft", "punch"):
+    if intensity not in ("soft", "punch", "caption_soft", "caption_tick"):
         raise ValueError("Недопустимая интенсивность звуков.")
     total = max(1, round(duration*rate))
-    peak = 0.12 if intensity == "soft" else 0.20
+    peak = {"soft":0.12, "punch":0.20, "caption_soft":0.034,
+            "caption_tick":0.063}[intensity]
     with wave.open(str(target), "wb") as wav:
         wav.setnchannels(1)
         wav.setsampwidth(2)
@@ -163,12 +197,15 @@ def make_sfx_track(
                 cursor += zero_count
             if cursor >= total:
                 break
-            n = min(int(rate*.19), total-cursor)
+            n = min(int(rate*(0.095 if intensity.startswith("caption_") else 0.19)),
+                    total-cursor)
             samples = array("h")
             for i in range(n):
                 t = i/rate
                 envelope = (1-math.exp(-t*110))*math.exp(-t*27)
-                frequency = 710-190*t/0.19
+                frequency = (985-130*t/0.095
+                             if intensity.startswith("caption_")
+                             else 710-190*t/0.19)
                 audio = (math.sin(2*math.pi*frequency*t)*0.74
                          + math.sin(2*math.pi*frequency*1.58*t)*0.26)
                 value = int(32767*peak*envelope*audio)
@@ -212,21 +249,26 @@ def apply_effects(
     emoji: str = "off",
     caption_position: str = "middle",
     quality: str = "high",
+    caption_sound: str = "off",
 ) -> dict:
-    """Наложить эмодзи и смешать акценты, сохраняя выбранное качество."""
+    """Наложить эмодзи и отдельные тихие звуки слов, сохраняя качество."""
     from telegram_editor import duration_and_audio, execute
     from export_profiles import get_export_profile
     export = get_export_profile(quality)
 
     validate_effects(sound, emoji, "off")
+    if caption_sound not in _ALLOWED_CAPTION_SFX:
+        raise ValueError("Звуки субтитров: off, soft или tick.")
     if caption_position not in ("top", "middle", "bottom"):
         raise ValueError("Неверная позиция эмодзи.")
     duration, has_audio = duration_and_audio(source)
     cues = pick_cues(words, duration)
+    caption_cues = (pick_caption_cues(words,duration,style=caption_sound)
+                    if caption_sound != "off" else [])
     visual = [(t, symbol) for t, symbol in cues if symbol] if emoji == "on" else []
-    if not cues or (sound == "off" and not visual):
+    if (sound == "off" and not visual and not caption_cues):
         source.replace(target)
-        return {"emoji_count": 0, "sfx_count": 0}
+        return {"emoji_count": 0, "sfx_count": 0, "caption_sfx_count": 0}
 
     with tempfile.TemporaryDirectory(prefix="reels_effects_") as tmp:
         folder = Path(tmp)
@@ -263,31 +305,46 @@ def apply_effects(
                 emoji_count += 1
 
         sfx_count = 0
+        caption_sfx_count = 0
         sound_output = "0:a:0?"
-        if sound != "off" and has_audio:
+        track_inputs = ["[0:a:0]"]
+        if sound != "off" and has_audio and cues:
             track = folder/"accents.wav"
             make_sfx_track(track,cues,duration,sound)
             args.extend(["-i",str(track)])
+            track_inputs.append(f"[{current_input}:a:0]")
+            current_input += 1
+            sfx_count = len(cues)
+        if caption_sound != "off" and has_audio and caption_cues:
+            track = folder/"subtitle_pops.wav"
+            intensity = "caption_soft" if caption_sound == "soft" else "caption_tick"
+            make_sfx_track(track,caption_cues,duration,intensity)
+            args.extend(["-i",str(track)])
+            track_inputs.append(f"[{current_input}:a:0]")
+            current_input += 1
+            caption_sfx_count = len(caption_cues)
+        if len(track_inputs)>1:
             filters.append(
-                f"[0:a:0][{current_input}:a:0]amix=inputs=2:duration=first:"
-                f"normalize=0,alimiter=limit=0.96[mixed]"
+                "".join(track_inputs)
+                + f"amix=inputs={len(track_inputs)}:duration=first:"
+                + "normalize=0,alimiter=limit=0.96[mixed]"
             )
             sound_output = "[mixed]"
-            sfx_count = len(cues)
 
         if emoji_count:
             args.extend(["-filter_complex",";".join(filters),"-map",prev,
                          "-c:v","libx264","-preset",export.preset,"-crf",str(export.crf)])
-        elif sfx_count:
+        elif sfx_count or caption_sfx_count:
             args.extend(["-filter_complex",";".join(filters),"-map","0:v:0",
                          "-c:v","copy"])
         else:
             source.replace(target)
-            return {"emoji_count":0,"sfx_count":0}
-        if sfx_count:
+            return {"emoji_count":0,"sfx_count":0,"caption_sfx_count":0}
+        if sfx_count or caption_sfx_count:
             args.extend(["-map",sound_output,"-c:a","aac","-b:a",export.audio_bitrate])
         else:
             args.extend(["-map","0:a:0?","-c:a","copy"])
         args.extend(["-t",f"{duration:.3f}","-movflags","+faststart",str(target)])
         execute(args)
-        return {"emoji_count":emoji_count, "sfx_count":sfx_count}
+        return {"emoji_count":emoji_count, "sfx_count":sfx_count,
+                "caption_sfx_count":caption_sfx_count}
