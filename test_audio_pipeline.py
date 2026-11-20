@@ -43,6 +43,18 @@ class AudioPipelineTests(unittest.TestCase):
                     self.assertGreater(duration, 1.25)
                     self.assertLess(duration, 1.65)
                     self.assertGreater(output.stat().st_size, 10000)
+            # Сопоставляем выбранные в записи настройки: ускорение ×1.1
+            # и тёплая цветокоррекция с обязательным сохранением аудио.
+            chosen = path / "x11_warm.mp4"
+            base_video(
+                source, chosen, [Segment(0, 1.4)], True,
+                audio_profile="balanced", speed=1.1, filter_style="warm",
+            )
+            faster_duration, has_audio = duration_and_audio(chosen)
+            self.assertTrue(has_audio)
+            self.assertGreater(faster_duration, 1.15)
+            self.assertLess(faster_duration, 1.38)
+            self.assertGreater(chosen.stat().st_size, 10000)
 
 
 if __name__ == "__main__":
