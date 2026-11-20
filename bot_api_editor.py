@@ -154,6 +154,11 @@ def render_result(
                 f"Длительность: {details['before']} → {details['after']} сек.\n"
                 "Субтитры из подтверждённого текста."
             )
+        caption += (
+            "\n✨ Эмодзи: " + str(details.get("emoji_count", 0))
+            + " · 🔊 Акцентов: " + str(details.get("sfx_count", 0))
+            + (" · 🪧 Хук добавлен" if hook and hook_position != "off" else "")
+        )
         send_result(token, chat_id, output_file, caption)
         LOG.info("Готовое видео отправлено")
     except ValueError as err:
