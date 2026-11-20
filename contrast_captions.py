@@ -20,7 +20,7 @@ def build_contrast_ass(
     caption_position: str = "middle",
     font_profile: str = "elegant",
 ) -> tuple[str, int]:
-    red = ass_color(accent_color)
+    red = ass_color(RED if accent_color == "auto" else accent_color)
     if caption_position not in ("top", "middle", "bottom"):
         raise ValueError("Неизвестное положение субтитров.")
     fonts = {"elegant": ("Liberation Serif", "1"), "clean": ("Liberation Sans", "0"), "bold": ("DejaVu Sans", "0")}
