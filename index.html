@@ -141,14 +141,14 @@
     <input type="color" id="color" value="#ebc0c8">
     <div class="split">
       <div><label class="field" for="fontBig">Крупный шрифт</label>
-        <select id="fontBig"><option>Тренд</option><option>Хайп</option><option>Ретро</option><option>Эксперт</option><option>Зефир</option><option>Журнал</option></select></div>
+        <select id="fontBig"><option value="elegant">Элегантный курсив</option><option value="clean">Минималистичный</option><option value="bold">Плотный акцент</option></select></div>
       <div><label class="field" for="fontSmall">Мелкий шрифт</label>
         <select id="fontSmall"><option>Классика</option><option>Тонкий</option><option>Журнал</option><option>Минимал</option></select></div>
     </div>
     <label class="field" for="fontFile">Свой шрифт (необязательно)</label>
     <input id="fontFile" type="file" accept=".ttf,.otf">
     <label class="field" for="position">Где стоят подписи</label>
-    <select id="position"><option value="auto">Авто — под лицом (планируемая функция)</option><option value="top">Над головой</option><option value="middle">По центру</option><option value="bottom">Внизу</option></select>
+    <select id="position"><option value="middle" selected>Средняя часть кадра</option><option value="top">Верхняя часть кадра</option><option value="bottom">Нижняя часть кадра</option></select>
     <label class="field" for="outline">Обводка: <span id="outlineValue">0</span></label>
     <input id="outline" type="range" min="0" max="8" value="0">
     <label class="field" for="shadow">Мягкая тень: <span id="shadowValue">2</span></label>
@@ -164,7 +164,7 @@
     <h2>Эффекты и фильтр</h2>
     <p>Выбери будущий стиль обработки изображения и звука.</p>
     <label class="field" for="camera">Динамика камеры</label>
-    <select id="camera"><option value="enhanced">Усиленная — чаще и ближе, как на записи</option><option value="soft_punch">Стандарт — плавные приближения</option><option value="gentle">Очень мягкое однократное приближение</option><option value="off">Без цифрового зума</option></select>
+    <select id="camera"><option value="soft_punch" selected>Стандарт — плавные приближения</option><option value="enhanced">Усиленная — чаще и ближе</option><option value="gentle">Очень мягкое однократное приближение</option><option value="off">Без цифрового зума</option></select>
     <label class="field" for="audio">🎧 Улучшение звука</label>
     <select id="audio">
       <option value="balanced">Бережная очистка — рекомендую</option>
@@ -173,9 +173,9 @@
     </select>
     <p class="note">Уменьшаем постоянный фон, сглаживаем громкость речи и защищаем от перегрузки. Голос не заменяется. Сильная очистка иногда искажает речь.</p>
     <label class="field" for="filter">Фильтр</label>
-    <select id="filter"><option value="warm" selected>Тёплый — как в записи (работает в тесте)</option><option value="none">Без фильтра (работает в тесте)</option><option value="soft" disabled>Нежный — скоро</option><option value="cool" disabled>Холодный — скоро</option><option value="contrast" disabled>Контрастный — скоро</option></select>
+    <select id="filter"><option value="none" selected>Без фильтра</option><option value="warm">Тёплый</option><option value="soft" disabled>Нежный — скоро</option><option value="cool" disabled>Холодный — скоро</option><option value="contrast" disabled>Контрастный — скоро</option></select>
     <label class="field" for="speed">Скорость</label>
-    <select id="speed"><option value="1.0">×1.0</option><option value="1.1" selected>×1.1</option><option value="1.2">×1.2</option><option value="1.3">×1.3</option><option value="1.5">×1.5</option></select>
+    <select id="speed"><option value="1.0" selected>×1.0</option><option value="1.1">×1.1</option><option value="1.2">×1.2</option><option value="1.3">×1.3</option><option value="1.5">×1.5</option></select>
     <div class="alert">Видео пока не отправляется на сервер и не изменяется. Настройки будут применяться после подключения системы монтажа.</div>
   </section>
 
@@ -190,7 +190,7 @@
       <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
     </div>
     <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
-    <p class="note">Я разобрала твою запись настроек: камера усиленная, звук Авто, скорость ×1.1, тёплый фильтр, розовые субтитры. В GitHub Actions теперь есть работающие camera_style = enhanced, video_speed = 1.1, video_filter = warm, audio_profile = balanced, subtitle_style = signature. Вставка своих фото, эмодзи и звуковые акценты пока не реализованы. Настройки с этого экрана ещё НЕ передаются автоматически в Actions, запуск выполняется там отдельно.</p>
+    <p class="note">Каждый запуск GitHub Actions можно настроить по-разному: mode, subtitle_style, color, font_profile, caption_position, camera_style, video_speed, video_filter, audio_profile и hook_text. Параметры из записи «Чит-Кода» не закреплены как обязательные. Выбор на экране Mini App пока служит предпросмотром; в обработку передаются именно параметры запуска Actions. Вставки своих фото, эмодзи и звуковые акценты пока не реализованы.</p>
     <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
   </section>
 </div>
@@ -295,9 +295,9 @@
   });
   function updateSample(){
     var big=byId('sampleBig'); big.style.color=byId('color').value;
-    var styles={Тренд:'Arial, sans-serif',Хайп:'Impact, Arial Black, sans-serif',Ретро:'Georgia, serif',Эксперт:'Arial, sans-serif',Зефир:'Trebuchet MS, sans-serif',Журнал:'Georgia, serif'};
+    var styles={elegant:'Georgia, serif',clean:'Arial, sans-serif',bold:'Arial Black, Arial, sans-serif'};
     big.style.fontFamily=styles[byId('fontBig').value]||'Arial,sans-serif';
-    big.style.fontWeight=(byId('fontBig').value==='Ретро'||byId('fontBig').value==='Журнал')?'700':'900';
+    big.style.fontWeight=byId('fontBig').value==='clean'?'500':'900';
     if(byId('subtitleStyle').value==='signature'){
       big.style.fontFamily='Georgia, "Times New Roman", serif';
       big.style.fontWeight='700';
@@ -312,7 +312,7 @@
       big.style.fontStyle='normal';
       big.style.color=byId('color').value;
     }
-    var positions={auto:'60%',top:'18%',middle:'48%',bottom:'78%'};
+    var positions={top:'32%',middle:'62%',bottom:'78%'};
     byId('sample').style.top=positions[byId('position').value]||'60%';
     big.style.webkitTextStroke=byId('outline').value+'px #211832';
     big.style.textShadow='0 2px '+(Number(byId('shadow').value)+2)+'px #000a';
