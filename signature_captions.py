@@ -95,6 +95,8 @@ def build_signature_ass(
     words: Sequence[tuple[float, float, str]],
     color: str = DEFAULT_ACCENT,
     hook: str = "",
+    caption_position: str = "middle",
+    font_profile: str = "elegant",
 ) -> tuple[str, int]:
     """Возвращает содержимое .ass и число событий.
 
@@ -102,6 +104,17 @@ def build_signature_ass(
     сетевые сервисы не нужны.
     """
     accent = ass_color(color)
+    if caption_position not in ("top", "middle", "bottom"):
+        raise ValueError("Неизвестное положение субтитров.")
+    fonts = {
+        "elegant": ("Liberation Serif", "1"),
+        "clean": ("DejaVu Sans", "0"),
+        "bold": ("DejaVu Sans", "0"),
+    }
+    if font_profile not in fonts:
+        raise ValueError("Неизвестный шрифт.")
+    fontname, italic = fonts[font_profile]
+    font_size = 74 if font_profile != "bold" else 72
     header = (
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
@@ -116,8 +129,8 @@ def build_signature_ass(
         " Alignment, MarginL, MarginR, MarginV, Encoding\n"
         "Style: Whisper,DejaVu Sans,33,&H00FFFFFF,&H00FFFFFF,&H00271728,"
         "&H85000000,0,0,0,0,100,100,0,0,1,1.5,1.0,5,60,60,40,1\n"
-        f"Style: Accent,Liberation Serif,74,{accent},{accent},&H00221921,"
-        "&H76000000,1,1,0,0,100,100,0,0,1,1.6,2,5,35,35,40,1\n"
+        f"Style: Accent,{fontname},{font_size},{accent},{accent},&H00221921,"
+        f"&H76000000,1,{italic},0,0,100,100,0,0,1,1.6,2,5,35,35,40,1\n"
         f"Style: Hook,DejaVu Sans,55,{accent},{accent},&H00221921,"
         "&H85000000,1,0,0,0,100,100,0,0,1,2,2,5,50,50,40,1\n"
         "\n[Events]\n"
@@ -128,9 +141,10 @@ def build_signature_ass(
     # Позиция постоянная: субтитры не скачут по экрану между репликами.
     # Трёхуровневая композиция с референса:
     # белый верхний текст / крупное розовое слово / белый нижний текст.
-    top_y = 736
-    hero_y = 794
-    bottom_y = 851
+    vertical_shift = {"top": -355, "middle": 0, "bottom": 165}[caption_position]
+    top_y = 736 + vertical_shift
+    hero_y = 794 + vertical_shift
+    bottom_y = 851 + vertical_shift
     for index, group in enumerate(groups):
         start = max(0.0, group[0][0] - 0.10)
         end = group[-1][1] + 0.32
