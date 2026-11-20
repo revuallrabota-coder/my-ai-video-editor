@@ -1,0 +1,56 @@
+name: "✅ Проверка кода монтажёра"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "reference_editor.py"
+      - "telegram_editor.py"
+      - "bot_api_editor.py"
+      - ".github/workflows/test-without-api-id.yml"
+      - ".github/workflows/check-editor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: "Зависимости для проверки"
+        run: python -m pip install "telethon>=1.40,<2" "requests>=2.31,<3"
+      - name: "Проверить синтаксис Python"
+        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py
+      - name: "Проверить приближения на тестовом видео"
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import tempfile
+          from reference_editor import analyze_reference, add_virtual_camera
+          from telegram_editor import duration_and_audio
+
+          with tempfile.TemporaryDirectory() as tmp:
+              root = Path(tmp)
+              source, ready = root / "source.mp4", root / "ready.mp4"
+              subprocess.run([
+                  "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                  "-f", "lavfi", "-i", "testsrc2=size=360x640:rate=30:duration=2",
+                  "-f", "lavfi", "-i", "sine=frequency=400:duration=2",
+                  "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac",
+                  "-shortest", str(source),
+              ], check=True)
+              profile = analyze_reference(source)
+              assert 0.9 <= profile.seconds_per_change <= 4.5
+              add_virtual_camera(source, ready, profile.seconds_per_change)
+              duration, has_audio = duration_and_audio(ready)
+              assert 1.7 < duration < 2.3
+              assert has_audio
+              print("✓ FFmpeg референсный монтаж: тест пройден")
+          PY
