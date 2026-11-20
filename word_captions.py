@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Sequence
 
 from signature_captions import ass_color, ass_time, safe_text
+from font_presets import choose_font
 
 Word = tuple[float, float, str]
 
@@ -63,8 +64,7 @@ def build_word_pop_ass(
     """ASS-слой: мягкое всплытие слова точно в момент произнесения."""
     if style not in ("signature", "contrast", "classic"):
         raise ValueError("Неизвестный стиль субтитров.")
-    if font_profile not in ("elegant", "clean", "bold"):
-        raise ValueError("Неизвестный вариант шрифта.")
+    font = choose_font(font_profile)
     positions = {"top": 360, "middle": 780, "bottom": 1055}
     if caption_position not in positions:
         raise ValueError("Неизвестная позиция текста.")
@@ -72,13 +72,8 @@ def build_word_pop_ass(
         color = ("#F0443E" if style == "contrast" else
                  "#FFFFFF" if style == "classic" else "#EBC0C8")
     primary = ass_color(color)
-    face, italic, bold = {
-        "elegant": ("Liberation Serif", 1, 1),
-        "clean": ("DejaVu Sans", 0, 0),
-        "bold": ("DejaVu Sans", 0, 1),
-    }[font_profile]
-    if style == "classic":
-        face, italic, bold = "DejaVu Sans", 0, 1
+    # Выбор пользовательского шрифта сохраняется и в режиме classic.
+    face, italic, bold = font.name, font.italic, font.bold
     header = (
         "[Script Info]\nScriptType: v4.00+\n"
         "PlayResX: 720\nPlayResY: 1280\n"
@@ -88,10 +83,12 @@ def build_word_pop_ass(
         " OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut,"
         " ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow,"
         " Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Word,{face},76,{primary},{primary},&H00251B24,"
-        f"&H71000000,{bold},{italic},0,0,100,100,0,0,1,1.8,1.0,5,45,45,40,1\n"
-        f"Style: Hook,DejaVu Sans,52,{primary},{primary},&H00251B24,"
-        "&H71000000,1,0,0,0,100,100,0,0,1,1.8,1,5,52,52,40,1\n\n"
+        f"Style: Word,{face},{font.size},{primary},{primary},{font.outline_color},"
+        f"&H71000000,{bold},{italic},0,0,{font.scale_x},{font.scale_y},0,0,"
+        f"1,{font.outline},{font.shadow},5,45,45,40,1\n"
+        f"Style: Hook,{face},52,{primary},{primary},&H00251B24,"
+        f"&H71000000,{bold},{italic},0,0,{font.scale_x},{font.scale_y},"
+        "0,0,1,1.8,1,5,52,52,40,1\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
@@ -104,7 +101,7 @@ def build_word_pop_ass(
         fade_in = min(155, max(24, round(length_ms * .24)))
         fade_out = min(95, max(18, round(length_ms * .15)))
         motion = min(310, max(70, round(length_ms * .63)))
-        size = 78 if len(word) <= 9 else 67 if len(word) <= 12 else 53
+        size = min(92, font.size + 2) if len(word) <= 9 else max(49, font.size - 10) if len(word) <= 12 else 51
         # Один лёгкий pop и подъём с zero-overlap по таймкодам.
         text = (
             r"{\an5\move(360,"+str(y+14)+",360,"+str(y)
