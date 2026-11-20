@@ -133,9 +133,18 @@ def main() -> None:
     if subtitle_style not in ("signature", "classic", "contrast"):
         raise ValueError("Неизвестный стиль субтитров.")
     hook = os.environ.get("HOOK_TEXT", "").strip()[:70]
-    camera_style = os.environ.get("CAMERA_STYLE", "soft_punch")
-    if camera_style not in ("soft_punch", "gentle", "off"):
-        raise ValueError("Режим камеры должен быть soft_punch, gentle или off.")
+    camera_style = os.environ.get("CAMERA_STYLE", "enhanced")
+    if camera_style not in ("enhanced", "soft_punch", "gentle", "off"):
+        raise ValueError("Неверный режим камеры.")
+    try:
+        speed = float(os.environ.get("VIDEO_SPEED", "1.1"))
+    except ValueError:
+        raise ValueError("Скорость видео должна быть числом.") from None
+    if not 0.8 <= speed <= 1.5:
+        raise ValueError("Допустимая скорость: от 0.8 до 1.5.")
+    filter_style = os.environ.get("VIDEO_FILTER", "warm")
+    if filter_style not in ("none", "warm"):
+        raise ValueError("Неизвестный фильтр видео.")
     if mode not in ("auto", "captions", "cuts", "reference", "my_style"):
         raise RuntimeError("Неизвестный режим обработки.")
 
@@ -246,7 +255,7 @@ def main() -> None:
                             original_file,
                             reference_file if mode == "reference" else None,
                             output_file, color, audio_profile, subtitle_style, hook,
-                            camera_style
+                            camera_style, speed, filter_style
                         )
                         if mode == "reference":
                             caption = (
@@ -265,7 +274,7 @@ def main() -> None:
                     else:
                         details = edit_video(
                             original_file, output_file, mode, color, audio_profile,
-                            subtitle_style, hook
+                            subtitle_style, hook, speed, filter_style
                         )
                         caption = (
                             "✅ Готово!\n"
