@@ -402,24 +402,21 @@ async function workerUploadRoute(request, env, path) {
         return json({error:"Часть "+(i+1)+" ещё не доступна в хранилище; повтори запуск."},409);
       }
     }
-    await env.UPLOADS.put(
-      uploadKey(id,"meta"),
-      JSON.stringify({...meta,state:"queued"}),
-      {expirationTtl:UPLOAD_TTL}
-    );
     try {
       await githubDispatch(GITHUB_UPLOAD_API,env.GITHUB_PAT,{
         upload_id:id,
         worker_url:new URL(request.url).origin
       });
     } catch(err) {
-      await env.UPLOADS.put(
-        uploadKey(id,"meta"),
-        JSON.stringify({...meta,state:"uploading"}),
-        {expirationTtl:UPLOAD_TTL}
-      );
       return json({error:String(err.message ?? err)},502);
     }
+    // Single KV write prevents the 1-write-per-second throttle on rollback.
+    // GitHub runner retries reading metadata while KV replicates.
+    await env.UPLOADS.put(
+      uploadKey(id,"meta"),
+      JSON.stringify({...meta,state:"queued"}),
+      {expirationTtl:UPLOAD_TTL}
+    );
     return json({
       started:true,
       message:"50 МБ переданы. GitHub скачает видео частями, смонтирует ролик и отправит MP4 в Telegram."
@@ -433,7 +430,8 @@ export default {
     const path = new URL(request.url).pathname;
     // Health can be checked in Safari; does not expose secrets.
     if (request.method === "GET" && path === "/health") {
-      return json({ status: "online", mode: "github-actions-launcher" });
+      return json({ status: "online", mode: "github-actions-launcher",
+        uploads_50mb_configured: Boolean(env.UPLOADS) });
     }
     if (path.startsWith("/internal/upload/")) {
       return workerUploadRoute(request, env, path);
