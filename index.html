@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8ebfa">
+  <meta name="description" content="Личный видеомонтажёр — мини-приложение Telegram">
+  <title>Мой AI Монтажёр</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {--ink:#20193e;--muted:#7e759c;--pink:#f636a1;--violet:#aa64f2;--line:#e5d8f7;--cream:#fff;--bg:#f8effe}
+    * {box-sizing:border-box}
+    body {margin:0; min-height:100vh; background:linear-gradient(145deg,#f1e9ff 0%,#ffebf5 58%,#f5f0ff 100%); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; color:var(--ink)}
+    button,input,select {font:inherit}
+    button {cursor:pointer}
+    .container {max-width:570px; margin:auto; padding:24px 16px 110px}
+    .top {display:flex; justify-content:space-between; align-items:center; margin-bottom:18px}
+    .brand {display:flex;align-items:center;gap:12px}
+    .logo {display:grid;place-items:center;font-size:27px;width:55px;height:55px;border-radius:17px;background:linear-gradient(145deg,#ff8ac7,#9d64f3);box-shadow:0 5px 18px #f77cb685}
+    h1 {font-size:22px;margin:0 0 3px;line-height:1.2}
+    h2 {font-size:25px;margin:0 0 8px}
+    h3 {font-size:18px;margin:20px 0 10px}
+    p {color:var(--muted);line-height:1.48;margin:7px 0 18px}
+    .tiny {font-size:12px;color:var(--muted)}
+    .progress {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;margin:16px 0 20px}
+    .progress-item {text-align:center}
+    .num {width:42px;height:42px;margin:auto auto 5px;display:grid;place-items:center;border-radius:50%;background:#fff;color:#aca2c1;border:3px solid #e9dff7;font-weight:800}
+    .progress-item.active .num {border-color:#f493ce;background:linear-gradient(135deg,#fc4b9c,#b453ec);color:white;box-shadow:0 5px 14px #df5fc559}
+    .progress-item.complete .num {background:#c1f7dc;color:#168457;border-color:#a8efd0}
+    .progress-item span {font-size:11px;color:#9389aa}
+    .progress-item.active span {color:var(--pink);font-weight:800}
+    .card {background:#ffffffed;border:2px solid #eee3f8;border-radius:27px;padding:22px;box-shadow:0 9px 26px #4c1a5410}
+    .page {display:none}
+    .page.active {display:block}
+    .upload {display:block;text-align:center;cursor:pointer;background:#fce5f3;border:3px dashed #f4a5d6;border-radius:23px;padding:22px 12px; margin:18px 0 15px}
+    .upload strong {display:block;font-size:18px}
+    .upload small {display:block;margin-top:8px;color:var(--muted)}
+    .upload input {position:absolute;opacity:0;width:1px;height:1px}
+    .upload .emoji {font-size:32px;margin-bottom:9px}
+    video {width:100%;max-height:340px;object-fit:contain;background:#161322;border-radius:18px}
+    .mini {margin:0 0 14px;font-size:13px;color:#777092;overflow-wrap:anywhere}
+    .segmented {display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}
+    .option,.selectbox {display:block;width:100%;background:#fff;border:2px solid var(--line);border-radius:18px;padding:15px 14px;margin:10px 0;text-align:left;color:var(--ink);font-weight:650}
+    .option.selected,.selectbox:focus-within {border-color:var(--pink);box-shadow:0 0 0 3px #f238a41c;background:#fff5fa}
+    .option small {display:block;color:var(--muted);font-weight:400;margin:6px 0 0;line-height:1.35}
+    .option input {margin-right:7px;accent-color:var(--pink)}
+    label.field {display:block;font-weight:700;margin:16px 0 6px}
+    select,input[type=text],input[type=file],input[type=color],input[type=range] {width:100%}
+    select,input[type=text],input[type=file] {background:#fff;border:2px solid var(--line);border-radius:15px;padding:13px;color:var(--ink);min-height:49px}
+    input[type=color] {height:55px;background:white;border:2px solid var(--line);border-radius:15px;padding:5px}
+    input[type=range] {accent-color:var(--pink)}
+    .split {display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .note {font-size:13px;color:var(--muted)}
+    .previewbox {position:relative;overflow:hidden;background:linear-gradient(140deg,#211832,#6b406d);border-radius:21px;aspect-ratio:9/12;max-height:390px;margin:15px auto;display:flex;align-items:center;justify-content:center;text-align:center;border:4px solid #f8d9b5}
+    .sample {position:absolute;left:7%;right:7%;top:60%;color:white;text-shadow:0 2px 7px #0008}
+    .sample .big {display:block;font-weight:900;font-size:clamp(22px,7vw,37px);line-height:1.12;text-transform:uppercase;overflow-wrap:anywhere}
+    .sample .small {display:block;font-weight:700;font-size:16px;margin-top:5px}
+    .caption-bg {position:absolute;inset:0;opacity:.2;background:radial-gradient(circle at 50% 30%,#fdbfcf,transparent 50%)}
+    .previewbox video {width:100%;height:100%;max-height:none;object-fit:contain;background:#171022;position:absolute;inset:0}
+    .footer {position:fixed;bottom:0;left:0;right:0;background:#fffefbeE;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #efdfef;backdrop-filter:blur(10px)}
+    .footer-inner {max-width:570px;margin:auto;display:flex;gap:10px}
+    .btn {border:0;border-radius:26px;padding:15px 20px;font-weight:800;font-size:16px}
+    .primary {background:linear-gradient(100deg,#fa429c,#ca49da);color:white;box-shadow:0 5px 16px #e6569b66;flex:1}
+    .secondary {background:#f0e7f9;color:#675381}
+    .smallbtn {background:#f3eafa;color:#694d88;font-size:13px;padding:10px 13px;border:0;border-radius:15px}
+    .summary-row {display:flex;gap:10px;justify-content:space-between;border:1px solid var(--line);border-radius:14px;padding:12px;margin:8px 0}
+    .summary-row span:first-child {color:var(--muted)}
+    .summary-row strong {text-align:right;overflow-wrap:anywhere}
+    .alert {background:#fff3f7;border:1px solid #f4afd3;padding:12px;border-radius:14px;color:#7c476c;font-size:13px;line-height:1.5}
+    .nowrap {white-space:nowrap}
+    [hidden] {display:none!important}
+    @media(max-width:365px){.container{padding-left:11px;padding-right:11px}.card{padding:15px}.progress-item span{font-size:9px}.num{width:35px;height:35px}}
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="top">
+    <div class="brand">
+      <div class="logo">🎬</div>
+      <div><h1>Мой AI Монтажёр</h1><div class="tiny">Твои видео. Твой стиль.</div></div>
+    </div>
+    <span class="tiny">Версия 0.1</span>
+  </div>
+  <div class="progress" id="progress"></div>
+
+  <section class="card page active" data-page="0">
+    <h2>Загрузить видео</h2>
+    <p>Выбери одно или несколько исходных видео, снятых на iPad или телефон.</p>
+    <label class="upload">
+      <div class="emoji">📎</div>
+      <strong>Выбрать видео</strong>
+      <small>Открывается файловый менеджер устройства</small>
+      <input type="file" id="videos" accept="video/*" multiple>
+    </label>
+    <div class="mini" id="videoInfo">Видео пока не выбрано.</div>
+    <video id="firstVideo" controls playsinline hidden></video>
+    <h3>Формат</h3>
+    <div class="segmented">
+      <button type="button" class="option selected" data-ratio="9:16">📱 Вертикально 9:16</button>
+      <button type="button" class="option" data-ratio="16:9">🖥️ Горизонтально 16:9</button>
+    </div>
+  </section>
+
+  <section class="card page" data-page="1">
+    <h2>Что делаем</h2>
+    <p>Выбери один вариант обработки.</p>
+    <label class="option selected mode"><input type="radio" name="mode" value="Монтаж + субтитры" checked> ✂️ Монтаж + субтитры<small>Убрать паузы и дубли, добавить зумы и подписи.</small></label>
+    <label class="option mode"><input type="radio" name="mode" value="Монтаж без субтитров"> 🎞️ Монтаж без субтитров<small>Только нарезка и движения камеры.</small></label>
+    <label class="option mode"><input type="radio" name="mode" value="Только субтитры"> 💬 Только субтитры<small>Не резать видео, добавить оформление речи.</small></label>
+    <h3>Свои фото в ролик</h3>
+    <input type="file" id="photos" accept="image/*" multiple>
+    <div class="note" id="photoInfo">Можно выбрать до 30 фото.</div>
+  </section>
+
+  <section class="card page" data-page="2">
+    <h2>Оформление подписей</h2>
+    <p>Большое слово выделяется цветом, остальные остаются белыми. Предпросмотр здесь условный, это не готовый монтаж.</p>
+    <div class="previewbox">
+      <div class="caption-bg"></div>
+      <video id="captionVideo" muted loop playsinline hidden></video>
+      <div class="sample" id="sample">
+        <span class="big" id="sampleBig">НАЙДИ ОШИБКУ</span>
+        <span class="small">за три секунды</span>
+      </div>
+    </div>
+    <label class="field" for="color">Цвет главного слова</label>
+    <input type="color" id="color" value="#d19aab">
+    <div class="split">
+      <div><label class="field" for="fontBig">Крупный шрифт</label>
+        <select id="fontBig"><option>Тренд</option><option>Хайп</option><option>Ретро</option><option>Эксперт</option><option>Зефир</option><option>Журнал</option></select></div>
+      <div><label class="field" for="fontSmall">Мелкий шрифт</label>
+        <select id="fontSmall"><option>Классика</option><option>Тонкий</option><option>Журнал</option><option>Минимал</option></select></div>
+    </div>
+    <label class="field" for="fontFile">Свой шрифт (необязательно)</label>
+    <input id="fontFile" type="file" accept=".ttf,.otf">
+    <label class="field" for="position">Где стоят подписи</label>
+    <select id="position"><option value="auto">Авто — под лицом (планируемая функция)</option><option value="top">Над головой</option><option value="middle">По центру</option><option value="bottom">Внизу</option></select>
+    <label class="field" for="outline">Обводка: <span id="outlineValue">0</span></label>
+    <input id="outline" type="range" min="0" max="8" value="0">
+    <label class="field" for="shadow">Мягкая тень: <span id="shadowValue">2</span></label>
+    <input id="shadow" type="range" min="0" max="10" value="2">
+    <label class="option"><input id="emoji" type="checkbox" checked> Эмодзи к словам</label>
+    <label class="option"><input id="soundfx" type="checkbox" checked> Звуковые акценты</label>
+    <label class="option"><input id="hook" type="checkbox" checked> Хук в начале ролика</label>
+    <label class="field" for="hookText">Текст хука</label>
+    <input id="hookText" type="text" maxlength="50" placeholder="Например: Найди ошибку!">
+  </section>
+
+  <section class="card page" data-page="3">
+    <h2>Эффекты и фильтр</h2>
+    <p>Выбери будущий стиль обработки изображения и звука.</p>
+    <label class="field" for="camera">Динамика камеры</label>
+    <select id="camera"><option>Стандарт — плавные зумы</option><option>Без динамики</option><option>Усиленная — больше зумов</option></select>
+    <label class="field" for="audio">Звук</label>
+    <select id="audio"><option>Как снято — исходная речь</option><option>Авто — выровнять громкость</option><option>Убрать фоновый шум</option></select>
+    <label class="field" for="filter">Фильтр</label>
+    <select id="filter"><option>Без фильтра</option><option>Тёплый</option><option>Нежный</option><option>Холодный</option><option>Контрастный</option></select>
+    <label class="field" for="speed">Скорость</label>
+    <select id="speed"><option value="1.0">×1.0</option><option value="1.1">×1.1</option><option value="1.2">×1.2</option><option value="1.3">×1.3</option><option value="1.5">×1.5</option></select>
+    <div class="alert">Видео пока не отправляется на сервер и не изменяется. Настройки будут применяться после подключения системы монтажа.</div>
+  </section>
+
+  <section class="card page" data-page="4">
+    <h2>Проверь заказ</h2>
+    <p>Мы сохраним твои настройки. Позже к этой странице подключится обработка видео.</p>
+    <div id="summary"></div>
+    <button class="btn primary" type="button" style="width:100%;margin:14px 0" id="saveButton">Скачать настройки</button>
+    <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
+  </section>
+</div>
+<footer class="footer"><div class="footer-inner"><button type="button" class="btn secondary" id="back" hidden>← Назад</button><button type="button" class="btn primary" id="next">Дальше →</button></div></footer>
+<script>
+(function(){
+  'use strict';
+  var tg=window.Telegram && window.Telegram.WebApp;
+  if(tg){tg.ready();tg.expand();}
+  var current=0, ratio='9:16', previewUrl=null;
+  var pages=Array.from(document.querySelectorAll('.page'));
+  var names=['Видео','Монтаж','Подписи','Эффекты','Итог'];
+  var byId=function(id){return document.getElementById(id)};
+  var videoInput=byId('videos');
+  var photoInput=byId('photos');
+  function fmtBytes(n){return n>=1073741824?(n/1073741824).toFixed(2)+' ГБ':(n/1048576).toFixed(1)+' МБ'}
+  function selectedText(id){return byId(id).options[byId(id).selectedIndex].text}
+  function getSettings(){
+    return {
+      videoFiles:Array.from(videoInput.files).map(function(f){return {name:f.name,sizeBytes:f.size}}),
+      photos:Array.from(photoInput.files).map(function(f){return f.name}),
+      ratio:ratio,
+      mode:document.querySelector('input[name="mode"]:checked').value,
+      subtitleColor:byId('color').value,
+      largeFont:byId('fontBig').value,
+      smallFont:byId('fontSmall').value,
+      customFont:byId('fontFile').files[0] ? byId('fontFile').files[0].name : null,
+      captionPosition:byId('position').value,
+      outline:Number(byId('outline').value),
+      shadow:Number(byId('shadow').value),
+      emoji:byId('emoji').checked,
+      soundEffects:byId('soundfx').checked,
+      hook:byId('hook').checked,
+      hookText:byId('hookText').value,
+      camera:selectedText('camera'),
+      audio:selectedText('audio'),
+      filter:selectedText('filter'),
+      speed:Number(byId('speed').value)
+    };
+  }
+  function row(key,value){
+    var d=document.createElement('div');d.className='summary-row';
+    var a=document.createElement('span');a.textContent=key;
+    var b=document.createElement('strong');b.textContent=value;
+    d.append(a,b);return d;
+  }
+  function draw(){
+    pages.forEach(function(p,i){p.classList.toggle('active',i===current)});
+    var progress=byId('progress');progress.replaceChildren();
+    names.forEach(function(name,i){
+      var el=document.createElement('div');
+      el.className='progress-item'+(i===current?' active':i<current?' complete':'');
+      var num=document.createElement('div');num.className='num';num.textContent=i<current?'✓':String(i+1);
+      var label=document.createElement('span');label.textContent=name;el.append(num,label);progress.append(el);
+    });
+    byId('back').hidden=current===0;
+    byId('next').hidden=current===4;
+    if(current===4){
+      var s=getSettings();var summary=byId('summary');summary.replaceChildren();
+      [['Видео',s.videoFiles.length+' шт.'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed]].forEach(function(item){summary.append(row(item[0],item[1]))});
+    }
+    window.scrollTo({top:0,behavior:'instant'});
+  }
+  videoInput.addEventListener('change',function(){
+    var files=Array.from(videoInput.files);
+    byId('videoInfo').textContent=files.length?files.length+' видео, '+fmtBytes(files.reduce(function(sum,f){return sum+f.size},0))+'. Первый файл: '+files[0].name:'Видео пока не выбрано.';
+    if(previewUrl)URL.revokeObjectURL(previewUrl);
+    previewUrl=files.length?URL.createObjectURL(files[0]):null;
+    ['firstVideo','captionVideo'].forEach(function(id){
+      var el=byId(id);
+      el.hidden=!previewUrl;
+      if(previewUrl){el.src=previewUrl;el.load()}else{el.removeAttribute('src')}
+    });
+  });
+  photoInput.addEventListener('change',function(){
+    byId('photoInfo').textContent=photoInput.files.length+' фото из 30';
+  });
+  document.querySelectorAll('[data-ratio]').forEach(function(button){
+    button.addEventListener('click',function(){
+      ratio=button.dataset.ratio;
+      document.querySelectorAll('[data-ratio]').forEach(function(x){x.classList.toggle('selected',x===button)});
+    });
+  });
+  document.querySelectorAll('.mode input').forEach(function(input){
+    input.addEventListener('change',function(){
+      document.querySelectorAll('.mode').forEach(function(label){label.classList.toggle('selected',label.querySelector('input').checked)});
+    });
+  });
+  function updateSample(){
+    var big=byId('sampleBig'); big.style.color=byId('color').value;
+    var styles={Тренд:'Arial, sans-serif',Хайп:'Impact, Arial Black, sans-serif',Ретро:'Georgia, serif',Эксперт:'Arial, sans-serif',Зефир:'Trebuchet MS, sans-serif',Журнал:'Georgia, serif'};
+    big.style.fontFamily=styles[byId('fontBig').value]||'Arial,sans-serif';
+    big.style.fontWeight=(byId('fontBig').value==='Ретро'||byId('fontBig').value==='Журнал')?'700':'900';
+    var positions={auto:'60%',top:'18%',middle:'48%',bottom:'78%'};
+    byId('sample').style.top=positions[byId('position').value]||'60%';
+    big.style.webkitTextStroke=byId('outline').value+'px #211832';
+    big.style.textShadow='0 2px '+(Number(byId('shadow').value)+2)+'px #000a';
+    big.textContent=byId('hookText').value.trim() || 'НАЙДИ ОШИБКУ';
+    byId('outlineValue').textContent=byId('outline').value;
+    byId('shadowValue').textContent=byId('shadow').value;
+  }
+  ['color','fontBig','position','outline','shadow','hookText'].forEach(function(id){byId(id).addEventListener('input',updateSample)});
+  function go(dir){
+    if(dir>0 && current===0 && !videoInput.files.length){alert('Сначала выбери хотя бы одно видео.');return}
+    if(dir>0 && current===1 && photoInput.files.length>30){alert('Можно выбрать не больше 30 фото.');return}
+    current=Math.max(0,Math.min(4,current+dir));draw();
+  }
+  byId('back').addEventListener('click',function(){go(-1)});
+  byId('next').addEventListener('click',function(){go(1)});
+  byId('saveButton').addEventListener('click',function(){
+    var data=JSON.stringify(getSettings(),null,2);
+    var blob=new Blob([data],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download='montage-settings.json';document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url)},5000);
+  });
+  updateSample();draw();
+})();
+</script>
+</body>
+</html>
