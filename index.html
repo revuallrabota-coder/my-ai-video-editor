@@ -390,6 +390,228 @@
       }else{alert('Скопируй ID вручную: '+ownerId)}
     });
   }
+
+  // Real rendering API. The backend verifies Telegram.WebApp.initData;
+  // no GitHub token or Telegram bot token is ever present in the browser.
+  var apiInput=byId('apiBase');
+  var jobId=null, jobTimer=null, currentTranscript='', submitting=false;
+  try{apiInput.value=localStorage.getItem('personalEditorServer')||''}catch(ignore){}
+  function apiOrigin(){
+    var address=apiInput.value.trim().replace(/\/+$/,'');
+    if(!/^https:\/\/[a-z0-9.-]+(?::443)?$/i.test(address)){
+      throw new Error('Укажи полный адрес HTTPS-сервера из Render, например https://...onrender.com');
+    }
+    return address;
+  }
+  function showRenderStatus(msg){byId('renderStatus').textContent=msg}
+  function modeForServer(mode){
+    var names={
+      'Мой стиль':'my_style',
+      'Монтаж + субтитры':'auto',
+      'Монтаж без субтитров':'cuts',
+      'Только субтитры':'captions',
+      'По референсу':'reference'
+    };
+    return names[mode]||'my_style';
+  }
+  function buildRenderSettings(){
+    var s=getSettings();
+    return {
+      mode:modeForServer(s.mode),
+      subtitle_style:s.subtitleStyle,
+      color:s.subtitleColor,
+      font_profile:s.largeFont,
+      caption_position:s.captionPosition,
+      camera_style:s.cameraStyle,
+      audio_profile:s.audioProfile,
+      filter_style:byId('filter').value,
+      speed:s.speed,
+      sound_effects:s.soundEffects?'soft':'off',
+      emoji_mode:s.emoji?'on':'off',
+      hook:s.hook?s.hookText:'',
+      hook_position:s.hook?s.hookPosition:'off'
+    };
+  }
+  function telegramProof(){
+    if(!tg || !tg.initData)throw new Error(
+      'Открой мини-приложение из меню своего Telegram-бота, а не обычной вкладкой Safari.'
+    );
+    return tg.initData;
+  }
+  async function checkedFetch(path, options){
+    var url=apiOrigin()+path;
+    var headers=Object.assign({},options&&options.headers||{});
+    headers['X-Telegram-Init-Data']=telegramProof();
+    var response;
+    try{response=await fetch(url,Object.assign({},options||{},{headers:headers,cache:'no-store'}))}
+    catch(err){throw new Error('Не удаётся связаться с сервером. Проверь его адрес и статус на Render.')}
+    if(!response.ok){
+      var explanation='';
+      try{
+        var json=await response.json();
+        explanation=typeof json.detail==='string'?json.detail:JSON.stringify(json.detail||json);
+      }catch(e){explanation='HTTP '+response.status}
+      throw new Error(explanation);
+    }
+    return response;
+  }
+  function stopPolling(){if(jobTimer){clearInterval(jobTimer);jobTimer=null}}
+  async function pollJob(){
+    if(!jobId || submitting)return;
+    try{
+      var response=await checkedFetch('/api/jobs/'+encodeURIComponent(jobId),{method:'GET'});
+      var data=await response.json();
+      showRenderStatus(data.message||data.status);
+      if(data.status==='needs_review'){
+        byId('reviewPanel').hidden=false;
+        if(currentTranscript!==data.transcript){
+          currentTranscript=data.transcript||'';
+          byId('reviewTranscript').value=currentTranscript;
+        }
+        stopPolling();
+      }else if(data.status==='done'){
+        byId('reviewPanel').hidden=true;
+        byId('downloadResult').hidden=false;
+        byId('startRender').disabled=false;
+        stopPolling();
+      }else if(data.status==='error'){
+        stopPolling();
+        byId('startRender').disabled=false;
+        showRenderStatus('⚠️ '+(data.error||data.message||'Монтаж не удался.'));
+      }
+    }catch(err){
+      showRenderStatus('⚠️ '+err.message);
+      stopPolling();
+      byId('startRender').disabled=false;
+    }
+  }
+  function startPolling(){
+    stopPolling();
+    pollJob();
+    jobTimer=setInterval(pollJob,3500);
+  }
+  byId('startRender').addEventListener('click',function(){
+    if(submitting)return;
+    try{
+      var endpoint=apiOrigin();
+      var auth=telegramProof();
+      var videos=videoInput.files;
+      if(videos.length!==1)throw new Error('Для одного монтажа выбери ровно одно исходное видео.');
+      if(photoInput.files.length)throw new Error('Вставки фотографий сервер пока не поддерживает. Убери их для первого теста.');
+      if(ratio!=='9:16')throw new Error('Сейчас реальный экспорт работает в 9:16. Выбери вертикальный формат.');
+      if(byId('fontFile').files.length)throw new Error('Загрузка собственного шрифта пока не поддерживается: выбери один из встроенных.');
+      var settings=buildRenderSettings();
+      var reference=byId('referenceVideo').files[0];
+      if(settings.mode==='reference' && !reference)throw new Error('Для режима по референсу выбери второй видеофайл.');
+      if(settings.hook_position!=='off' && !settings.hook.trim())throw new Error('Введи текст хука либо выключи переключатель.');
+      try{localStorage.setItem('personalEditorServer',endpoint)}catch(ignore){}
+      var body=new FormData();
+      body.append('video',videos[0],videos[0].name);
+      if(settings.mode==='reference')body.append('reference',reference,reference.name);
+      body.append('settings',JSON.stringify(settings));
+
+      jobId=null;
+      currentTranscript='';
+      byId('reviewPanel').hidden=true;
+      byId('downloadResult').hidden=true;
+      byId('uploadProgress').hidden=false;
+      byId('uploadProgress').value=0;
+      byId('startRender').disabled=true;
+      submitting=true;
+      showRenderStatus('Загружаю видео на сервер…');
+      var xhr=new XMLHttpRequest();
+      xhr.open('POST',endpoint+'/api/jobs',true);
+      xhr.setRequestHeader('X-Telegram-Init-Data',auth);
+      xhr.upload.onprogress=function(event){
+        if(event.lengthComputable){
+          var percent=Math.min(100,Math.round(event.loaded/event.total*100));
+          byId('uploadProgress').value=percent;
+          showRenderStatus('Загрузка: '+percent+'%');
+        }
+      };
+      xhr.onload=function(){
+        submitting=false;
+        byId('uploadProgress').hidden=true;
+        if(xhr.status>=200 && xhr.status<300){
+          try{
+            var answer=JSON.parse(xhr.responseText);
+            jobId=answer.job_id;
+            showRenderStatus('Видео загружено. Анализирую речь…');
+            startPolling();
+          }catch(e){
+            byId('startRender').disabled=false;
+            showRenderStatus('Ошибка ответа сервера.');
+          }
+        }else{
+          byId('startRender').disabled=false;
+          var message='HTTP '+xhr.status;
+          try{
+            var error=JSON.parse(xhr.responseText);
+            message=typeof error.detail==='string'?error.detail:message;
+          }catch(e){}
+          showRenderStatus('⚠️ '+message);
+        }
+      };
+      xhr.onerror=function(){
+        submitting=false;
+        byId('startRender').disabled=false;
+        byId('uploadProgress').hidden=true;
+        showRenderStatus('⚠️ Не удалось загрузить файл. Проверь URL сервера и его работу.');
+      };
+      xhr.send(body);
+    }catch(err){
+      submitting=false;
+      byId('startRender').disabled=false;
+      showRenderStatus('⚠️ '+err.message);
+    }
+  });
+  byId('confirmTranscript').addEventListener('click',async function(){
+    if(!jobId)return;
+    var text=byId('reviewTranscript').value.trim();
+    if(!text && currentTranscript) {
+      showRenderStatus('Исправленный текст не должен быть пустым.'); return;
+    }
+    var accepted=text===currentTranscript;
+    try{
+      byId('confirmTranscript').disabled=true;
+      var resp=await checkedFetch('/api/jobs/'+encodeURIComponent(jobId)+'/review',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({confirmed:accepted,corrected_text:accepted?'':text})
+      });
+      byId('reviewPanel').hidden=true;
+      showRenderStatus('Текст принят! Монтирую ролик…');
+      submitting=false;
+      startPolling();
+    }catch(err){
+      showRenderStatus('⚠️ '+err.message);
+    }finally{
+      byId('confirmTranscript').disabled=false;
+    }
+  });
+  byId('downloadResult').addEventListener('click',async function(){
+    if(!jobId)return;
+    try{
+      showRenderStatus('Скачиваю готовый MP4…');
+      var response=await checkedFetch('/api/jobs/'+encodeURIComponent(jobId)+'/download',{
+        method:'GET'
+      });
+      var blob=await response.blob();
+      var url=URL.createObjectURL(blob);
+      var anchor=document.createElement('a');
+      anchor.href=url;
+      anchor.download='my-edited-reels.mp4';
+      anchor.style.display='none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(function(){URL.revokeObjectURL(url)},60000);
+      showRenderStatus('✅ Видео готово. Сохранение файла началось.');
+    }catch(err){
+      showRenderStatus('⚠️ '+err.message);
+    }
+  });
+
   updateSample();draw();
 })();
 </script>
