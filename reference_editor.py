@@ -116,7 +116,7 @@ def add_virtual_camera(
     gentle: только одно очень медленное приближение на 2.5%.
     off: без искусственного увеличения.
     """
-    if camera_style not in ("soft_punch", "gentle", "off"):
+    if camera_style not in ("soft_punch", "enhanced", "gentle", "off"):
         raise ValueError("Неизвестный режим камеры.")
     if camera_style == "off":
         # Не перекодируем видеокартинку и не добавляем цифрового дрожания.
@@ -134,10 +134,18 @@ def add_virtual_camera(
         # Период 13 сек, за одну серию: широкий -> близкий -> широкий.
         # smoothstep даёт нулевую скорость в начале и в конце каждого
         # перехода, поэтому переключений с тряской быть не должно.
-        p = "mod(on,390)"
-        entrance = _smoothstep(p, 24, 24)
-        exit_ = _smoothstep(p, 211, 30)
-        zoom = f"1+0.11*({entrance}-{exit_})"
+        if camera_style == "enhanced":
+            # Режим «Усиленная» из записи: чаще и заметнее, но так же плавно.
+            # 9 секунд на серию, 18% увеличение, удержание крупного кадра.
+            p = "mod(on,270)"
+            entrance = _smoothstep(p, 12, 27)
+            exit_ = _smoothstep(p, 173, 30)
+            zoom = f"1+0.18*({entrance}-{exit_})"
+        else:
+            p = "mod(on,390)"
+            entrance = _smoothstep(p, 24, 24)
+            exit_ = _smoothstep(p, 211, 30)
+            zoom = f"1+0.11*({entrance}-{exit_})"
 
     # Больший промежуточный размер уменьшает ступенчатые сдвиги центра.
     vf = (
@@ -164,6 +172,8 @@ def montage_by_reference(
     subtitle_style: str = "signature",
     hook: str = "",
     camera_style: str = "soft_punch",
+    speed: float = 1.0,
+    filter_style: str = "none",
 ) -> dict:
     """Монтаж с нарезкой тишины, ритмом референса и живыми субтитрами."""
     # Без второго файла используем постоянный темп из разобранного
@@ -183,7 +193,10 @@ def montage_by_reference(
         joined = folder / "joined.mp4"
         dynamic = folder / "dynamic.mp4"
         subtitles = folder / "subtitles.ass"
-        base_video(original, joined, kept, source_has_audio, audio_profile=audio_profile)
+        base_video(
+            original, joined, kept, source_has_audio,
+            audio_profile=audio_profile, speed=speed, filter_style=filter_style,
+        )
         add_virtual_camera(joined, dynamic, profile.seconds_per_change, camera_style=camera_style)
         count = write_ass(dynamic, subtitles, color, style=subtitle_style, hook=hook)
         if count:
@@ -192,7 +205,7 @@ def montage_by_reference(
             dynamic.replace(output)
     return {
         "before": round(source_duration, 1),
-        "after": round(sum(s.end - s.start for s in kept), 1),
+        "after": round(sum(s.end - s.start for s in kept) / speed, 1),
         "subtitle_events": count,
         "reference_scene_changes": profile.scene_changes,
         "reference_pace_seconds": profile.seconds_per_change,
