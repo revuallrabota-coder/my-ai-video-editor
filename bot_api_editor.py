@@ -87,9 +87,9 @@ def send_result(token: str, chat_id: int, result: Path, caption: str) -> None:
     try:
         with result.open("rb") as stream:
             resp = requests.post(
-                API_ROOT + token + "/sendVideo",
-                data={"chat_id": chat_id, "caption": caption, "supports_streaming": "true"},
-                files={"video": (result.name, stream, "video/mp4")},
+                API_ROOT + token + "/sendDocument",
+                data={"chat_id": chat_id, "caption": caption + "\n📁 Исходное качество MP4."},
+                files={"document": (result.name, stream, "video/mp4")},
                 timeout=(30, 180),
             )
             payload = resp.json()
@@ -123,6 +123,7 @@ def render_result(
     emoji_mode: str = "off",
     hook_position: str = "start",
     quality: str = "high",
+    subtitle_delay: float = 0.30,
 ) -> None:
     """Рендер только из одобренной версии текста."""
     try:
@@ -137,6 +138,7 @@ def render_result(
                 caption_animation=caption_animation,
                 sound_effects=sound_effects, emoji_mode=emoji_mode,
                 hook_position=hook_position, quality=quality,
+                subtitle_delay=subtitle_delay,
             )
             caption = (
                 "🎬 Монтаж готов! "
@@ -149,7 +151,7 @@ def render_result(
                 subtitle_style, hook, speed, filter_style,
                 caption_position, font_profile, reviewed_words,
                 caption_animation, sound_effects, emoji_mode, hook_position,
-                quality,
+                quality, subtitle_delay,
             )
             caption = (
                 "✅ Готово! "
@@ -215,6 +217,9 @@ def main() -> None:
         raise ValueError("Скорость видео должна быть числом.") from None
     if not 0.8 <= speed <= 1.5:
         raise ValueError("Допустимая скорость: от 0.8 до 1.5.")
+    subtitle_delay = float(os.environ.get("SUBTITLE_DELAY", "0.30"))
+    if not -0.5 <= subtitle_delay <= 1.5:
+        raise ValueError("SUBTITLE_DELAY от -0.5 до +1.5 сек.")
     quality = os.environ.get("EXPORT_QUALITY", "high")
     from export_profiles import get_export_profile
     get_export_profile(quality)
@@ -263,6 +268,7 @@ def main() -> None:
         "\n/hook end ТЕКСТ — хук в конце."
         "\n/hook both ТЕКСТ — хук и там, и там."
         "\n/hook off — выключить."
+        "\n/sync 0.4 — задержать титры; /sync 0 — без задержки."
     )
     send_text(token, owner_id, prompt)
     LOG.info("Ожидаем входящие видео от владельца, режим=%s, максимум 15 минут.", mode)
@@ -363,6 +369,22 @@ def main() -> None:
                         )
                     continue
 
+                if low.startswith("/sync"):
+                    parts = low.split()
+                    if len(parts) != 2:
+                        send_text(token, chat_id, "Пример: /sync 0.4 — титры позже речи; /sync 0 — без задержки.")
+                        continue
+                    try:
+                        value = float(parts[1].replace(",", "."))
+                        if not -0.5 <= value <= 1.5:
+                            raise ValueError()
+                        subtitle_delay = value
+                    except ValueError:
+                        send_text(token, chat_id, "Укажи число от -0.5 до 1.5: /sync 0.4")
+                        continue
+                    send_text(token, chat_id, f"⏱ Сдвиг субтитров: {subtitle_delay:+.2f} сек.")
+                    continue
+
                 if pending_words is not None and pending_chat_id == chat_id:
                     if raw_text.lower() == "/ok":
                         reviewed_words = pending_words
@@ -405,6 +427,7 @@ def main() -> None:
                         caption_animation=caption_animation,
                         sound_effects=sound_effects, emoji_mode=emoji_mode,
                         hook_position=hook_position, quality=quality,
+                        subtitle_delay=subtitle_delay,
                     )
                     return
 
@@ -459,6 +482,7 @@ def main() -> None:
                             caption_animation=caption_animation,
                             sound_effects=sound_effects, emoji_mode=emoji_mode,
                             hook_position=hook_position, quality=quality,
+                        subtitle_delay=subtitle_delay,
                         )
                         return
                     from telegram_editor import transcribe_words, duration_and_audio
