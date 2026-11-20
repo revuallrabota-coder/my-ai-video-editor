@@ -225,6 +225,7 @@
       <button class="btn primary" id="upload50Button" type="button" style="width:100%;margin-top:10px">📤 Загрузить и смонтировать до 50 МБ</button>
       <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
       <p class="mini" id="upload50Status" role="status" aria-live="polite">Использует адрес Cloudflare из поля ниже.</p>
+      <button class="btn" id="checkUploadedResult" type="button" style="width:100%;margin-top:8px">⬇️ Проверить готовность / скачать Full HD</button>
       <p class="mini"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/CLOUDFLARE_50MB.md" target="_blank" rel="noopener noreferrer">Как один раз подключить хранилище KV на iPad</a></p>
     </div>
     <div class="alert" style="margin:16px 0">
@@ -516,6 +517,7 @@
       var partSize=start.chunk_size;
       var parts=start.parts;
       var id=start.upload_id;
+      try{localStorage.setItem('personalEditorLastUpload',JSON.stringify({id:id,url:url,created:Date.now()}))}catch(ignore){}
       for(var i=0;i<parts;i++){
         var a=i*partSize,b=Math.min(file.size,(i+1)*partSize);
         // Blob.slice не держит весь файл в памяти iPad одновременно.
@@ -545,6 +547,58 @@
       status.textContent='⚠️ '+(err.message||err);
     }finally{
       btn.disabled=false;
+    }
+  });
+
+
+  byId('checkUploadedResult').addEventListener('click',async function(){
+    var button=byId('checkUploadedResult'),status=byId('upload50Status');
+    if(button.disabled)return;
+    try{
+      var previous;
+      try{previous=JSON.parse(localStorage.getItem('personalEditorLastUpload')||'null')}catch(ignore){}
+      if(!previous || !previous.id || !previous.url){
+        throw new Error('Сначала загрузи видео кнопкой «До 50 МБ».');
+      }
+      var proof=telegramProof();
+      button.disabled=true;
+      status.textContent='Проверяю готовность MP4 в Cloudflare…';
+      var response=await fetch(previous.url+'/upload/'+previous.id+'/status',{
+        headers:{'X-Telegram-Init-Data':proof},cache:'no-store'
+      });
+      var data=await response.json();
+      if(!response.ok)throw new Error(data.error||'Ошибка проверки');
+      if(!data.ready){
+        status.textContent='🎬 Ролик ещё обрабатывается. Если бот уже прислал MP4 файлом, отдельное скачивание не требуется. Для больших результатов повтори проверку позднее.';
+        return;
+      }
+      if(!data.size || data.size>250000000 || !data.parts || data.parts>63){
+        throw new Error('Неверный размер MP4 на сервере.');
+      }
+      var buffers=[];
+      for(var i=0;i<data.parts;i++){
+        var part=await fetch(
+          previous.url+'/upload/'+previous.id+'/result/'+i,{
+            headers:{'X-Telegram-Init-Data':proof},cache:'no-store'
+          }
+        );
+        if(!part.ok)throw new Error('Часть готового видео №'+(i+1)+' недоступна. Повтори скачивание.');
+        buffers.push(await part.blob());
+        status.textContent='⬇️ Получаю Full HD: '+Math.round((i+1)*100/data.parts)+'%';
+      }
+      var blob=new Blob(buffers,{type:'video/mp4'});
+      if(blob.size!==data.size)throw new Error('Готовый файл загрузился не полностью.');
+      var objectUrl=URL.createObjectURL(blob);
+      var link=document.createElement('a');
+      link.href=objectUrl;link.download='my-reels-fullhd.mp4';
+      link.style.display='none';
+      document.body.appendChild(link);link.click();link.remove();
+      setTimeout(function(){URL.revokeObjectURL(objectUrl)},90000);
+      status.textContent='✅ Готовый Full HD MP4 сохранён без дополнительного сжатия.';
+    }catch(err){
+      status.textContent='⚠️ '+(err.message||err);
+    }finally{
+      button.disabled=false;
     }
   });
 
