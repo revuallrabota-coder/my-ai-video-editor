@@ -13,6 +13,14 @@ FILTERS: dict[str,str] = {
     "clean": "eq=contrast=1.035:brightness=0.007:saturation=1.018",
     "film": "eq=contrast=1.04:saturation=0.94:gamma=0.985,colorbalance=rs=0.013:bs=-0.012",
     "matte": "eq=contrast=0.95:saturation=0.97:gamma=1.03",
+    # "Old Money": светлый мягкий контраст, приглушённый золотистый.
+    "old_money": "eq=contrast=0.98:saturation=0.92:gamma=1.02,colorbalance=rs=0.012:bs=-0.01",
+    # "Vintage": ненавязчивая аналоговая теплота и лёгкая матовость.
+    "vintage": "eq=contrast=0.94:saturation=0.84:gamma=1.015,colorbalance=rs=0.021:bs=-0.015",
+    # "Street": энергичный контраст и холодные тени без резкой тонировки кожи.
+    "street": "eq=contrast=1.13:saturation=1.10:brightness=-0.004,colorbalance=rs=-0.012:bs=0.014",
+    # "Elegant": нейтральная чистая картинка, не красим оттенок ногтей.
+    "elegant": "eq=contrast=1.025:saturation=0.985:gamma=1.015",
 }
 
 def video_filter_chain(name: str) -> str:
