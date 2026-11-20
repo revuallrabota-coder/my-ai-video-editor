@@ -211,7 +211,10 @@ def ass_color(hex_color: str) -> str:
     return f"&H{rgb[4:6]}{rgb[2:4]}{rgb[0:2]}&".upper()
 
 
-def write_ass(video_path: Path, output_ass: Path, color: str) -> int:
+def write_ass(
+    video_path: Path, output_ass: Path, color: str,
+    style: str = "signature", hook: str = "",
+) -> int:
     from faster_whisper import WhisperModel
 
     LOG.info("Распознаём оригинальную речь (бесплатная локальная модель).")
@@ -229,6 +232,14 @@ def write_ass(video_path: Path, output_ass: Path, color: str) -> int:
                     words.append((float(word.start), float(word.end), text))
         elif segment.text.strip():
             words.append((float(segment.start), float(segment.end), clean_ass_text(segment.text)))
+
+    if style == "signature":
+        from signature_captions import build_signature_ass
+        content, count = build_signature_ass(words, color=color, hook=hook)
+        output_ass.write_text(content, encoding="utf-8")
+        return count
+    if style != "classic":
+        raise ValueError("Неизвестный стиль субтитров.")
 
     header = (
         "[Script Info]\nScriptType: v4.00+\nPlayResX: 720\nPlayResY: 1280\n"
@@ -291,6 +302,8 @@ def burn_subtitles(input_path: Path, ass_path: Path, output_path: Path) -> None:
 def edit_video(
     original: Path, output: Path, mode: str, color: str,
     audio_profile: str = "balanced",
+    subtitle_style: str = "signature",
+    hook: str = "",
 ) -> dict:
     duration, has_audio = duration_and_audio(original)
     ranges = ([Segment(0.0, duration)] if mode == "captions"
@@ -301,7 +314,7 @@ def edit_video(
         subtitle_events = 0
         if mode != "cuts" and has_audio:
             ass = Path(directory) / "captions.ass"
-            subtitle_events = write_ass(work, ass, color)
+            subtitle_events = write_ass(work, ass, color, style=subtitle_style, hook=hook)
             if subtitle_events:
                 burn_subtitles(work, ass, output)
             else:
@@ -330,6 +343,10 @@ async def main() -> None:
     color = os.environ.get("SUBTITLE_COLOR", DEFAULT_COLOR)
     audio_profile = os.environ.get("AUDIO_PROFILE", "balanced")
     audio_filterchain(audio_profile)  # early validation
+    subtitle_style = os.environ.get("SUBTITLE_STYLE", "signature")
+    if subtitle_style not in ("signature", "classic"):
+        raise ValueError("Неверный стиль субтитров.")
+    hook = os.environ.get("HOOK_TEXT", "").strip()[:70]
     if mode not in ("auto", "captions", "cuts"):
         raise ValueError("Неподдерживаемый режим.")
     done = asyncio.Event()
@@ -374,7 +391,10 @@ async def main() -> None:
                     if original.stat().st_size > MAX_BYTES:
                         raise ValueError("Файл больше 1 ГБ.")
                     await event.respond("✂️ Нарезаю видео и оформляю субтитры. Оригинальная речь сохранится.")
-                    details = await asyncio.to_thread(edit_video, original, result, mode, color, audio_profile)
+                    details = await asyncio.to_thread(
+                        edit_video, original, result, mode, color, audio_profile,
+                        subtitle_style, hook
+                    )
                     await client.send_file(
                         event.chat_id, str(result), supports_streaming=True,
                         caption=(
