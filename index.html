@@ -95,7 +95,7 @@
     <div class="mini" id="videoInfo">Видео пока не выбрано.</div>
     <video id="firstVideo" controls playsinline hidden></video>
     <h3>Видео-референс (необязательно)</h3>
-    <p class="note">Если хочешь монтаж с похожим темпом, выбери пример для предпросмотра. Пока файлы отсюда не загружаются на сервер: в тестовом режиме их нужно будет отправить в чат бота отдельно.</p>
+    <p class="note">Если выберешь режим «По референсу», этот пример отправится на подключённый сервер вместе с исходником. В других режимах референс используется только для предпросмотра.</p>
     <input id="referenceVideo" type="file" accept="video/*">
     <div class="mini" id="referenceInfo">Референс не выбран.</div>
     <video id="referencePreview" controls playsinline hidden></video>
@@ -195,13 +195,30 @@
     <select id="filter"><option value="none" selected>Без фильтра</option><option value="warm">Тёплый</option><option value="soft" disabled>Нежный — скоро</option><option value="cool" disabled>Холодный — скоро</option><option value="contrast" disabled>Контрастный — скоро</option></select>
     <label class="field" for="speed">Скорость</label>
     <select id="speed"><option value="1.0" selected>×1.0</option><option value="1.1">×1.1</option><option value="1.2">×1.2</option><option value="1.3">×1.3</option><option value="1.5">×1.5</option></select>
-    <div class="alert">Видео пока не отправляется на сервер и не изменяется. Настройки будут применяться после подключения системы монтажа.</div>
+    <div class="alert">Видео действительно обрабатывается сервером только после подключения backend на последнем шаге. Сам этот экран лишь настраивает монтаж.</div>
   </section>
 
   <section class="card page" data-page="4">
-    <h2>Проверь заказ</h2>
-    <p>Мы сохраним твои настройки. Позже к этой странице подключится обработка видео.</p>
+    <h2>Готовим монтаж</h2>
+    <p>Проверь настройки. Для настоящего монтажа подключи сервер один раз, затем нажимай «Монтировать» прямо здесь.</p>
     <div id="summary"></div>
+    <div class="alert" style="margin:16px 0">
+      <strong>🎞 Настоящий монтаж через сервер</strong>
+      <p class="note">Сначала размести наш backend на Render и вставь HTTPS-адрес сервера. Этот адрес сохраняется только в браузере. <strong>Токен бота здесь вводить нельзя.</strong></p>
+      <label class="field" for="apiBase">Адрес твоего сервера</label>
+      <input id="apiBase" type="url" inputmode="url" placeholder="https://my-ai-video-editor-api.onrender.com" autocomplete="off" style="width:100%;max-width:100%">
+      <div class="mini">Для работы открой Mini App через кнопку своего Telegram-бота. Первый тест: одно видео 10–20 секунд, желательно до 20 МБ.</div>
+      <button class="btn primary" type="button" style="width:100%;margin-top:12px" id="startRender">🎬 Монтировать видео</button>
+      <p class="mini" id="renderStatus" role="status" aria-live="polite">Сервер пока не подключён.</p>
+      <progress id="uploadProgress" max="100" value="0" style="width:100%" hidden></progress>
+      <div id="reviewPanel" hidden>
+        <h3>📝 Проверь распознанные слова</h3>
+        <p class="note">Если ИИ ошибся, исправь текст ниже. После подтверждения он попадёт в субтитры.</p>
+        <textarea id="reviewTranscript" rows="5" style="width:100%;font:inherit;border:1px solid #d9c9e6;border-radius:12px;padding:10px"></textarea>
+        <button class="btn primary" id="confirmTranscript" type="button" style="width:100%;margin:12px 0">✅ Продолжить монтаж</button>
+      </div>
+      <button class="btn primary" id="downloadResult" type="button" style="width:100%" hidden>⬇️ Скачать готовый MP4</button>
+    </div>
     <button class="btn primary" type="button" style="width:100%;margin:14px 0" id="saveButton">Скачать настройки</button>
     <div id="ownerIdCard" class="alert" hidden style="margin:12px 0">
       <strong>Твой Telegram ID: <span id="ownerIdValue"></span></strong>
@@ -209,7 +226,7 @@
       <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
     </div>
     <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
-    <p class="note">Каждый запуск GitHub Actions можно настроить по-разному: mode, subtitle_style, color, font_profile, caption_position, camera_style, video_speed, video_filter, audio_profile и hook_text. Параметры из записи «Чит-Кода» не закреплены как обязательные. Выбор на экране Mini App пока служит предпросмотром; в обработку передаются именно параметры запуска Actions. После отправки видео бот сначала пришлёт текст распознанной речи: /ok подтвердить, /fix ошибка=правильно исправить отдельное слово, /text ТВОЙ ПОЛНЫЙ ТЕКСТ заменить весь текст. Новый editorial Zoom меняет общий план на крупный при смене фразы и удерживает его, без циклической раскачки. Субтитры signature / contrast / classic появляются по одному слову. Варианты _phrases выводят прежние фразы целиком. Звуковые акценты, эмодзи и хук теперь реализованы через команды в Telegram: /effects, /sfx soft|punch|off, /emoji on|off, /hook start|end|both ТЕКСТ. Файлы и настройки из Mini App в обработчик пока не передаются автоматически. Вставки фото всё ещё не реализованы.</p>
+    <p class="note">Для монтажа внутри Mini App выбери настройки выше и нажми «Монтировать» после подключения своего сервера. GitHub Actions остаётся запасным ручным способом. Раньше каждый запуск GitHub Actions можно было настроить по-разному: mode, subtitle_style, color, font_profile, caption_position, camera_style, video_speed, video_filter, audio_profile и hook_text. Параметры из записи «Чит-Кода» не закреплены как обязательные. Выбор на экране Mini App пока служит предпросмотром; в обработку передаются именно параметры запуска Actions. После отправки видео бот сначала пришлёт текст распознанной речи: /ok подтвердить, /fix ошибка=правильно исправить отдельное слово, /text ТВОЙ ПОЛНЫЙ ТЕКСТ заменить весь текст. Новый editorial Zoom меняет общий план на крупный при смене фразы и удерживает его, без циклической раскачки. Субтитры signature / contrast / classic появляются по одному слову. Варианты _phrases выводят прежние фразы целиком. Звуковые акценты, эмодзи и хук теперь реализованы через команды в Telegram: /effects, /sfx soft|punch|off, /emoji on|off, /hook start|end|both ТЕКСТ. Файлы и настройки из Mini App в обработчик пока не передаются автоматически. Вставки фото всё ещё не реализованы.</p>
     <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
   </section>
 </div>
