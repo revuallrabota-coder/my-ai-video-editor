@@ -88,6 +88,7 @@ def add_hook_to_ass(
     position: str,
     duration: float,
     color: str,
+    font_profile: str = "elegant",
 ) -> str:
     """Хук в начале/конце с тёмной полупрозрачной подложкой ЗА текстом."""
     if position not in _ALLOWED_HOOK:
@@ -95,11 +96,13 @@ def add_hook_to_ass(
     text = _escape_hook(text)
     if not text or position == "off" or duration < 0.6:
         return content
-    from word_captions import build_word_pop_ass  # импорт для единых асс-стилей
+    from font_presets import choose_font
+    font = choose_font(font_profile)
     accent = ass_color(color if color != "auto" else "#EBC0C8")
     new_styles = (
-        f"Style: ReelsHook,DejaVu Sans,51,{accent},{accent},&H00241A20,"
-        "&HAA000000,1,0,0,0,100,100,0,0,1,1.5,1,5,54,54,40,1\n"
+        f"Style: ReelsHook,{font.name},51,{accent},{accent},&H00241A20,"
+        f"&HAA000000,{font.bold},{font.italic},0,0,"
+        f"{font.scale_x},{font.scale_y},0,0,1,1.5,1,5,54,54,40,1\n"
         "Style: HookPlate,DejaVu Sans,20,&H00FFFFFF,&H00FFFFFF,&H00161616,"
         "&H7C161616,0,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1\n"
     )
