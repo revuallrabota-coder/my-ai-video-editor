@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 
-from speech_review import align_corrected_words, apply_word_fixes, map_words_to_ranges, plain_transcript
+from speech_review import align_corrected_words, apply_word_fixes, map_words_to_ranges, plain_transcript, shift_word_timestamps
 from reference_editor import speech_zoom_windows, smooth_zoom_expression, editorial_zoom_expression
 from telegram_editor import Segment
 
@@ -70,6 +70,22 @@ class TranscriptReviewTests(unittest.TestCase):
         self.assertTrue(all(b>a for a,b in windows))
         self.assertIn("on",smooth_zoom_expression(windows,0.16))
 
+
+
+class SubtitleTimingTests(unittest.TestCase):
+    def test_positive_delay_moves_titles_not_audio(self):
+        words=[(0.10,0.35,"Слово"),(0.38,0.60,"другое"),(1.1,1.5,"фраза")]
+        shifted=shift_word_timestamps(words,0.30,2.0)
+        self.assertEqual([x[2] for x in shifted],[x[2] for x in words])
+        self.assertAlmostEqual(shifted[0][0],0.40)
+        self.assertAlmostEqual(shifted[1][0],0.68)
+        self.assertAlmostEqual(shifted[2][0],1.40)
+
+    def test_clamps_at_video_end_and_rejects_bad_offset(self):
+        shifted=shift_word_timestamps([(0.7,0.95,"конец")],0.30,1.1)
+        self.assertAlmostEqual(shifted[0][1],1.1)
+        with self.assertRaises(ValueError):
+            shift_word_timestamps([(0.7,0.95,"конец")],9.0,1.1)
 
 if __name__=="__main__":
     unittest.main()
