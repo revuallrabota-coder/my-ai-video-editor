@@ -296,8 +296,9 @@ async def main() -> None:
     done = asyncio.Event()
     busy = False
 
-    async with TelegramClient("telegram_editor_session", api_id, api_hash) as client:
-        await client.start(bot_token=token)
+    client = TelegramClient("telegram_editor_session", api_id, api_hash)
+    await client.start(bot_token=token)
+    try:
         LOG.info("Бот подключён. Ожидание нового видео владельца (%s секунд).", WAIT_SECONDS)
 
         @client.on(events.NewMessage(incoming=True))
@@ -354,6 +355,8 @@ async def main() -> None:
             await asyncio.wait_for(done.wait(), timeout=WAIT_SECONDS)
         except asyncio.TimeoutError:
             LOG.info("Время ожидания нового видео закончилось. Завершаем задание.")
+    finally:
+        await client.disconnect()
 
 
 if __name__ == "__main__":
