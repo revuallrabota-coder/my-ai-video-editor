@@ -1,0 +1,50 @@
+name: "📥 Монтаж видео до 50 МБ (Cloudflare KV)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_id:
+        description: "Protected Cloudflare upload identifier"
+        required: true
+        type: string
+      worker_url:
+        description: "HTTPS URL of the user's Cloudflare Worker"
+        required: true
+        type: string
+
+concurrency:
+  group: telegram-video-montage
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  import-and-montage:
+    name: "🔐 Скачать исходник, проверить слова, смонтировать Reels"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: "Получить код редактора"
+        uses: actions/checkout@v4
+      - name: "Установить Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: "Установить FFmpeg и шрифты"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core fonts-liberation fonts-noto-color-emoji fonts-lato fonts-comfortaa
+      - name: "Установить зависимости"
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install "requests>=2.31,<3"
+      - name: "Проверить синтаксис"
+        run: python -m py_compile process_uploaded_video.py bot_api_editor.py telegram_editor.py reference_editor.py speech_review.py reels_effects.py export_profiles.py reference_dynamic_captions.py
+      - name: "Загрузить частями и выполнить монтаж"
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          OWNER_TELEGRAM_ID: ${{ secrets.OWNER_TELEGRAM_ID }}
+          UPLOAD_ID: ${{ inputs.upload_id }}
+          UPLOAD_WORKER_URL: ${{ inputs.worker_url }}
+        run: python process_uploaded_video.py
