@@ -148,6 +148,45 @@ def smooth_zoom_expression(
     return "1+" + "+".join(parts)
 
 
+def editorial_zoom_expression(
+    words: list[tuple[float, float, str]],
+    duration: float,
+    amplitude: float = 0.17,
+) -> str:
+    """Монтажная смена планов: приблизить и УДЕРЖИВАТЬ до следующей фразы.
+
+    Старый алгоритм делал циклические переходы вперед-назад. Здесь камера
+    один раз меняет крупность на границе выбранной фразы и остаётся на
+    новом плане несколько секунд. Движение между планами занимает около
+    0.36 с. Переходы чередуют общий и крупный план.
+    """
+    if duration < 1.5:
+        return "1"
+    from signature_captions import split_groups
+    groups = split_groups(words)
+    phrase_beginnings = sorted({
+        max(0.0, float(g[0][0])) for g in groups if g
+    })
+    candidates = [t for t in phrase_beginnings if 0.55 <= t < duration - .6]
+    if not candidates:
+        candidates = [min(1.0, duration * .26)]
+    selected: list[float] = []
+    for t in candidates:
+        if not selected or t - selected[-1] >= 3.25:
+            selected.append(t)
+        if len(selected) >= 24:
+            break
+    # Применяем smoothstep только к моменту смены плана.
+    ramps: list[str] = []
+    for idx, t in enumerate(selected):
+        frame = round(t*30)
+        x = f"max(0,min(1,(on-{frame})/11))"
+        smooth = f"({x}*{x}*(3-2*{x}))"
+        sign = "+" if idx % 2 == 0 else "-"
+        ramps.append(f"{sign}{amplitude:.3f}*{smooth}")
+    return "1"+"".join(ramps)
+
+
 def add_virtual_camera(
     source: Path,
     output: Path,
@@ -165,7 +204,7 @@ def add_virtual_camera(
     gentle: только одно очень медленное приближение на 2.5%.
     off: без искусственного увеличения.
     """
-    if camera_style not in ("soft_punch", "enhanced", "gentle", "off"):
+    if camera_style not in ("editorial", "soft_punch", "enhanced", "gentle", "off"):
         raise ValueError("Неизвестный режим камеры.")
     if camera_style == "off":
         # Не перекодируем видеокартинку и не добавляем цифрового дрожания.
@@ -178,6 +217,10 @@ def add_virtual_camera(
         return
     if camera_style == "gentle":
         zoom = "min(1.025,1+on*0.00012)"
+    elif camera_style == "editorial":
+        duration, _ = duration_and_audio(source)
+        zoom = editorial_zoom_expression(words or [], duration, .17)
+        LOG.info("Editorial close-up holds triggered by phrases.")
     elif words:
         duration, _ = duration_and_audio(source)
         windows = speech_zoom_windows(words, duration)
@@ -232,6 +275,7 @@ def montage_by_reference(
     caption_position: str = "middle",
     font_profile: str = "elegant",
     words_override: list[tuple[float, float, str]] | None = None,
+    caption_animation: str = "word_pop",
 ) -> dict:
     """Монтаж с нарезкой тишины, ритмом референса и живыми субтитрами."""
     # Без второго файла используем постоянный темп из разобранного
@@ -270,6 +314,7 @@ def montage_by_reference(
             dynamic, subtitles, color, style=subtitle_style, hook=hook,
             caption_position=caption_position, font_profile=font_profile,
             words_override=words,
+            caption_animation=caption_animation,
         )
         if count:
             burn_subtitles(dynamic, subtitles, output)
