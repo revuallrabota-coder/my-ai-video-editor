@@ -54,10 +54,10 @@ def split_groups(
             continue
         # Разбивка на 2-4 слова, соответствующая коротким фразам референса.
         if current and (
-            len(current) >= 4
-            or start - current[-1][1] >= 0.32
-            or end - current[0][0] > 2.15
-            or sum(len(w[2]) + 1 for w in current) + len(word) > 32
+            len(current) >= 5
+            or start - current[-1][1] >= 0.52
+            or end - current[0][0] > 2.75
+            or sum(len(w[2]) + 1 for w in current) + len(word) > 38
             or bool(re.search(r"[.!?]$", current[-1][2]))
         ):
             groups.append(current)
@@ -129,33 +129,49 @@ def build_signature_ass(
     small_y = 754
     hero_y = 810
     for index, group in enumerate(groups):
-        start = max(0.0, group[0][0] - 0.075)
-        end = group[-1][1] + 0.22
+        # Одна строка живёт всю ФРАЗУ, а не мигает на каждом слове.
+        # Небольшой перекрёстный fade соседних фраз сглаживает смену.
+        start = max(0.0, group[0][0] - 0.10)
+        end = group[-1][1] + 0.35
         if index + 1 < len(groups):
-            end = min(end, max(start + 0.30, groups[index + 1][0][0] - 0.015))
-        if end <= start + 0.12:
+            following = groups[index + 1][0][0]
+            end = min(end, max(start + 0.22, following + 0.075))
+        duration_ms = max(1, round((end - start) * 1000))
+        if duration_ms < 220:
             continue
+
+        # Для коротких фраз не даём анимации занять всё время показа.
+        fade_in = min(280, max(75, round(duration_ms * 0.25)))
+        fade_out = min(230, max(70, round(duration_ms * 0.21)))
+        rise_ms = min(460, max(180, round(duration_ms * 0.5)))
 
         main_index = pick_main_word(group)
         main_word = safe_text(group[main_index][2]).strip(" ,.")
-        other = " ".join(w[2] for i, w in enumerate(group) if i != main_index)
-        other = safe_text(other)
-        # Мелкая строка над акцентом, мягкий подъём и растворение.
+        other = safe_text(" ".join(
+            w[2] for i, w in enumerate(group) if i != main_index
+        ))
+
+        # Никакого скачка на 25 пикселей и резкого увеличения на 14%:
+        # всего 7–11 пикселей подъёма и 4–6% изменения масштаба.
         if other:
             small = (
-                r"{\an5\move(360,768,360," + str(small_y) + r",0,230)"
-                r"\fad(130,170)\fscx96\fscy96"
-                r"\t(0,240,\fscx100\fscy100)}" + other
+                r"{\an5\move(360,761,360," + str(small_y) + ",0," + str(rise_ms) + ")"
+                r"\fad(" + str(fade_in) + "," + str(fade_out) + ")"
+                r"\fscx97\fscy97\blur0.35"
+                r"\t(0," + str(rise_ms) + r",0.65,\fscx100\fscy100)}"
+                + other
             )
             events.append(event(0, start, end, "Whisper", small))
+
         if main_word:
             word = main_word.upper()
-            # Редкое длинное слово не должно выходить за ширину кадра.
             size = 74 if len(word) <= 10 else 63 if len(word) <= 13 else 52
             hero = (
-                r"{\an5\move(360,835,360," + str(hero_y) + r",0,280)"
-                r"\fad(170,200)\fscx86\fscy86"
-                r"\t(0,290,\fscx100\fscy100)\fs" + str(size) + "}" + word
+                r"{\an5\move(360,821,360," + str(hero_y) + ",0," + str(rise_ms) + ")"
+                r"\fad(" + str(fade_in) + "," + str(fade_out) + ")"
+                r"\fscx94\fscy94\blur0.4"
+                r"\t(0," + str(rise_ms) + r",0.65,\fscx100\fscy100)"
+                r"\fs" + str(size) + "}" + word
             )
             events.append(event(1, start, end, "Accent", hero))
 
