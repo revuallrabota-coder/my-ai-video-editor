@@ -4,7 +4,7 @@
 'bebas' — вытянутый конденсированный заголовок (не выдаём подмену за Bebas Neue);
 'platform' — широкий жирный акцент, по духу Platform;
 'bubble' — округлый стикер с контуром;
-'script' — декоративная подпись;
+'script' — кириллическая декоративная курсивная подпись;
 'modern' — современный строгий гротеск.
 
 Все пакеты доступны через Ubuntu apt, нестандартные шрифты
@@ -34,7 +34,7 @@ PRESETS: dict[str, FontSpec] = {
     "bebas": FontSpec("DejaVu Sans Condensed", 88, 1, 0, 72, 112, 1.2),
     "platform": FontSpec("Lato Heavy", 71, 1, 0, 119, 98, 1.5),
     "bubble": FontSpec("Comfortaa", 72, 1, 0, 104, 100, 4.8, 1.7, "&H00171719"),
-    "script": FontSpec("Lobster Two", 78, 1, 1, 100, 100, 1.6),
+    "script": FontSpec("Liberation Serif", 81, 1, 1, 110, 98, 1.35),
     "modern": FontSpec("Lato", 73, 1, 0, 100, 100, 1.3),
 }
 
