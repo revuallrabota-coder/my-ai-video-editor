@@ -19,12 +19,22 @@ class ContrastCaptionTests(unittest.TestCase):
         ]
         ass,count=build_contrast_ass(words,hook="РАЗБОР РАБОТЫ")
         self.assertGreaterEqual(count,2)
-        self.assertIn("Style: Strong,Liberation Sans",ass)
+        self.assertIn("Style: Strong,Liberation Serif",ass)
         self.assertIn("Style: Small,Liberation Sans",ass)
         self.assertIn(r"\fad(",ass)
         self.assertIn(r"\move(",ass)
         self.assertIn("РАЗБОР РАБОТЫ",ass)
         self.assertNotIn("Cheat Code",ass)
+
+    def test_font_and_position_are_selectable(self) -> None:
+        words=[(0.1,0.45,"Красивый"),(0.5,0.9,"маникюр")]
+        top,b=build_contrast_ass(words,caption_position="top",font_profile="clean")
+        bottom,c=build_contrast_ass(words,caption_position="bottom",font_profile="bold")
+        self.assertGreater(b,0)
+        self.assertGreater(c,0)
+        self.assertIn("Style: Strong,Liberation Sans",top)
+        self.assertIn("Style: Strong,DejaVu Sans",bottom)
+        self.assertNotEqual(top,bottom)
 
     def test_ffmpeg_can_render(self) -> None:
         words=[
