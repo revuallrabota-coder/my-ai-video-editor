@@ -6,9 +6,10 @@ on:
       mode:
         description: "Режим обработки"
         required: true
-        default: auto
+        default: my_style
         type: choice
         options:
+          - my_style
           - auto
           - captions
           - cuts
