@@ -94,49 +94,61 @@ def analyze_reference(path: Path) -> ReferenceProfile:
     )
 
 
+def _smoothstep(t: str, offset: int, frames: int) -> str:
+    """FFmpeg expression: плавный ход без резкого ускорения."""
+    x = f"min(1,max(0,({t}-{offset})/{frames}))"
+    return f"({x}*{x}*(3-2*{x}))"
+
+
 def add_virtual_camera(
     source: Path,
     output: Path,
     cadence: float,
-    camera_style: str = "gentle",
+    camera_style: str = "soft_punch",
 ) -> None:
-    """Устранить искусственную тряску от повторного zoompan.
+    """Плавные приближения с задержками на крупном плане.
 
-    Раньше зум качался туда-сюда каждые 4-5 секунд и мелко
-    дрожал из-за пересчёта центрирования. Теперь только ОДНО
-    непрерывное, очень медленное приближение, максимум 2.5%.
-    При camera_style='off' эффект полностью выключается.
-    Движение исходной камеры это не стабилизирует.
+    soft_punch: 0.8 сек плавное приближение (около 11%), ~5 сек
+    удержание крупности, ~1 сек плавное отдаление. Между сериями есть
+    стабильный общий план. Никаких циклических колебаний zoom'а
+    каждый кадр и случайных сдвигов.
+
+    gentle: только одно очень медленное приближение на 2.5%.
+    off: без искусственного увеличения.
     """
-    if camera_style not in ("gentle", "off"):
+    if camera_style not in ("soft_punch", "gentle", "off"):
         raise ValueError("Неизвестный режим камеры.")
-
     if camera_style == "off":
-        # Уже кадрировано в base_video: не пересчитываем/не увеличиваем
-        # изображение второй раз, чтобы исключить дополнительные подёргивания.
+        # Не перекодируем видеокартинку и не добавляем цифрового дрожания.
         execute([
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-            "-i", str(source),
-            "-map", "0:v:0", "-map", "0:a:0?",
-            "-c:v", "copy", "-c:a", "copy",
-            "-movflags", "+faststart", str(output),
+            "-i", str(source), "-map", "0:v:0", "-map", "0:a:0?",
+            "-c:v", "copy", "-c:a", "copy", "-movflags", "+faststart",
+            str(output),
         ])
         return
+    if camera_style == "gentle":
+        zoom = "min(1.025,1+on*0.00012)"
+    else:
+        # Плавная монтажная смена крупности (вместо «дышащего» зума).
+        # Период 13 сек, за одну серию: широкий -> близкий -> широкий.
+        # smoothstep даёт нулевую скорость в начале и в конце каждого
+        # перехода, поэтому переключений с тряской быть не должно.
+        p = "mod(on,390)"
+        entrance = _smoothstep(p, 24, 24)
+        exit_ = _smoothstep(p, 211, 30)
+        zoom = f"1+0.11*({entrance}-{exit_})"
 
-    # Предсказуемая монотонная траектория, а не циклический zoom.
-    # Первые ~7 сек медленно растёт от 1.00 до 1.025, дальше остаётся
-    # неизменным. Центр кадра фиксирован, без случайных смещений.
-    zoom = "min(1.025,1+on*0.00012)"
+    # Больший промежуточный размер уменьшает ступенчатые сдвиги центра.
     vf = (
-        "scale=900:1600:flags=lanczos,setsar=1,fps=30,"
+        "scale=1080:1920:flags=lanczos,setsar=1,fps=30,"
         f"zoompan=z='{zoom}':"
         "x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':"
         "d=1:s=720x1280:fps=30,format=yuv420p"
     )
     execute([
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-        "-i", str(source),
-        "-vf", vf,
+        "-i", str(source), "-vf", vf,
         "-map", "0:v:0", "-map", "0:a:0?",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
         "-c:a", "copy", "-movflags", "+faststart", str(output),
@@ -151,7 +163,7 @@ def montage_by_reference(
     audio_profile: str = "balanced",
     subtitle_style: str = "signature",
     hook: str = "",
-    camera_style: str = "gentle",
+    camera_style: str = "soft_punch",
 ) -> dict:
     """Монтаж с нарезкой тишины, ритмом референса и живыми субтитрами."""
     # Без второго файла используем постоянный темп из разобранного
