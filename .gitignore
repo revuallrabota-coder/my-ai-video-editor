@@ -1,0 +1,17 @@
+# Не добавлять в публичный репозиторий токены, сессии и исходники
+.env
+.env.*
+*.session
+*.session-journal
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.mp4
+*.mov
+*.m4v
+*.mkv
+*.wav
+*.mp3
+*.ass
+montage-settings.json
