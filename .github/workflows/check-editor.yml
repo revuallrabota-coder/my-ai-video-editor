@@ -15,6 +15,9 @@ on:
       - "editor_api.py"
       - "requirements-api.txt"
       - "test_editor_api.py"
+      - "export_profiles.py"
+      - "reference_dynamic_captions.py"
+      - "test_reference_motion.py"
       - "Dockerfile"
       - "render.yaml"
       - "test_word_captions.py"
@@ -46,12 +49,15 @@ jobs:
       - name: "Зависимости для проверки"
         run: python -m pip install "telethon>=1.40,<2" "requests>=2.31,<3" "Pillow>=10,<13" -r requirements-api.txt
       - name: "Проверить синтаксис Python"
-        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py speech_review.py word_captions.py reels_effects.py font_presets.py editor_api.py
+        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py speech_review.py word_captions.py reels_effects.py font_presets.py editor_api.py export_profiles.py reference_dynamic_captions.py
       - name: "Проверить правки распознавания и зум по фразам"
         run: python -m unittest -v test_speech_review.py
 
       - name: "Проверить авторизацию Telegram и безопасные настройки API"
         run: python -m unittest -v test_editor_api.py
+
+      - name: "Проверить боковой Zoom, плавающий текст и Full HD"
+        run: python -m unittest -v test_reference_motion.py
 
       - name: "Проверить звук, эмодзи и хук в настоящем FFmpeg"
         run: python -m unittest -v test_reels_effects.py
@@ -92,8 +98,8 @@ jobs:
               ], check=True)
               profile = analyze_reference(source)
               assert 0.9 <= profile.seconds_per_change <= 4.5
-              for camera_style in ("off", "gentle", "soft_punch", "enhanced", "editorial"):
-                  add_virtual_camera(source, ready, profile.seconds_per_change, camera_style=camera_style)
+              for camera_style in ("off", "gentle", "soft_punch", "enhanced", "editorial", "cinematic_pan"):
+                  add_virtual_camera(source, ready, profile.seconds_per_change, camera_style=camera_style, quality="balanced")
                   duration, has_audio = duration_and_audio(ready)
                   assert 1.7 < duration < 2.3
                   assert has_audio
