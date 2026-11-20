@@ -112,6 +112,7 @@
     <label class="option selected mode"><input type="radio" name="mode" value="Монтаж + субтитры" checked> ✂️ Монтаж + субтитры<small>Убрать паузы и дубли, добавить зумы и подписи.</small></label>
     <label class="option mode"><input type="radio" name="mode" value="Монтаж без субтитров"> 🎞️ Монтаж без субтитров<small>Только нарезка и движения камеры.</small></label>
     <label class="option mode"><input type="radio" name="mode" value="Только субтитры"> 💬 Только субтитры<small>Не резать видео, добавить оформление речи.</small></label>
+    <label class="option mode"><input type="radio" name="mode" value="Мой стиль"> 💗 Мой стиль — один исходник<small>По сохранённому референсу: мягкие зумы, розовые всплывающие субтитры и чистый голос. Выбери my_style в GitHub Actions, отправь одно видео.</small></label>
     <label class="option mode"><input type="radio" name="mode" value="По референсу"> 🎬 Монтаж по референсу<small>Первый этап: ритм смен кадров из видео-примера, зумы и субтитры. Для запуска выбери reference в GitHub Actions и отправь два видео в чат.</small></label>
     <h3>Свои фото в ролик</h3>
     <input type="file" id="photos" accept="image/*" multiple>
@@ -188,7 +189,7 @@
       <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
     </div>
     <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
-    <p class="note">Для стиля из референса выбери subtitle_style = signature в GitHub Actions. Необязательный заголовок введи в hook_text, звук выбери через audio_profile = balanced, strong или off. Если режим reference, сначала пришли видео-пример, потом исходник. Каждый файл до 20 МБ. Настройки мини-приложения в Actions пока не передаются автоматически.</p>
+    <p class="note">Для обычного нового Reels выбирай mode = my_style и subtitle_style = signature в GitHub Actions: отправь ОДНО видео, повторять референс не нужно. Необязательный заголовок вводится в hook_text. Звук: audio_profile = balanced, strong или off. Для другого референса выбери mode = reference и отправь ДВА видео. Файлы до 20 МБ. Настройки мини-приложения в Actions пока не передаются автоматически.</p>
     <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
   </section>
 </div>
