@@ -170,8 +170,8 @@
       <p style="margin:6px 0">Это число понадобится для секрета OWNER_TELEGRAM_ID на GitHub. Не путай с токеном бота.</p>
       <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
     </div>
-    <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/montage.yml" target="_blank" rel="noopener noreferrer">▶️ Запустить монтаж через GitHub Actions</a></p>
-    <p class="note">Пока это отдельный запуск через GitHub. Параметры с экрана автоматически в Actions не передаются: выбери режим и цвет там же. Отправляй видео боту, только когда задание перейдёт в состояние «Ожидание видео».</p>
+    <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
+    <p class="note">Пока это отдельный ручной запуск через GitHub, без api_id и api_hash. Для теста нужно видео до 20 МБ. Настройки с экрана автоматически в Actions не передаются. Запусти задачу, дождись сообщения от бота «Монтажёр запущен!», затем отправь новое видео в чат.</p>
     <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
   </section>
 </div>
