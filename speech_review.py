@@ -124,3 +124,29 @@ def map_words_to_ranges(
         timeline += b-a
     mapped.sort(key=lambda item: (item[0], item[1]))
     return mapped
+
+
+def shift_word_timestamps(
+    words: Sequence[Word],
+    delay_seconds: float = 0.30,
+    total_duration: float | None = None,
+) -> list[Word]:
+    """Смещает ТОЛЬКО титры, а не голос/видео. Плюс = позже.
+
+    Применяется после монтажа на финальной временной шкале.
+    Не растягивает речь и не меняет скорость воспроизведения.
+    """
+    delay = float(delay_seconds)
+    if not -0.5 <= delay <= 1.5:
+        raise ValueError("Смещение субтитров: от -0.5 до +1.5 сек.")
+    result: list[Word] = []
+    for start, end, word in words:
+        a = max(0.0, float(start) + delay)
+        b = float(end) + delay
+        if total_duration is not None:
+            if a >= float(total_duration) - 0.015:
+                continue
+            b = min(b, float(total_duration))
+        if b > a + 0.025 and word.strip():
+            result.append((a, b, word))
+    return result
