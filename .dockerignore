@@ -1,0 +1,16 @@
+.git
+.github
+__pycache__
+*.pyc
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.wav
+*.ass
+*.log
+*.session
+.env
+.env.*
+README.md
+test_*.py
