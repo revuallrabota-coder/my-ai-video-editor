@@ -174,6 +174,8 @@ def montage_by_reference(
     camera_style: str = "soft_punch",
     speed: float = 1.0,
     filter_style: str = "none",
+    caption_position: str = "middle",
+    font_profile: str = "elegant",
 ) -> dict:
     """Монтаж с нарезкой тишины, ритмом референса и живыми субтитрами."""
     # Без второго файла используем постоянный темп из разобранного
@@ -198,7 +200,10 @@ def montage_by_reference(
             audio_profile=audio_profile, speed=speed, filter_style=filter_style,
         )
         add_virtual_camera(joined, dynamic, profile.seconds_per_change, camera_style=camera_style)
-        count = write_ass(dynamic, subtitles, color, style=subtitle_style, hook=hook)
+        count = write_ass(
+            dynamic, subtitles, color, style=subtitle_style, hook=hook,
+            caption_position=caption_position, font_profile=font_profile,
+        )
         if count:
             burn_subtitles(dynamic, subtitles, output)
         else:
