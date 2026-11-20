@@ -164,7 +164,7 @@
     <h2>Эффекты и фильтр</h2>
     <p>Выбери будущий стиль обработки изображения и звука.</p>
     <label class="field" for="camera">Динамика камеры</label>
-    <select id="camera"><option>Стандарт — плавные зумы</option><option>Без динамики</option><option>Усиленная — больше зумов</option></select>
+    <select id="camera"><option value="soft_punch">Как в примере — приближение и задержка на крупном плане</option><option value="gentle">Очень мягкое однократное приближение</option><option value="off">Без цифрового зума</option></select>
     <label class="field" for="audio">🎧 Улучшение звука</label>
     <select id="audio">
       <option value="balanced">Бережная очистка — рекомендую</option>
@@ -190,7 +190,7 @@
       <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
     </div>
     <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
-    <p class="note">В GitHub Actions: mode = my_style. subtitle_style = signature — мягкий розовый стиль из первого референса; contrast — красно-белые акценты, как в показанном ролике. camera_style = off отключает искусственные зумы и тряску. Звук: audio_profile = balanced либо strong. Отправь ОДНО видео до 20 МБ в чат после сообщения бота. Настройки Mini App пока не передаются в Actions автоматически.</p>
+    <p class="note">В GitHub Actions: mode = my_style, camera_style = soft_punch — плавное приближение и задержка на крупном плане, похожие по ритму на монтаж из присланного примера. subtitle_style = contrast для красно-белых акцентов либо signature для розового стиля. Звук: audio_profile = balanced или strong. Отправь ОДНО видео до 20 МБ после сообщения бота. Настройки Mini App пока не передаются в Actions автоматически.</p>
     <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
   </section>
 </div>
@@ -228,6 +228,7 @@
       hook:byId('hook').checked,
       hookText:byId('hookText').value,
       camera:selectedText('camera'),
+      cameraStyle:byId('camera').value,
       audio:selectedText('audio'),
       audioProfile:byId('audio').value,
       filter:selectedText('filter'),
