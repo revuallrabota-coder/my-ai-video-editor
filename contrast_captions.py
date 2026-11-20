@@ -56,9 +56,9 @@ def build_contrast_ass(
         length_ms = int((end - start) * 1000)
         if length_ms < 230:
             continue
-        fadein = min(265, int(length_ms * .25))
-        fadeout = min(210, int(length_ms * .20))
-        motion = min(390, int(length_ms * .50))
+        fadein = min(310, max(150, int(length_ms * .31)))
+        fadeout = min(230, max(100, int(length_ms * .22)))
+        motion = min(480, max(220, int(length_ms * .53)))
         highlight = pick_main_word(group)
         main = safe_text(group[highlight][2]).strip(" ,.!?").upper()
         small = safe_text(" ".join(w[2] for j, w in enumerate(group) if j != highlight))
@@ -67,7 +67,7 @@ def build_contrast_ass(
             text = (
                 r"{\an5\move(360,"+str(766+vertical_shift)+",360,"+str(755+vertical_shift)+",0,"+str(motion)+")"
                 r"\fad("+str(fadein)+","+str(fadeout)+")"
-                r"\fscx95\fscy95"
+                r"\fscx88\fscy88"
                 r"\t(0,"+str(motion)+r",0.7,\fscx100\fscy100)"
                 r"\fs"+str(font_size)+"}"+main
             )
@@ -76,7 +76,7 @@ def build_contrast_ass(
             text=(
                 r"{\an5\move(360,"+str(829+vertical_shift)+",360,"+str(822+vertical_shift)+",0,"+str(motion)+")"
                 r"\fad("+str(fadein)+","+str(fadeout)+")"
-                r"\fscx97\fscy97"
+                r"\fscx93\fscy93"
                 r"\t(0,"+str(motion)+r",0.7,\fscx100\fscy100)}"+small
             )
             events.append(event(0,start,end,"Small",text))
