@@ -153,8 +153,11 @@ def base_video(
     audio_profile: str = "balanced",
     speed: float = 1.0,
     filter_style: str = "none",
+    quality: str = "high",
 ) -> None:
-    """Собрать видео, реально применяя скорость, цвет и очистку речи."""
+    """Собрать видео с выбранным разрешением без принудительного 720p."""
+    from export_profiles import get_export_profile
+    profile = get_export_profile(quality)
     if not 0.8 <= speed <= 1.5:
         raise ValueError("Скорость должна быть от 0.8 до 1.5.")
     if filter_style not in ("none", "warm"):
@@ -191,8 +194,8 @@ def base_video(
             audio_source = "[aclean]"
 
     video_filters = (
-        "scale=720:1280:force_original_aspect_ratio=decrease,"
-        "pad=720:1280:(ow-iw)/2:(oh-ih)/2:color=0x1a1426,"
+        f"scale={profile.dimensions}:force_original_aspect_ratio=decrease:flags=lanczos,"
+        f"pad={profile.dimensions}:(ow-iw)/2:(oh-ih)/2:color=0x1a1426,"
         "setsar=1,fps=30"
     )
     if filter_style == "warm":
@@ -204,11 +207,11 @@ def base_video(
     args = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(path), "-filter_complex", ";".join(filters),
-        "-map", "[vout]", "-c:v", "libx264", "-preset", "veryfast",
-        "-crf", "22", "-pix_fmt", "yuv420p",
+        "-map", "[vout]", "-c:v", "libx264", "-preset", profile.preset,
+        "-crf", str(profile.crf), "-pix_fmt", "yuv420p",
     ]
     if has_audio:
-        args.extend(["-map", audio_source, "-c:a", "aac", "-b:a", "160k"])
+        args.extend(["-map", audio_source, "-c:a", "aac", "-b:a", profile.audio_bitrate])
     else:
         args.append("-an")
     args.extend(["-movflags", "+faststart", str(output)])
@@ -329,6 +332,14 @@ def write_ass(
         return sum(line.startswith("Dialogue: ") for line in complete.splitlines())
 
 
+    if style == "reference_dynamic" or caption_animation == "reference_dynamic":
+        from reference_dynamic_captions import build_reference_dynamic_ass
+        content, count = build_reference_dynamic_ass(
+            words, color=color,
+            caption_position=caption_position, font_profile=font_profile,
+        )
+        return save_subtitles(content)
+
     if caption_animation == "word_pop":
         from word_captions import build_word_pop_ass
         content, count = build_word_pop_ass(
@@ -402,11 +413,17 @@ def write_ass(
     return save_subtitles(header + "".join(events))
 
 
-def burn_subtitles(input_path: Path, ass_path: Path, output_path: Path) -> None:
+def burn_subtitles(
+    input_path: Path, ass_path: Path, output_path: Path,
+    quality: str = "high",
+) -> None:
+    from export_profiles import get_export_profile
+    profile = get_export_profile(quality)
     args = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(input_path), "-vf", f"ass={ass_path}",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
+        "-c:v", "libx264", "-preset", profile.preset,
+        "-crf", str(profile.crf),
         "-pix_fmt", "yuv420p", "-c:a", "copy",
         "-movflags", "+faststart", str(output_path),
     ]
@@ -427,6 +444,7 @@ def edit_video(
     sound_effects: str = "off",
     emoji_mode: str = "off",
     hook_position: str = "start",
+    quality: str = "high",
 ) -> dict:
     from reels_effects import apply_effects, validate_effects
     from speech_review import map_words_to_ranges
@@ -442,6 +460,7 @@ def edit_video(
         base_video(
             original, work, ranges, has_audio,
             audio_profile=audio_profile, speed=speed, filter_style=filter_style,
+            quality=quality,
         )
         words = (
             map_words_to_ranges(words_override, ranges, speed)
@@ -458,7 +477,7 @@ def edit_video(
                 hook_position=hook_position,
             )
             if subtitle_events:
-                burn_subtitles(work, ass, staged)
+                burn_subtitles(work, ass, staged, quality=quality)
             else:
                 work.replace(staged)
         else:
@@ -469,7 +488,7 @@ def edit_video(
         effect_stats=apply_effects(
             staged, output, words,
             sound=sound_effects, emoji=emoji_mode,
-            caption_position=caption_position,
+            caption_position=caption_position, quality=quality,
         )
     return {
         "before": round(duration, 1),
