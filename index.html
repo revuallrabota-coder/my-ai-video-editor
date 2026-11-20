@@ -207,8 +207,17 @@
 
   <section class="card page" data-page="4">
     <h2>Готовим монтаж</h2>
-    <p>Проверь настройки. Для настоящего монтажа подключи сервер один раз, затем нажимай «Монтировать» прямо здесь.</p>
+    <p>Проверь настройки. Если Render требует иностранную карту, используй запуск без карты через Cloudflare и GitHub Actions. Полностью автоматическая загрузка прямо из приложения остаётся отдельным серверным режимом.</p>
     <div id="summary"></div>
+    <div class="alert" style="margin:16px 0">
+      <strong>🆓 Без банковской карты: Cloudflare + GitHub Actions</strong>
+      <p class="note">Бесплатная альтернатива Render. Выбираешь стиль здесь, нажимаешь запуск, а когда наш Telegram-бот попросит видео, отправляешь ему исходник <strong>в чат до 20 МБ</strong>. Готовый ролик бот пришлёт обратно. Видео из поля выбора в приложении при этом <strong>не загружается</strong>: оно понадобится для будущего прямого сервера.</p>
+      <label class="field" for="launcherBase">Адрес твоего Cloudflare Worker</label>
+      <input id="launcherBase" type="url" inputmode="url" autocomplete="off" placeholder="https://my-video-editor.ИМЯ.workers.dev" style="width:100%;max-width:100%">
+      <button class="btn primary" id="launchWithoutCard" type="button" style="width:100%;margin-top:12px">▶️ Запустить монтаж без карты</button>
+      <p class="mini" id="launchStatus" role="status" aria-live="polite">Для этой кнопки нужно один раз создать бесплатный Cloudflare Worker и указать его HTTPS-адрес.</p>
+      <p class="mini"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/CLOUDFLARE_NO_CARD.md" target="_blank" rel="noopener noreferrer">Инструкция подключения Cloudflare на iPad</a></p>
+    </div>
     <div class="alert" style="margin:16px 0">
       <strong>🎞 Настоящий монтаж через сервер</strong>
       <p class="note">Сначала размести наш backend на Render и вставь HTTPS-адрес сервера. Адрес сервера сохраняется только в браузере на этом устройстве. <strong>Токен бота здесь вводить нельзя.</strong></p>
@@ -398,6 +407,44 @@
       }else{alert('Скопируй ID вручную: '+ownerId)}
     });
   }
+
+  // Без карты: Cloudflare Worker безопасно запускает GitHub Actions.
+  // Worker не получает видео; после запуска пришли файл в Telegram-чат бота.
+  var launcherInput=byId('launcherBase');
+  try{launcherInput.value=localStorage.getItem('personalEditorLauncher')||''}catch(ignore){}
+  byId('launchWithoutCard').addEventListener('click',async function(){
+    var button=byId('launchWithoutCard');
+    var status=byId('launchStatus');
+    if(button.disabled)return;
+    try{
+      var url=launcherInput.value.trim().replace(/\\/+$/,'');
+      if(!/^https:\/\/[a-z0-9.-]+(?::443)?$/i.test(url)){
+        throw new Error('Вставь HTTPS-адрес своего Cloudflare Worker, заканчивающийся .workers.dev');
+      }
+      if(!tg || !tg.initData){
+        throw new Error('Открой мини-приложение именно через меню своего Telegram-бота.');
+      }
+      var settings=buildRenderSettings();
+      // GitHub Actions обрабатывает файл, присланный в Telegram после запуска.
+      button.disabled=true;
+      status.textContent='Отправляю команду запуска в GitHub Actions…';
+      var response=await fetch(url+'/launch',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({init_data:tg.initData,settings:settings}),
+        cache:'no-store'
+      });
+      var data={};
+      try{data=await response.json()}catch(ignore){}
+      if(!response.ok)throw new Error(data.error||('HTTP '+response.status));
+      try{localStorage.setItem('personalEditorLauncher',url)}catch(ignore){}
+      status.textContent='✅ Команда принята. Открой чат своего бота. Когда он напишет «Режим запущен», отправь видео до 20 МБ и затем подтверди слова командой /ok или /fix. На этой кнопке видео с iPad автоматически НЕ передаётся.';
+    }catch(err){
+      status.textContent='⚠️ '+err.message;
+    }finally{
+      button.disabled=false;
+    }
+  });
 
   // Real rendering API. The backend verifies Telegram.WebApp.initData;
   // no GitHub token or Telegram bot token is ever present in the browser.
