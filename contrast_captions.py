@@ -17,8 +17,17 @@ def build_contrast_ass(
     words: Sequence[tuple[float, float, str]],
     hook: str = "",
     accent_color: str = RED,
+    caption_position: str = "middle",
+    font_profile: str = "elegant",
 ) -> tuple[str, int]:
     red = ass_color(accent_color)
+    if caption_position not in ("top", "middle", "bottom"):
+        raise ValueError("Неизвестное положение субтитров.")
+    fonts = {"elegant": ("Liberation Serif", "1"), "clean": ("Liberation Sans", "0"), "bold": ("DejaVu Sans", "0")}
+    if font_profile not in fonts:
+        raise ValueError("Неизвестный шрифт.")
+    fontname, italic = fonts[font_profile]
+    vertical_shift = {"top": -365, "middle": 0, "bottom": 185}[caption_position]
     header = (
         "[Script Info]\nScriptType: v4.00+\n"
         "PlayResX: 720\nPlayResY: 1280\n"
@@ -30,8 +39,8 @@ def build_contrast_ass(
         " Alignment, MarginL, MarginR, MarginV, Encoding\n"
         "Style: Small,Liberation Sans,34,&H00FFFFFF,&H00FFFFFF,&H00212223,"
         "&H99000000,0,0,0,0,100,100,0,0,1,1.8,1.0,5,60,60,40,1\n"
-        f"Style: Strong,Liberation Sans,69,{red},{red},&H00222222,"
-        "&H99000000,1,0,0,0,100,100,0,0,1,2.0,1.0,5,40,40,40,1\n"
+        f"Style: Strong,{fontname},69,{red},{red},&H00222222,"
+        f"&H99000000,1,{italic},0,0,100,100,0,0,1,2.0,1.0,5,40,40,40,1\n"
         f"Style: Title,Liberation Sans,65,{red},{red},&H00222222,"
         "&H99000000,1,0,0,0,100,100,0,0,1,1,1,5,52,52,40,1\n\n"
         "[Events]\n"
@@ -56,7 +65,7 @@ def build_contrast_ass(
         if main:
             font_size = 69 if len(main) <= 10 else 60 if len(main) <= 13 else 48
             text = (
-                r"{\an5\move(360,766,360,755,0,"+str(motion)+")"
+                r"{\an5\move(360,"+str(766+vertical_shift)+",360,"+str(755+vertical_shift)+",0,"+str(motion)+")"
                 r"\fad("+str(fadein)+","+str(fadeout)+")"
                 r"\fscx95\fscy95"
                 r"\t(0,"+str(motion)+r",0.7,\fscx100\fscy100)"
@@ -65,7 +74,7 @@ def build_contrast_ass(
             events.append(event(1,start,end,"Strong",text))
         if small:
             text=(
-                r"{\an5\move(360,829,360,822,0,"+str(motion)+")"
+                r"{\an5\move(360,"+str(829+vertical_shift)+",360,"+str(822+vertical_shift)+",0,"+str(motion)+")"
                 r"\fad("+str(fadein)+","+str(fadeout)+")"
                 r"\fscx97\fscy97"
                 r"\t(0,"+str(motion)+r",0.7,\fscx100\fscy100)}"+small
