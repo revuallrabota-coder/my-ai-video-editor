@@ -70,6 +70,41 @@ def align_corrected_words(
     return output
 
 
+def apply_word_fixes(
+    original: Sequence[Word],
+    replacements: str,
+) -> list[Word]:
+    """Команда /fix ошибка=правильно; ошибка2=правильно2.
+
+    Удобно для пары ошибок без переписывания всей речи.
+    Времена слов сохраняются; совпадающие ошибочные слова заменяются все.
+    """
+    rules: dict[str, str] = {}
+    for part in replacements.split(";"):
+        if not part.strip():
+            continue
+        if "=" not in part:
+            raise ValueError("Формат: /fix неверно=верно; другое=правильно")
+        wrong, right = (x.strip() for x in part.split("=",1))
+        if not _normal(wrong) or not right or len(right) > 80:
+            raise ValueError("Укажи слово до и после знака =")
+        rules[_normal(wrong)] = right
+    if not rules or len(rules) > 20:
+        raise ValueError("Можно исправить от 1 до 20 слов за сообщение.")
+    fixed: list[Word] = []
+    replaced = 0
+    for a,b,word in original:
+        key = _normal(word)
+        if key in rules:
+            fixed.append((a,b,rules[key]))
+            replaced+=1
+        else:
+            fixed.append((a,b,word))
+    if not replaced:
+        raise ValueError("Не нашла указанных ошибочных слов в расшифровке.")
+    return fixed
+
+
 def map_words_to_ranges(
     original: Sequence[Word], kept: Sequence, speed: float = 1.0,
 ) -> list[Word]:
