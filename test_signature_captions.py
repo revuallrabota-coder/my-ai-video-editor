@@ -47,6 +47,27 @@ class SignatureCaptionTests(unittest.TestCase):
         groups = split_groups(self.WORDS)
         self.assertGreaterEqual(len(groups), 2)
 
+    def test_multiple_font_and_position_options(self) -> None:
+        elegant_top,_=build_signature_ass(
+            self.WORDS,caption_position="top",font_profile="elegant"
+        )
+        clean_bottom,_=build_signature_ass(
+            self.WORDS,caption_position="bottom",font_profile="clean"
+        )
+        bold_middle,_=build_signature_ass(
+            self.WORDS,caption_position="middle",font_profile="bold"
+        )
+        self.assertIn("Style: Accent,Liberation Serif",elegant_top)
+        self.assertIn("Style: Accent,DejaVu Sans",clean_bottom)
+        self.assertIn("Style: Accent,DejaVu Sans",bold_middle)
+        self.assertNotEqual(elegant_top,clean_bottom)
+
+    def test_unknown_position_or_font_rejected(self) -> None:
+        with self.assertRaises(ValueError):
+            build_signature_ass(self.WORDS,caption_position="arbitrary")
+        with self.assertRaises(ValueError):
+            build_signature_ass(self.WORDS,font_profile="unavailable")
+
     def test_ffmpeg_renders_animated_ass(self) -> None:
         with tempfile.TemporaryDirectory(prefix="signature_test_") as tmp:
             root = Path(tmp)
