@@ -30,7 +30,9 @@ class SignatureCaptionTests(unittest.TestCase):
         self.assertIn(r"\fad(", ass)
         self.assertIn(r"\t(0,", ass)
         self.assertIn("НАШ СТИЛЬ", ass)
-        self.assertIn("МАНИКЮР", ass)
+        self.assertIn("РАЗБЕРЁМ", ass)
+        self.assertIn("маникюр", ass)  # нижняя белая строка
+        self.assertIn("Сегодня", ass)  # верхняя белая строка
         self.assertNotIn("random zoom", ass)
 
     def test_does_not_break_on_untrusted_words(self) -> None:
