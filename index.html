@@ -129,8 +129,14 @@
         <span class="small">за три секунды</span>
       </div>
     </div>
+    <label class="field" for="subtitleStyle">Стиль субтитров</label>
+    <select id="subtitleStyle">
+      <option value="signature" selected>Мой стиль — розовый курсив и мягкое всплытие</option>
+      <option value="classic">Старый стиль — выделение слов</option>
+    </select>
+    <p class="note">Постоянный шаблон по твоему референсу: мелкий белый текст над крупным розовым словом. В GitHub Actions выбирай subtitle_style = signature.</p>
     <label class="field" for="color">Цвет главного слова</label>
-    <input type="color" id="color" value="#d19aab">
+    <input type="color" id="color" value="#ebc0c8">
     <div class="split">
       <div><label class="field" for="fontBig">Крупный шрифт</label>
         <select id="fontBig"><option>Тренд</option><option>Хайп</option><option>Ретро</option><option>Эксперт</option><option>Зефир</option><option>Журнал</option></select></div>
@@ -182,7 +188,7 @@
       <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
     </div>
     <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
-    <p class="note">Для теста выбери нужный режим в GitHub Actions, а в поле audio_profile поставь balanced (бережно), strong (сильнее) или off (без улучшения). По референсу сначала пришли пример, потом своё видео. Каждый файл до 20 МБ. Выбранные здесь настройки пока не передаются в Actions автоматически.</p>
+    <p class="note">Для стиля из референса выбери subtitle_style = signature в GitHub Actions. Необязательный заголовок введи в hook_text, звук выбери через audio_profile = balanced, strong или off. Если режим reference, сначала пришли видео-пример, потом исходник. Каждый файл до 20 МБ. Настройки мини-приложения в Actions пока не передаются автоматически.</p>
     <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
   </section>
 </div>
@@ -208,6 +214,7 @@
       ratio:ratio,
       mode:document.querySelector('input[name="mode"]:checked').value,
       subtitleColor:byId('color').value,
+      subtitleStyle:byId('subtitleStyle').value,
       largeFont:byId('fontBig').value,
       smallFont:byId('fontSmall').value,
       customFont:byId('fontFile').files[0] ? byId('fontFile').files[0].name : null,
@@ -244,7 +251,7 @@
     byId('next').hidden=current===4;
     if(current===4){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Видео',s.videoFiles.length+' шт.'],['Референс',s.referenceVideo||'нет'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed]].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Видео',s.videoFiles.length+' шт.'],['Референс',s.referenceVideo||'нет'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='signature'?'Мой стиль':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed]].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -288,6 +295,13 @@
     var styles={Тренд:'Arial, sans-serif',Хайп:'Impact, Arial Black, sans-serif',Ретро:'Georgia, serif',Эксперт:'Arial, sans-serif',Зефир:'Trebuchet MS, sans-serif',Журнал:'Georgia, serif'};
     big.style.fontFamily=styles[byId('fontBig').value]||'Arial,sans-serif';
     big.style.fontWeight=(byId('fontBig').value==='Ретро'||byId('fontBig').value==='Журнал')?'700':'900';
+    if(byId('subtitleStyle').value==='signature'){
+      big.style.fontFamily='Georgia, "Times New Roman", serif';
+      big.style.fontWeight='700';
+      big.style.fontStyle='italic';
+    }else{
+      big.style.fontStyle='normal';
+    }
     var positions={auto:'60%',top:'18%',middle:'48%',bottom:'78%'};
     byId('sample').style.top=positions[byId('position').value]||'60%';
     big.style.webkitTextStroke=byId('outline').value+'px #211832';
@@ -296,7 +310,7 @@
     byId('outlineValue').textContent=byId('outline').value;
     byId('shadowValue').textContent=byId('shadow').value;
   }
-  ['color','fontBig','position','outline','shadow','hookText'].forEach(function(id){byId(id).addEventListener('input',updateSample)});
+  ['color','fontBig','position','outline','shadow','hookText','subtitleStyle'].forEach(function(id){byId(id).addEventListener('input',updateSample)});
   function go(dir){
     if(dir>0 && current===0 && !videoInput.files.length){alert('Сначала выбери хотя бы одно видео.');return}
     if(dir>0 && current===1 && photoInput.files.length>30){alert('Можно выбрать не больше 30 фото.');return}
