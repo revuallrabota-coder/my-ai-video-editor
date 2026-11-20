@@ -238,6 +238,7 @@ def ass_color(hex_color: str) -> str:
 def write_ass(
     video_path: Path, output_ass: Path, color: str,
     style: str = "signature", hook: str = "",
+    caption_position: str = "middle", font_profile: str = "elegant",
 ) -> int:
     from faster_whisper import WhisperModel
 
@@ -259,12 +260,18 @@ def write_ass(
 
     if style == "signature":
         from signature_captions import build_signature_ass
-        content, count = build_signature_ass(words, color=color, hook=hook)
+        content, count = build_signature_ass(
+            words, color=color, hook=hook,
+            caption_position=caption_position, font_profile=font_profile,
+        )
         output_ass.write_text(content, encoding="utf-8")
         return count
     if style == "contrast":
         from contrast_captions import build_contrast_ass
-        content, count = build_contrast_ass(words, hook=hook)
+        content, count = build_contrast_ass(
+            words, hook=hook,
+            caption_position=caption_position, font_profile=font_profile,
+        )
         output_ass.write_text(content, encoding="utf-8")
         return count
     if style != "classic":
@@ -335,6 +342,8 @@ def edit_video(
     hook: str = "",
     speed: float = 1.0,
     filter_style: str = "none",
+    caption_position: str = "middle",
+    font_profile: str = "elegant",
 ) -> dict:
     duration, has_audio = duration_and_audio(original)
     ranges = ([Segment(0.0, duration)] if mode == "captions"
@@ -348,7 +357,10 @@ def edit_video(
         subtitle_events = 0
         if mode != "cuts" and has_audio:
             ass = Path(directory) / "captions.ass"
-            subtitle_events = write_ass(work, ass, color, style=subtitle_style, hook=hook)
+            subtitle_events = write_ass(
+                work, ass, color, style=subtitle_style, hook=hook,
+                caption_position=caption_position, font_profile=font_profile,
+            )
             if subtitle_events:
                 burn_subtitles(work, ass, output)
             else:
