@@ -128,6 +128,7 @@ def montage_by_reference(
     reference: Path,
     output: Path,
     color: str = "#E8A0C0",
+    audio_profile: str = "balanced",
 ) -> dict:
     """Монтаж с нарезкой тишины, ритмом референса и живыми субтитрами."""
     profile = analyze_reference(reference)
@@ -140,7 +141,7 @@ def montage_by_reference(
         joined = folder / "joined.mp4"
         dynamic = folder / "dynamic.mp4"
         subtitles = folder / "subtitles.ass"
-        base_video(original, joined, kept, source_has_audio)
+        base_video(original, joined, kept, source_has_audio, audio_profile=audio_profile)
         add_virtual_camera(joined, dynamic, profile.seconds_per_change)
         count = write_ass(dynamic, subtitles, color)
         if count:
