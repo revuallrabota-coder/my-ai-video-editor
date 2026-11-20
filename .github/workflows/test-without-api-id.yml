@@ -16,9 +16,22 @@ on:
       color:
         description: "Цвет субтитров (#RRGGBB)"
         required: true
-        default: "#E8A0C0"
+        default: "#EBC0C8"
         type: string
 
+      subtitle_style:
+        description: "Субтитры по референсу или старые"
+        required: true
+        default: signature
+        type: choice
+        options:
+          - signature
+          - classic
+      hook_text:
+        description: "Заголовок вверху первые 5 секунд (необязательно)"
+        required: false
+        default: ""
+        type: string
       audio_profile:
         description: "Звук: очистка от шума и ровная громкость"
         required: true
@@ -53,7 +66,7 @@ jobs:
       - name: "Установить FFmpeg"
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          sudo apt-get install -y ffmpeg fonts-dejavu-core fonts-liberation
 
       - name: "Установить зависимости"
         run: |
@@ -61,7 +74,7 @@ jobs:
           python -m pip install "requests>=2.31,<3"
 
       - name: "Проверить синтаксис"
-        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py
+        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py
 
       - name: "Запустить тестовый монтаж"
         env:
@@ -70,4 +83,6 @@ jobs:
           MONTAGE_MODE: ${{ inputs.mode }}
           SUBTITLE_COLOR: ${{ inputs.color }}
           AUDIO_PROFILE: ${{ inputs.audio_profile }}
+          SUBTITLE_STYLE: ${{ inputs.subtitle_style }}
+          HOOK_TEXT: ${{ inputs.hook_text }}
         run: python bot_api_editor.py
