@@ -151,8 +151,15 @@ def audio_filterchain(profile: str) -> str:
 def base_video(
     path: Path, output: Path, ranges: list[Segment], has_audio: bool,
     audio_profile: str = "balanced",
+    speed: float = 1.0,
+    filter_style: str = "none",
 ) -> None:
-    """Покадровый монтаж с сохранением речи и необязательным шумоподавлением."""
+    """Собрать видео, реально применяя скорость, цвет и очистку речи."""
+    if not 0.8 <= speed <= 1.5:
+        raise ValueError("Скорость должна быть от 0.8 до 1.5.")
+    if filter_style not in ("none", "warm"):
+        raise ValueError("Поддерживаются только фильтры none и warm.")
+
     filters: list[str] = []
     concat_inputs = ""
     for idx, fragment in enumerate(ranges):
@@ -162,21 +169,38 @@ def base_video(
         if has_audio:
             filters.append(f"[0:a]atrim=start={a:.3f}:end={b:.3f},asetpts=PTS-STARTPTS[a{idx}]")
             concat_inputs += f"[a{idx}]"
+
     if has_audio:
         filters.append(f"{concat_inputs}concat=n={len(ranges)}:v=1:a=1[vjoined][ajoined]")
-        sound_filters = audio_filterchain(audio_profile)
-        if sound_filters:
-            filters.append(f"[ajoined]{sound_filters}[aclean]")
-            audio_output = "[aclean]"
-        else:
-            audio_output = "[ajoined]"
     else:
         filters.append(f"{concat_inputs}concat=n={len(ranges)}:v=1:a=0[vjoined]")
-    filters.append(
-        "[vjoined]scale=720:1280:force_original_aspect_ratio=decrease,"
+
+    video_source = "[vjoined]"
+    audio_source = "[ajoined]"
+    if abs(speed - 1.0) > 0.001:
+        filters.append(f"{video_source}setpts=(PTS-STARTPTS)/{speed:.3f}[vtempo]")
+        video_source = "[vtempo]"
+        if has_audio:
+            filters.append(f"{audio_source}atempo={speed:.3f}[atempo]")
+            audio_source = "[atempo]"
+
+    if has_audio:
+        sound_filters = audio_filterchain(audio_profile)
+        if sound_filters:
+            filters.append(f"{audio_source}{sound_filters}[aclean]")
+            audio_source = "[aclean]"
+
+    video_filters = (
+        "scale=720:1280:force_original_aspect_ratio=decrease,"
         "pad=720:1280:(ow-iw)/2:(oh-ih)/2:color=0x1a1426,"
-        "setsar=1,fps=30,format=yuv420p[vout]"
+        "setsar=1,fps=30"
     )
+    if filter_style == "warm":
+        # Умеренный тёплый тон, без агрессивного изменения оттенка кожи.
+        video_filters += ",colorbalance=rs=0.045:gs=0.005:bs=-0.025"
+    video_filters += ",format=yuv420p"
+    filters.append(f"{video_source}{video_filters}[vout]")
+
     args = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(path), "-filter_complex", ";".join(filters),
@@ -184,7 +208,7 @@ def base_video(
         "-crf", "22", "-pix_fmt", "yuv420p",
     ]
     if has_audio:
-        args.extend(["-map", audio_output, "-c:a", "aac", "-b:a", "160k"])
+        args.extend(["-map", audio_source, "-c:a", "aac", "-b:a", "160k"])
     else:
         args.append("-an")
     args.extend(["-movflags", "+faststart", str(output)])
@@ -309,13 +333,18 @@ def edit_video(
     audio_profile: str = "balanced",
     subtitle_style: str = "signature",
     hook: str = "",
+    speed: float = 1.0,
+    filter_style: str = "none",
 ) -> dict:
     duration, has_audio = duration_and_audio(original)
     ranges = ([Segment(0.0, duration)] if mode == "captions"
               else get_keep_ranges(original, duration, has_audio))
     with tempfile.TemporaryDirectory(prefix="editor_") as directory:
         work = Path(directory) / "joined.mp4"
-        base_video(original, work, ranges, has_audio, audio_profile=audio_profile)
+        base_video(
+            original, work, ranges, has_audio,
+            audio_profile=audio_profile, speed=speed, filter_style=filter_style,
+        )
         subtitle_events = 0
         if mode != "cuts" and has_audio:
             ass = Path(directory) / "captions.ass"
@@ -328,7 +357,7 @@ def edit_video(
             work.replace(output)
     return {
         "before": round(duration, 1),
-        "after": round(sum(s.end-s.start for s in ranges), 1),
+        "after": round(sum(s.end-s.start for s in ranges) / speed, 1),
         "subtitle_events": subtitle_events,
     }
 
