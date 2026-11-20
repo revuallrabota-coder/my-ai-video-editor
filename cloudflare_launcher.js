@@ -219,11 +219,11 @@ async function workerUploadRoute(request, env, path) {
         !equalHex(bearer, env.TELEGRAM_BOT_TOKEN)) {
       return json({error:"Unauthorized"},401);
     }
-    const match = path.match(/^\/internal\/upload\/([a-f0-9-]{36})(?:\/(manifest|chunk\/\d+|release))?$/);
+    const match = path.match(/^\/internal\/upload\/([a-f0-9-]{36})(?:\/(manifest|chunk\/\d+|result\/start|result\/finish|result\/\d+|release))?$/);
     if (!match || !idMatches(match[1])) return json({error:"Not found"},404);
     const id = match[1], operation=match[2] ?? "manifest";
     const meta = await env.UPLOADS.get(uploadKey(id,"meta"),"json");
-    if (!meta || meta.state !== "queued") {
+    if (!meta || !["queued","done"].includes(meta.state)) {
       return json({error:"Upload metadata is not yet available"},409);
     }
     if (request.method === "GET" && operation === "manifest") {
@@ -245,11 +245,54 @@ async function workerUploadRoute(request, env, path) {
         }
       });
     }
+    if (request.method === "POST" && operation === "result/start") {
+      let input;
+      try {input = await request.json();}
+      catch {return json({error:"Bad result metadata"},400);}
+      const size=Number(input.size);
+      if (!Number.isSafeInteger(size) || size < 1024 || size > 250_000_000) {
+        return json({error:"Result is too large for temporary KV"},413);
+      }
+      const count=Math.ceil(size/UPLOAD_PART_BYTES);
+      if (meta.state !== "queued") return json({error:"Already finished"},409);
+      await env.UPLOADS.put(uploadKey(id,"meta"),
+        JSON.stringify({...meta,output:{size,parts:count,state:"uploading"}}),
+        {expirationTtl:UPLOAD_TTL});
+      return json({ok:true,parts:count});
+    }
+    const resultPart=operation.match(/^result\/(\d+)$/);
+    if (request.method === "PUT" && resultPart) {
+      const i=Number(resultPart[1]),o=meta.output;
+      if (!o || o.state!=="uploading" || !Number.isSafeInteger(i)
+          || i<0 || i>=o.parts) return json({error:"Bad result part"},409);
+      const expected=Math.min(UPLOAD_PART_BYTES,o.size-i*UPLOAD_PART_BYTES);
+      const buffer=await request.arrayBuffer();
+      if(buffer.byteLength!==expected)return json({error:"Incorrect result chunk"},400);
+      await env.UPLOADS.put(uploadKey(id,"output:"+i),buffer,{expirationTtl:UPLOAD_TTL});
+      return json({ok:true,index:i});
+    }
+    if (request.method === "POST" && operation === "result/finish") {
+      const o=meta.output;
+      if (!o || o.state!=="uploading") return json({error:"No result upload"},409);
+      for(let i=0;i<o.parts;i++){
+        const buf=await env.UPLOADS.get(uploadKey(id,"output:"+i),"arrayBuffer");
+        if (!buf || buf.byteLength!==Math.min(UPLOAD_PART_BYTES,o.size-i*UPLOAD_PART_BYTES)){
+          return json({error:"Result KV chunk is not yet available"},409);
+        }
+      }
+      await env.UPLOADS.put(uploadKey(id,"meta"),
+        JSON.stringify({...meta,state:"done",output:{...o,state:"ready"}}),
+        {expirationTtl:UPLOAD_TTL});
+      return json({ok:true});
+    }
     if (request.method === "DELETE" && operation === "release") {
       await Promise.all(
         Array.from({length:meta.parts},(_,i)=>env.UPLOADS.delete(uploadKey(id,i)))
       );
-      await env.UPLOADS.delete(uploadKey(id,"meta"));
+      // Keep the authenticated output available for an iPad download.
+      if (!meta.output || meta.output.state!=="ready") {
+        await env.UPLOADS.delete(uploadKey(id,"meta"));
+      }
       return json({released:true});
     }
     return json({error:"Unknown internal route"},404);
@@ -262,6 +305,37 @@ async function workerUploadRoute(request, env, path) {
     await validateTelegram(initData, env.TELEGRAM_BOT_TOKEN, env.OWNER_TELEGRAM_ID);
   } catch (err) {
     return json({error:String(err.message ?? err)},403);
+  }
+  // Only the verified Telegram owner may check/download final MP4 chunks.
+  const clientStatus=path.match(/^\/upload\/([a-f0-9-]{36})\/status$/);
+  if (request.method === "GET" && clientStatus) {
+    const meta=await env.UPLOADS.get(uploadKey(clientStatus[1],"meta"),"json");
+    if (!meta) return json({error:"Файл уже удалён или время хранения истекло."},404);
+    const o=meta.output;
+    return json({
+      ready:meta.state==="done" && o?.state==="ready",
+      size:o?.size ?? 0,parts:o?.parts ?? 0,
+      state:meta.state
+    });
+  }
+  const clientResult=path.match(/^\/upload\/([a-f0-9-]{36})\/result\/(\d+)$/);
+  if (request.method === "GET" && clientResult) {
+    const id=clientResult[1], i=Number(clientResult[2]);
+    const meta=await env.UPLOADS.get(uploadKey(id,"meta"),"json");
+    const o=meta?.output;
+    if(!meta || meta.state!=="done" || o?.state!=="ready" || i<0 || i>=o.parts)
+      return json({error:"Готовый ролик ещё не загружен."},409);
+    const bytes=await env.UPLOADS.get(uploadKey(id,"output:"+i),"arrayBuffer");
+    if(!bytes)return json({error:"Фрагмент результата пока недоступен."},409);
+    return new Response(bytes,{
+      headers:{
+        "Content-Type":"application/octet-stream",
+        "Cache-Control":"no-store",
+        "Access-Control-Allow-Origin":ORIGIN,
+        "Access-Control-Allow-Headers":"X-Telegram-Init-Data",
+        "Vary":"Origin"
+      }
+    });
   }
   if (request.method === "POST" && path === "/upload/start") {
     let payload;
