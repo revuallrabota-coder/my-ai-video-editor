@@ -269,7 +269,7 @@ def write_ass(
     if style == "contrast":
         from contrast_captions import build_contrast_ass
         content, count = build_contrast_ass(
-            words, hook=hook,
+            words, hook=hook, accent_color=color,
             caption_position=caption_position, font_profile=font_profile,
         )
         output_ass.write_text(content, encoding="utf-8")
