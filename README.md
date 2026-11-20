@@ -1,3 +1,26 @@
+# 🎛 Настройки выбираются заново для каждого ролика
+
+**Никакой набор из записи экрана стороннего бота не закреплён как обязательный.** Это только пример. В нашем GitHub Actions по ссылке [🧪 Запустить монтаж без API ID](https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml) каждый раз доступны **10 независимых настроек**:
+
+| Параметр | Варианты |
+|---|---|
+| mode | my_style / auto / captions / cuts / reference |
+| subtitle_style | signature (розовый) / contrast (красный) / classic |
+| color | auto (под стиль) либо любой #RRGGBB |
+| font_profile | elegant / clean / bold |
+| caption_position | top / middle / bottom |
+| camera_style | enhanced / soft_punch / gentle / off |
+| video_speed | 1.0 / 1.1 / 1.2 |
+| video_filter | none / warm |
+| audio_profile | balanced / strong / off |
+| hook_text | свой текст в начале или пусто |
+
+Выбор из твоей записи, например **enhanced + 1.1 + warm**, теперь можно поставить вручную, но это **не обязательные настройки**. По умолчанию бережнее: мягкий soft_punch, скорость 1.0, фильтр none. В contrast при color=auto красные акценты, в signature при color=auto розовые.
+
+**Важно:** только настройки, переданные в GitHub Actions, действительно влияют на текущий рендер. Интерфейс Mini App ещё не соединён с Actions; выбор в нём пока предпросмотр. Эмодзи, фото-вставки, саунд-эффекты и импорт произвольного шрифта ещё не реализованы. Полноценная проверка новых шрифтов и положений на твоём видео ещё не проведена.
+
+---
+
 # 🎥 Новое приближение «Как в Чит-Коде» (без тряски)
 
 По просьбе пользователя режим **camera_style = soft_punch** теперь стоит **по умолчанию** в тестовом Bot API workflow и Mini App.
