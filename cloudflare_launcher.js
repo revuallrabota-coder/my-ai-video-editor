@@ -24,11 +24,16 @@ const CHOICES = {
   subtitle_style: ["reference_dynamic", "signature", "contrast", "classic",
     "signature_phrases", "contrast_phrases", "classic_phrases"],
   camera_style: ["cinematic_pan", "editorial", "soft_punch", "enhanced", "gentle", "off"],
-  video_filter: ["none", "warm"],
+  video_filter: ["none","warm","soft","cool","contrast","clean","film","matte"],
   caption_position: ["top", "middle", "bottom"],
   font_profile: ["elegant", "clean", "bold", "bebas", "platform", "bubble", "script", "modern"],
   audio_profile: ["off", "balanced", "strong"],
-  video_speed: ["1.0", "1.1", "1.2"]
+  video_speed: ["1.0", "1.1", "1.2"],
+  caption_variant: ["editorial","luxe","minimal","neon","pop"],
+  small_font_profile: ["elegant","clean","bold","bebas","platform","bubble","script","modern"],
+  background_style: ["off","occasional","frequent","always"],
+  animation_style: ["float","pop","slide"],
+  subtitle_sfx: ["off","soft","tick"]
 };
 
 function json(value, status = 200, origin = ORIGIN) {
@@ -156,6 +161,11 @@ function verifiedWorkerSettings(config) {
   if (!["off", "on"].includes(emoji)) {
     throw new Error("Неверный режим эмодзи.");
   }
+  const captionVariant = field(config.caption_variant,"caption_variant","editorial");
+  const smallFont = field(config.small_font_profile,"small_font_profile","modern");
+  const backgroundStyle = field(config.background_style,"background_style","occasional");
+  const animationStyle = field(config.animation_style,"animation_style","float");
+  const subtitleSound = field(config.subtitle_sfx,"subtitle_sfx","soft");
   const quality = String(config.export_quality ?? "high");
   if (!["high", "balanced"].includes(quality)) {
     throw new Error("Недопустимое качество.");
@@ -173,6 +183,11 @@ function verifiedWorkerSettings(config) {
     video_filter: original.video_filter,
     caption_position: original.caption_position,
     font_profile: original.font_profile,
+    small_font_profile: smallFont,
+    caption_variant: captionVariant,
+    background_style: backgroundStyle,
+    animation_style: animationStyle,
+    subtitle_sfx: subtitleSound,
     audio_profile: original.audio_profile,
     sound_effects: sound,
     emoji_mode: emoji,
