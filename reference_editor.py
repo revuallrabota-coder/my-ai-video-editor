@@ -187,77 +187,121 @@ def editorial_zoom_expression(
     return "1"+"".join(ramps)
 
 
+def side_pan_expressions(
+    words: list[tuple[float, float, str]],
+    duration: float,
+) -> tuple[str, str]:
+    """Eased left/right reframing with occasional held closeups.
+
+    No random shaking and no repetitive sine oscillation. Transitions
+    start on sentence boundaries; crop stays safely within frame.
+    """
+    from signature_captions import split_groups
+    groups = split_groups(words)
+    beginnings = sorted({
+        float(g[0][0]) for g in groups if g and 0.7 < g[0][0] < duration - .5
+    })
+    changes: list[float] = []
+    for t in beginnings:
+        if not changes or t - changes[-1] >= 4.6:
+            changes.append(t)
+        if len(changes) >= 16:
+            break
+    if not changes and duration > 3:
+        changes = [min(2.0, duration*.35)]
+    ramps = []
+    position = 0.0
+    for index, t in enumerate(changes):
+        # Center -> right -> left -> center, with ~1.2s soft transitions.
+        target = (0.28, -0.28, 0.0)[index%3]
+        delta = target - position
+        position = target
+        frame = round(t * 30)
+        x = f"max(0,min(1,(on-{frame})/36))"
+        smooth = f"({x}*{x}*(3-2*{x}))"
+        ramps.append(f"{delta:+.3f}*{smooth}")
+    pan_ratio = "0.5" + "".join(ramps)
+    # Always keep a modest crop margin for side movements.
+    # Cut to slightly closer shot on selected phrase boundaries.
+    zoom = "1.10+0.38*(" + editorial_zoom_expression(words,duration,.16) + "-1)"
+    return zoom, f"(iw-iw/zoom)*({pan_ratio})"
+
+
 def add_virtual_camera(
     source: Path,
     output: Path,
     cadence: float,
-    camera_style: str = "soft_punch",
+    camera_style: str = "cinematic_pan",
     words: list[tuple[float, float, str]] | None = None,
+    *,
+    quality: str = "high",
+    subtitles_ass: Path | None = None,
 ) -> None:
-    """Плавные приближения с задержками на крупном плане.
+    """Smooth virtual camera with optional subtitle burn in SAME encode.
 
-    soft_punch: 0.8 сек плавное приближение (около 11%), ~5 сек
-    удержание крупности, ~1 сек плавное отдаление. Между сериями есть
-    стабильный общий план. Никаких циклических колебаний zoom'а
-    каждый кадр и случайных сдвигов.
-
-    gentle: только одно очень медленное приближение на 2.5%.
-    off: без искусственного увеличения.
+    cinematic_pan: sideways ease + held editorial closeups, no shakes.
+    Other camera modes remain available for per-video selection.
     """
-    if camera_style not in ("editorial", "soft_punch", "enhanced", "gentle", "off"):
+    from export_profiles import get_export_profile
+    profile = get_export_profile(quality)
+    if camera_style not in (
+        "cinematic_pan","editorial","soft_punch","enhanced","gentle","off",
+    ):
         raise ValueError("Неизвестный режим камеры.")
     if camera_style == "off":
-        # Не перекодируем видеокартинку и не добавляем цифрового дрожания.
-        execute([
-            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-            "-i", str(source), "-map", "0:v:0", "-map", "0:a:0?",
-            "-c:v", "copy", "-c:a", "copy", "-movflags", "+faststart",
-            str(output),
-        ])
+        if subtitles_ass is not None:
+            burn_subtitles(source, subtitles_ass, output, quality=quality)
+        else:
+            execute([
+                "ffmpeg","-hide_banner","-loglevel","error","-y",
+                "-i",str(source),"-map","0:v:0","-map","0:a:0?",
+                "-c:v","copy","-c:a","copy","-movflags","+faststart",
+                str(output),
+            ])
         return
+    x_expr = "(iw-iw/zoom)/2"
     if camera_style == "gentle":
         zoom = "min(1.025,1+on*0.00012)"
+    elif camera_style == "cinematic_pan":
+        duration, _ = duration_and_audio(source)
+        zoom, x_expr = side_pan_expressions(words or [], duration)
     elif camera_style == "editorial":
         duration, _ = duration_and_audio(source)
         zoom = editorial_zoom_expression(words or [], duration, .17)
-        LOG.info("Editorial close-up holds triggered by phrases.")
     elif words:
         duration, _ = duration_and_audio(source)
         windows = speech_zoom_windows(words, duration)
         amplitude = 0.20 if camera_style == "enhanced" else 0.16
         zoom = smooth_zoom_expression(windows, amplitude)
-        LOG.info("Speech-aware zooms: %d intervals", len(windows))
     else:
-        # Плавная монтажная смена крупности (вместо «дышащего» зума).
-        # Период 13 сек, за одну серию: широкий -> близкий -> широкий.
-        # smoothstep даёт нулевую скорость в начале и в конце каждого
-        # перехода, поэтому переключений с тряской быть не должно.
         if camera_style == "enhanced":
-            # Режим «Усиленная» из записи: чаще и заметнее, но так же плавно.
-            # 9 секунд на серию, 18% увеличение, удержание крупного кадра.
             p = "mod(on,270)"
-            entrance = _smoothstep(p, 12, 27)
-            exit_ = _smoothstep(p, 173, 30)
+            entrance = _smoothstep(p,12,27)
+            exit_ = _smoothstep(p,173,30)
             zoom = f"1+0.18*({entrance}-{exit_})"
         else:
             p = "mod(on,390)"
-            entrance = _smoothstep(p, 24, 24)
-            exit_ = _smoothstep(p, 211, 30)
+            entrance = _smoothstep(p,24,24)
+            exit_ = _smoothstep(p,211,30)
             zoom = f"1+0.11*({entrance}-{exit_})"
 
-    # Больший промежуточный размер уменьшает ступенчатые сдвиги центра.
     vf = (
-        "scale=1080:1920:flags=lanczos,setsar=1,fps=30,"
+        f"scale={profile.expanded_dimensions}:flags=lanczos,"
+        "setsar=1,fps=30,"
         f"zoompan=z='{zoom}':"
-        "x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':"
-        "d=1:s=720x1280:fps=30,format=yuv420p"
+        f"x='{x_expr}':y='(ih-ih/zoom)/2':"
+        f"d=1:s={profile.zoom_size}:fps=30,format=yuv420p"
     )
+    if subtitles_ass is not None:
+        # Prevent another lossy video-generation pass for subtitle rendering.
+        vf += f",ass={subtitles_ass}"
     execute([
-        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-        "-i", str(source), "-vf", vf,
-        "-map", "0:v:0", "-map", "0:a:0?",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
-        "-c:a", "copy", "-movflags", "+faststart", str(output),
+        "ffmpeg","-hide_banner","-loglevel","error","-y",
+        "-i",str(source),"-vf",vf,
+        "-map","0:v:0","-map","0:a:0?",
+        "-c:v","libx264","-preset",profile.preset,
+        "-crf",str(profile.crf),"-pix_fmt","yuv420p",
+        "-c:a","copy","-movflags","+faststart",str(output),
     ])
 
 
@@ -279,6 +323,7 @@ def montage_by_reference(
     sound_effects: str = "off",
     emoji_mode: str = "off",
     hook_position: str = "start",
+    quality: str = "high",
 ) -> dict:
     """Монтаж с нарезкой тишины, ритмом референса и живыми субтитрами."""
     from reels_effects import apply_effects, validate_effects
@@ -300,10 +345,11 @@ def montage_by_reference(
         joined = folder / "joined.mp4"
         dynamic = folder / "dynamic.mp4"
         subtitles = folder / "subtitles.ass"
-        subtitled = folder / "subtitled.mp4"
+        subtitled = folder / "subtitled.mp4"  # legacy intermediary; no longer encoded
         base_video(
             original, joined, kept, source_has_audio,
             audio_profile=audio_profile, speed=speed, filter_style=filter_style,
+            quality=quality,
         )
         from speech_review import map_words_to_ranges
         from telegram_editor import transcribe_words
@@ -312,25 +358,24 @@ def montage_by_reference(
             words = map_words_to_ranges(words_override, kept, speed)
         else:
             words = transcribe_words(joined)
-        add_virtual_camera(
-            joined, dynamic, profile.seconds_per_change,
-            camera_style=camera_style, words=words,
-        )
+        # Render title timings from the joined timeline, then burn those
+        # titles while making the actual camera move (one less lossy pass).
         count = write_ass(
-            dynamic, subtitles, color, style=subtitle_style, hook=hook,
+            joined, subtitles, color, style=subtitle_style, hook=hook,
             caption_position=caption_position, font_profile=font_profile,
             words_override=words,
             caption_animation=caption_animation,
             hook_position=hook_position,
         )
-        if count:
-            burn_subtitles(dynamic, subtitles, subtitled)
-        else:
-            dynamic.replace(subtitled)
+        add_virtual_camera(
+            joined, dynamic, profile.seconds_per_change,
+            camera_style=camera_style, words=words,
+            quality=quality, subtitles_ass=subtitles if count else None,
+        )
         effect_stats = apply_effects(
-            subtitled, output, words,
+            dynamic, output, words,
             sound=sound_effects, emoji=emoji_mode,
-            caption_position=caption_position,
+            caption_position=caption_position, quality=quality,
         )
     return {
         "before": round(source_duration, 1),
