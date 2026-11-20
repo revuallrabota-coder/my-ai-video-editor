@@ -238,6 +238,11 @@ def write_ass(
         content, count = build_signature_ass(words, color=color, hook=hook)
         output_ass.write_text(content, encoding="utf-8")
         return count
+    if style == "contrast":
+        from contrast_captions import build_contrast_ass
+        content, count = build_contrast_ass(words, hook=hook)
+        output_ass.write_text(content, encoding="utf-8")
+        return count
     if style != "classic":
         raise ValueError("Неизвестный стиль субтитров.")
 
@@ -344,7 +349,7 @@ async def main() -> None:
     audio_profile = os.environ.get("AUDIO_PROFILE", "balanced")
     audio_filterchain(audio_profile)  # early validation
     subtitle_style = os.environ.get("SUBTITLE_STYLE", "signature")
-    if subtitle_style not in ("signature", "classic"):
+    if subtitle_style not in ("signature", "classic", "contrast"):
         raise ValueError("Неверный стиль субтитров.")
     hook = os.environ.get("HOOK_TEXT", "").strip()[:70]
     if mode not in ("auto", "captions", "cuts"):
