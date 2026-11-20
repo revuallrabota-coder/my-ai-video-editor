@@ -18,6 +18,16 @@ on:
         default: "#E8A0C0"
         type: string
 
+      audio_profile:
+        description: "Звук: очистка от шума и ровная громкость"
+        required: true
+        default: balanced
+        type: choice
+        options:
+          - balanced
+          - strong
+          - off
+
 concurrency:
   group: telegram-video-montage
   cancel-in-progress: false
@@ -58,4 +68,5 @@ jobs:
           OWNER_TELEGRAM_ID: ${{ secrets.OWNER_TELEGRAM_ID }}
           MONTAGE_MODE: ${{ inputs.mode }}
           SUBTITLE_COLOR: ${{ inputs.color }}
+          AUDIO_PROFILE: ${{ inputs.audio_profile }}
         run: python telegram_editor.py
