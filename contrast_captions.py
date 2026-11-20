@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Sequence
 
 from signature_captions import ass_color, ass_time, event, pick_main_word, safe_text, split_groups
+from font_presets import choose_font
 
 RED = "#F0443E"
 
@@ -23,10 +24,8 @@ def build_contrast_ass(
     red = ass_color(RED if accent_color == "auto" else accent_color)
     if caption_position not in ("top", "middle", "bottom"):
         raise ValueError("Неизвестное положение субтитров.")
-    fonts = {"elegant": ("Liberation Serif", "1"), "clean": ("Liberation Sans", "0"), "bold": ("DejaVu Sans", "0")}
-    if font_profile not in fonts:
-        raise ValueError("Неизвестный шрифт.")
-    fontname, italic = fonts[font_profile]
+    font = choose_font(font_profile)
+    fontname, italic = font.name, str(font.italic)
     vertical_shift = {"top": -365, "middle": 0, "bottom": 185}[caption_position]
     header = (
         "[Script Info]\nScriptType: v4.00+\n"
@@ -39,8 +38,9 @@ def build_contrast_ass(
         " Alignment, MarginL, MarginR, MarginV, Encoding\n"
         "Style: Small,Liberation Sans,34,&H00FFFFFF,&H00FFFFFF,&H00212223,"
         "&H99000000,0,0,0,0,100,100,0,0,1,1.8,1.0,5,60,60,40,1\n"
-        f"Style: Strong,{fontname},69,{red},{red},&H00222222,"
-        f"&H99000000,1,{italic},0,0,100,100,0,0,1,2.0,1.0,5,40,40,40,1\n"
+        f"Style: Strong,{fontname},{font.size},{red},{red},{font.outline_color},"
+        f"&H99000000,{font.bold},{italic},0,0,{font.scale_x},{font.scale_y},0,0,"
+        f"1,{font.outline},{font.shadow},5,40,40,40,1\n"
         f"Style: Title,Liberation Sans,65,{red},{red},&H00222222,"
         "&H99000000,1,0,0,0,100,100,0,0,1,1,1,5,52,52,40,1\n\n"
         "[Events]\n"
