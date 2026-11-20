@@ -36,6 +36,11 @@ PRESETS: dict[str, FontSpec] = {
     "bubble": FontSpec("Comfortaa", 72, 1, 0, 104, 100, 4.8, 1.7, "&H00171719"),
     "script": FontSpec("Liberation Serif", 81, 1, 1, 110, 98, 1.35),
     "modern": FontSpec("Lato", 73, 1, 0, 100, 100, 1.3),
+    # Не требуется внешних/платных шрифтов: используем кириллические аналоги.
+    "old_money": FontSpec("Liberation Serif", 79, 1, 0, 98, 100, 1.1, .55),
+    "vintage": FontSpec("Liberation Serif", 78, 1, 1, 103, 99, 1.8, .8),
+    "street": FontSpec("DejaVu Sans Condensed", 85, 1, 0, 90, 100, 2.6, 1.2),
+    "refined": FontSpec("Lato", 72, 0, 0, 100, 100, .9, .55),
 }
 
 def choose_font(name: str) -> FontSpec:
