@@ -218,8 +218,8 @@ def main() -> None:
     font_profile = os.environ.get("FONT_PROFILE", "elegant")
     if caption_position not in ("top", "middle", "bottom"):
         raise ValueError("Недопустимое положение субтитров.")
-    if font_profile not in ("elegant", "clean", "bold"):
-        raise ValueError("Недопустимый шрифт.")
+    from font_presets import choose_font
+    choose_font(font_profile)  # Проверка существования выбранного шрифта
     if filter_style not in ("none", "warm"):
         raise ValueError("Неизвестный фильтр видео.")
     if mode not in ("auto", "captions", "cuts", "reference", "my_style"):
