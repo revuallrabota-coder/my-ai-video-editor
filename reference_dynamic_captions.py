@@ -37,13 +37,32 @@ def build_reference_dynamic_ass(
     color: str = "auto",
     caption_position: str = "middle",
     font_profile: str = "bold",
+    small_font_profile: str = "modern",
+    caption_variant: str = "editorial",
+    background_style: str = "occasional",
+    animation_style: str = "float",
 ) -> tuple[str, int]:
     """Build independently animated subtitles with intermittent backing."""
     if caption_position not in ("top", "middle", "bottom"):
         raise ValueError("Недопустимое положение субтитров.")
+    variants = {
+        "editorial": ("#F0443E","#FFFFFF"),
+        "luxe": ("#D8BFA0","#FFF4E5"),
+        "minimal": ("#FFFFFF","#EFEFEF"),
+        "neon": ("#D7FF6C","#F3F7E7"),
+        "pop": ("#FF7BB6","#FFF3F9"),
+    }
+    if caption_variant not in variants:
+        raise ValueError("Неизвестный вариант оформления субтитров.")
+    if background_style not in ("off","occasional","frequent","always"):
+        raise ValueError("Недопустимый режим подложки субтитров.")
+    if animation_style not in ("float","pop","slide"):
+        raise ValueError("Недопустимая анимация текста.")
     font = choose_font(font_profile)
-    primary = ass_color("#F0443E" if color == "auto" else color)
-    white = "&H00FFFFFF&"
+    tiny_font = choose_font(small_font_profile)
+    main_hex, small_hex = variants[caption_variant]
+    primary = ass_color(main_hex if color == "auto" else color)
+    white = ass_color(small_hex)
     # Безопасная зона Reels: не прячем текст под нижние кнопки/описание.
     ybase = {"top": 410, "middle": 720, "bottom": 860}[caption_position]
     header = (
@@ -58,8 +77,9 @@ def build_reference_dynamic_ass(
         f"Style: Main,{font.name},91,{primary},{primary},&H0020191C,"
         f"&H99000000,1,0,0,0,{font.scale_x},{font.scale_y},0,0,"
         "1,1.2,1.0,5,35,35,40,1\n"
-        f"Style: Tiny,DejaVu Sans,35,{white},{white},&H0020191C,"
-        "&H89000000,0,0,0,0,100,100,0,0,1,1.0,1.0,5,38,38,40,1\n"
+        f"Style: Tiny,{tiny_font.name},35,{white},{white},&H0020191C,"
+        f"&H89000000,{tiny_font.bold},{tiny_font.italic},0,0,"
+        f"{tiny_font.scale_x},{tiny_font.scale_y},0,0,1,1.0,1.0,5,38,38,40,1\n"
         f"Style: Plate,DejaVu Sans,12,{white},{white},&H00101010,"
         "&H73000000,0,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1\n"
         "\n[Events]\n"
@@ -128,9 +148,19 @@ def build_reference_dynamic_ass(
         shown = safe_text(word).strip()[:42]
         if not shown:
             continue
+        # Все анимации используют реальные таймкоды произнесённых слов.
+        # float — мягко вверх, slide — мягко вбок, pop — без рывка масштаба.
+        if animation_style == "slide":
+            movement = (r"\move("+str(base_x+min(18,delta))+","+str(base_y)+","
+                        +str(base_x)+","+str(base_y)+",0,"+str(rise)+")")
+        elif animation_style == "pop":
+            movement = r"\pos("+str(base_x)+","+str(base_y)+")"
+            scale = 91 if strong else 96
+        else:
+            movement = (r"\move("+str(base_x)+","+str(base_y+delta)+","
+                        +str(base_x)+","+str(base_y)+",0,"+str(rise)+")")
         text = (
-            r"{\an5\move("+str(base_x)+","+str(base_y+delta)+","
-            +str(base_x)+","+str(base_y)+",0,"+str(rise)+")"
+            r"{\an5"+movement+
             r"\fad("+str(fade)+","+str(fade_out)+")"
             r"\fscx"+str(scale)+r"\fscy"+str(scale)+r"\blur0.45"
             r"\t(0,"+str(rise)+r",0.65,\fscx100\fscy100)"
@@ -138,12 +168,17 @@ def build_reference_dynamic_ass(
         )
         style = "Main" if strong else "Tiny"
         # A dark translucent pill only every fourth group, not everywhere.
-        if strong and group_id % 4 == 2:
+        use_plate = (
+            background_style == "always" or
+            (background_style == "frequent" and strong and group_id % 2 == 0) or
+            (background_style == "occasional" and strong and group_id % 4 == 2)
+        )
+        if use_plate:
             w = min(294, max(94, round(len(shown)*size*.39)+34))
             h = 51 if size > 90 else 43
             shape = (
                 r"{\an5\pos("+str(base_x)+","+str(base_y)+r")\p1"
-                r"\1c&H181616&\1a&H62&\fad("+str(fade)+","+str(fade_out)+")}"
+                r"\1c&H181616&\1a&H8C&\fad("+str(fade)+","+str(fade_out)+")}"
                 +_rounded_plate(w,h)
             )
             lines.append(
