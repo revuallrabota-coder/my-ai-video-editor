@@ -236,6 +236,7 @@ def add_virtual_camera(
     *,
     quality: str = "high",
     subtitles_ass: Path | None = None,
+    intermediate: bool = False,
 ) -> None:
     """Smooth virtual camera with optional subtitle burn in SAME encode.
 
@@ -300,7 +301,8 @@ def add_virtual_camera(
         "-i",str(source),"-vf",vf,
         "-map","0:v:0","-map","0:a:0?",
         "-c:v","libx264","-preset",profile.preset,
-        "-crf",str(profile.crf),"-pix_fmt","yuv420p",
+        "-crf",str(min(14, profile.crf) if intermediate else profile.crf),
+        "-pix_fmt","yuv420p",
         "-c:a","copy","-movflags","+faststart",str(output),
     ])
 
