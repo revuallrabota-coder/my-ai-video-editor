@@ -64,7 +64,7 @@ jobs:
               ], check=True)
               profile = analyze_reference(source)
               assert 0.9 <= profile.seconds_per_change <= 4.5
-              for camera_style in ("off", "gentle"):
+              for camera_style in ("off", "gentle", "soft_punch"):
                   add_virtual_camera(source, ready, profile.seconds_per_change, camera_style=camera_style)
                   duration, has_audio = duration_and_audio(ready)
                   assert 1.7 < duration < 2.3
