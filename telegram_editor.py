@@ -310,36 +310,49 @@ def write_ass(
     caption_position: str = "middle", font_profile: str = "elegant",
     words_override: list[tuple[float, float, str]] | None = None,
     caption_animation: str = "word_pop",
+    hook_position: str = "start",
 ) -> int:
     words = words_override if words_override is not None else transcribe_words(video_path)
+    from reels_effects import add_hook_to_ass
+
+    def save_subtitles(content: str) -> int:
+        seconds, _ = duration_and_audio(video_path)
+        accent_color = (
+            "#F0443E" if style == "contrast" and color == "auto" else
+            "#FFFFFF" if style == "classic" and color == "auto" else color
+        )
+        complete = add_hook_to_ass(
+            content, hook, position=hook_position, duration=seconds,
+            color=accent_color,
+        )
+        output_ass.write_text(complete, encoding="utf-8")
+        return sum(line.startswith("Dialogue: ") for line in complete.splitlines())
+
 
     if caption_animation == "word_pop":
         from word_captions import build_word_pop_ass
         content, count = build_word_pop_ass(
-            words, style=style, color=color, hook=hook,
+            words, style=style, color=color, hook="",
             caption_position=caption_position, font_profile=font_profile,
         )
-        output_ass.write_text(content, encoding="utf-8")
-        return count
+        return save_subtitles(content)
     if caption_animation != "phrase_float":
         raise ValueError("Неизвестная анимация субтитров.")
 
     if style == "signature":
         from signature_captions import build_signature_ass
         content, count = build_signature_ass(
-            words, color=color, hook=hook,
+            words, color=color, hook="",
             caption_position=caption_position, font_profile=font_profile,
         )
-        output_ass.write_text(content, encoding="utf-8")
-        return count
+        return save_subtitles(content)
     if style == "contrast":
         from contrast_captions import build_contrast_ass
         content, count = build_contrast_ass(
-            words, hook=hook, accent_color=color,
+            words, hook="", accent_color=color,
             caption_position=caption_position, font_profile=font_profile,
         )
-        output_ass.write_text(content, encoding="utf-8")
-        return count
+        return save_subtitles(content)
     if style != "classic":
         raise ValueError("Неизвестный стиль субтитров.")
 
@@ -386,8 +399,7 @@ def write_ass(
                 f"Dialogue: 0,{ass_time(start)},{ass_time(shown_until)},"
                 f"Main,,0,0,0,,{line}\n"
             )
-    output_ass.write_text(header + "".join(events), encoding="utf-8")
-    return len(events)
+    return save_subtitles(header + "".join(events))
 
 
 def burn_subtitles(input_path: Path, ass_path: Path, output_path: Path) -> None:
@@ -412,40 +424,59 @@ def edit_video(
     font_profile: str = "elegant",
     words_override: list[tuple[float, float, str]] | None = None,
     caption_animation: str = "word_pop",
+    sound_effects: str = "off",
+    emoji_mode: str = "off",
+    hook_position: str = "start",
 ) -> dict:
+    from reels_effects import apply_effects, validate_effects
+    from speech_review import map_words_to_ranges
+    validate_effects(sound_effects, emoji_mode, hook_position)
+
     duration, has_audio = duration_and_audio(original)
     ranges = ([Segment(0.0, duration)] if mode == "captions"
               else get_keep_ranges(original, duration, has_audio))
     with tempfile.TemporaryDirectory(prefix="editor_") as directory:
-        work = Path(directory) / "joined.mp4"
+        folder=Path(directory)
+        work = folder / "joined.mp4"
+        staged = folder / "with_subtitles.mp4"
         base_video(
             original, work, ranges, has_audio,
             audio_profile=audio_profile, speed=speed, filter_style=filter_style,
         )
+        words = (
+            map_words_to_ranges(words_override, ranges, speed)
+            if words_override is not None else
+            (transcribe_words(work) if has_audio and mode != "cuts" else [])
+        )
         subtitle_events = 0
         if mode != "cuts" and has_audio:
-            ass = Path(directory) / "captions.ass"
+            ass = folder / "captions.ass"
             subtitle_events = write_ass(
                 work, ass, color, style=subtitle_style, hook=hook,
                 caption_position=caption_position, font_profile=font_profile,
-                words_override=(
-                    __import__("speech_review").map_words_to_ranges(words_override, ranges, speed)
-                    if words_override is not None else None
-                ),
-                caption_animation=caption_animation,
+                words_override=words, caption_animation=caption_animation,
+                hook_position=hook_position,
             )
             if subtitle_events:
-                burn_subtitles(work, ass, output)
+                burn_subtitles(work, ass, staged)
             else:
-                work.replace(output)
+                work.replace(staged)
         else:
-            work.replace(output)
+            work.replace(staged)
+
+        # Звуковые акценты и эмодзи накладываются только после одобрения
+        # слов, чтобы не менять тайминги подписи и не заглушить речь.
+        effect_stats=apply_effects(
+            staged, output, words,
+            sound=sound_effects, emoji=emoji_mode,
+            caption_position=caption_position,
+        )
     return {
         "before": round(duration, 1),
         "after": round(sum(s.end-s.start for s in ranges) / speed, 1),
         "subtitle_events": subtitle_events,
+        **effect_stats,
     }
-
 
 async def main() -> None:
     required = ["TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_BOT_TOKEN", "OWNER_TELEGRAM_ID"]
