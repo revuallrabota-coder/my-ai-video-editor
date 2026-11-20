@@ -27,12 +27,21 @@ on:
         type: choice
         options:
           - signature
+          - contrast
           - classic
       hook_text:
         description: "Заголовок вверху первые 5 секунд (необязательно)"
         required: false
         default: ""
         type: string
+      camera_style:
+        description: "Движение камеры: выключено (стабильно) или мягкий зум"
+        required: true
+        default: "off"
+        type: choice
+        options:
+          - "off"
+          - gentle
       audio_profile:
         description: "Звук: очистка от шума и ровная громкость"
         required: true
@@ -75,7 +84,7 @@ jobs:
           python -m pip install "requests>=2.31,<3"
 
       - name: "Проверить синтаксис"
-        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py
+        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py
 
       - name: "Запустить тестовый монтаж"
         env:
@@ -85,5 +94,6 @@ jobs:
           SUBTITLE_COLOR: ${{ inputs.color }}
           AUDIO_PROFILE: ${{ inputs.audio_profile }}
           SUBTITLE_STYLE: ${{ inputs.subtitle_style }}
+          CAMERA_STYLE: ${{ inputs.camera_style }}
           HOOK_TEXT: ${{ inputs.hook_text }}
         run: python bot_api_editor.py
