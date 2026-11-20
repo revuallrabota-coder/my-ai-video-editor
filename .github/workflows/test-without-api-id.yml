@@ -23,9 +23,10 @@ on:
       subtitle_style:
         description: "Оформление + анимация: слова отдельно или фразы"
         required: true
-        default: signature
+        default: reference_dynamic
         type: choice
         options:
+          - reference_dynamic
           - signature
           - contrast
           - classic
@@ -40,9 +41,10 @@ on:
       camera_style:
         description: "Приближение: монтажные планы или прежний зум"
         required: true
-        default: editorial
+        default: cinematic_pan
         type: choice
         options:
+          - cinematic_pan
           - editorial
           - enhanced
           - soft_punch
@@ -130,7 +132,7 @@ jobs:
           python -m pip install "requests>=2.31,<3"
 
       - name: "Проверить синтаксис"
-        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py word_captions.py speech_review.py reels_effects.py font_presets.py
+        run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py word_captions.py speech_review.py reels_effects.py font_presets.py export_profiles.py reference_dynamic_captions.py
 
       - name: "Запустить тестовый монтаж"
         env:
@@ -145,5 +147,6 @@ jobs:
           VIDEO_FILTER: ${{ inputs.video_filter }}
           CAPTION_POSITION: ${{ inputs.caption_position }}
           FONT_PROFILE: ${{ inputs.font_profile }}
+          EXPORT_QUALITY: high
           HOOK_TEXT: ${{ inputs.hook_text }}
         run: python bot_api_editor.py
