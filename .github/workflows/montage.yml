@@ -21,9 +21,10 @@ on:
       subtitle_style:
         description: "Субтитры по референсу или старые"
         required: true
-        default: signature
+        default: reference_dynamic
         type: choice
         options:
+          - reference_dynamic
           - signature
           - contrast
           - classic
