@@ -17,7 +17,7 @@ from pathlib import Path
 import requests
 
 # Общая функция монтажа. Не требует авторизации MTProto.
-from telegram_editor import edit_video
+from telegram_editor import edit_video, audio_filterchain
 from reference_editor import montage_by_reference
 
 LOG = logging.getLogger("bot_api_editor")
@@ -127,6 +127,8 @@ def main() -> None:
 
     mode = os.environ.get("MONTAGE_MODE", "auto")
     color = os.environ.get("SUBTITLE_COLOR", "#E8A0C0")
+    audio_profile = os.environ.get("AUDIO_PROFILE", "balanced")
+    audio_filterchain(audio_profile)  # early validation
     if mode not in ("auto", "captions", "cuts", "reference"):
         raise RuntimeError("Неизвестный режим обработки.")
 
@@ -222,23 +224,23 @@ def main() -> None:
                         send_text(token, chat_id, "⚠️ Не удалось прочитать референс. Пришли другой файл MP4/MOV.")
                     continue
 
-                send_text(token, chat_id, "✂️ Исходник получен. Начинаю монтаж и субтитры…")
+                send_text(token, chat_id, "🎧 Исходник получен. Делаю монтаж и улучшаю звучание речи…")
                 try:
                     download_video(token, media["file_id"], original_file)
                     if mode == "reference":
                         details = montage_by_reference(
-                            original_file, reference_file, output_file, color
+                            original_file, reference_file, output_file, color, audio_profile
                         )
                         caption = (
                             "✅ Первая версия монтажа по референсу готова!\n"
                             f"Видео: {details['before']} → {details['after']} сек.\n"
                             f"В референсе обнаружено смен кадров: {details['reference_scene_changes']}.\n"
                             f"Ритм приближений: ~{details['reference_pace_seconds']} сек.\n"
-                            "Твой оригинальный голос сохранён.\n"
+                            "Твоя речь сохранена.\n"
                             "Это подбор темпа, не точное копирование графики и переходов."
                         )
                     else:
-                        details = edit_video(original_file, output_file, mode, color)
+                        details = edit_video(original_file, output_file, mode, color, audio_profile)
                         caption = (
                             "✅ Готово!\n"
                             f"Видео: {details['before']} → {details['after']} сек.\n"
