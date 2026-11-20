@@ -156,11 +156,18 @@
     <input id="outline" type="range" min="0" max="8" value="0">
     <label class="field" for="shadow">Мягкая тень: <span id="shadowValue">2</span></label>
     <input id="shadow" type="range" min="0" max="10" value="2">
-    <label class="option"><input id="emoji" type="checkbox" checked> Эмодзи к словам</label>
-    <label class="option"><input id="soundfx" type="checkbox" checked> Звуковые акценты</label>
-    <label class="option"><input id="hook" type="checkbox" checked> Хук в начале ролика</label>
-    <label class="field" for="hookText">Текст хука</label>
-    <input id="hookText" type="text" maxlength="50" placeholder="Например: Найди ошибку!">
+    <label class="option"><input id="emoji" type="checkbox" checked> ✨ Эмодзи к ключевым словам</label>
+    <label class="option"><input id="soundfx" type="checkbox" checked> 🔊 Мягкие звуковые акценты</label>
+    <label class="option"><input id="hook" type="checkbox"> 🪧 Показать хук на полупрозрачной подложке</label>
+    <label class="field" for="hookPosition">Где показать хук</label>
+    <select id="hookPosition">
+      <option value="start">В начале</option>
+      <option value="end">В конце</option>
+      <option value="both">В начале и в конце</option>
+    </select>
+    <label class="field" for="hookText">Текст хука (свой текст)</label>
+    <input id="hookText" type="text" maxlength="58" placeholder="Например: Найди ошибку за 3 секунды!">
+    <p class="note">В тестовой версии эти флажки работают через команды в Telegram: /sfx soft, /emoji on, /hook end ТВОЙ ТЕКСТ. Настройки этого экрана пока не отправляются на сервер автоматически.</p>
   </section>
 
   <section class="card page" data-page="3">
@@ -193,7 +200,7 @@
       <button class="smallbtn" type="button" id="copyOwnerId">Скопировать мой ID</button>
     </div>
     <p><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/test-without-api-id.yml" target="_blank" rel="noopener noreferrer">▶️ Тест: монтаж без API ID (видео до 20 МБ)</a></p>
-    <p class="note">Каждый запуск GitHub Actions можно настроить по-разному: mode, subtitle_style, color, font_profile, caption_position, camera_style, video_speed, video_filter, audio_profile и hook_text. Параметры из записи «Чит-Кода» не закреплены как обязательные. Выбор на экране Mini App пока служит предпросмотром; в обработку передаются именно параметры запуска Actions. После отправки видео бот сначала пришлёт текст распознанной речи: /ok подтвердить, /fix ошибка=правильно исправить отдельное слово, /text ТВОЙ ПОЛНЫЙ ТЕКСТ заменить весь текст. Новый editorial Zoom меняет общий план на крупный при смене фразы и удерживает его, без циклической раскачки. Субтитры signature / contrast / classic появляются по одному слову. Варианты _phrases выводят прежние фразы целиком. Вставки фото, эмодзи и звуковые акценты пока не реализованы.</p>
+    <p class="note">Каждый запуск GitHub Actions можно настроить по-разному: mode, subtitle_style, color, font_profile, caption_position, camera_style, video_speed, video_filter, audio_profile и hook_text. Параметры из записи «Чит-Кода» не закреплены как обязательные. Выбор на экране Mini App пока служит предпросмотром; в обработку передаются именно параметры запуска Actions. После отправки видео бот сначала пришлёт текст распознанной речи: /ok подтвердить, /fix ошибка=правильно исправить отдельное слово, /text ТВОЙ ПОЛНЫЙ ТЕКСТ заменить весь текст. Новый editorial Zoom меняет общий план на крупный при смене фразы и удерживает его, без циклической раскачки. Субтитры signature / contrast / classic появляются по одному слову. Варианты _phrases выводят прежние фразы целиком. Звуковые акценты, эмодзи и хук теперь реализованы через команды в Telegram: /effects, /sfx soft|punch|off, /emoji on|off, /hook start|end|both ТЕКСТ. Файлы и настройки из Mini App в обработчик пока не передаются автоматически. Вставки фото всё ещё не реализованы.</p>
     <div class="alert"><strong>Важно:</strong> это первая версия интерфейса, а не готовый видеоредактор. Файлы остаются на устройстве, монтаж и отправка готового ролика в Telegram пока не подключены. Настройки сохраняются отдельным JSON-файлом.</div>
   </section>
 </div>
@@ -229,6 +236,7 @@
       emoji:byId('emoji').checked,
       soundEffects:byId('soundfx').checked,
       hook:byId('hook').checked,
+      hookPosition:byId('hookPosition').value,
       hookText:byId('hookText').value,
       camera:selectedText('camera'),
       cameraStyle:byId('camera').value,
