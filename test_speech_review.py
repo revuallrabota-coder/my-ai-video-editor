@@ -4,7 +4,7 @@ from __future__ import annotations
 import unittest
 
 from speech_review import align_corrected_words, apply_word_fixes, map_words_to_ranges, plain_transcript
-from reference_editor import speech_zoom_windows, smooth_zoom_expression
+from reference_editor import speech_zoom_windows, smooth_zoom_expression, editorial_zoom_expression
 from telegram_editor import Segment
 
 
@@ -45,6 +45,19 @@ class TranscriptReviewTests(unittest.TestCase):
         result=map_words_to_ranges(source,kept,speed=1.25)
         self.assertEqual([x[2] for x in result],["первое","второе","третье"])
         self.assertAlmostEqual(result[1][0],0.48,places=2)
+
+    def test_editorial_zoom_keeps_the_close_up_until_next_phrase(self) -> None:
+        words = [
+            (0.1,0.4,"Первая"),(0.45,0.8,"фраза"),
+            (3.7,4.1,"Вторая"),(4.15,4.5,"фраза"),
+            (7.3,7.7,"Третья"),(7.73,8.15,"фраза"),
+        ]
+        expr = editorial_zoom_expression(words, duration=10.0, amplitude=0.17)
+        self.assertIn("on", expr)
+        self.assertNotIn("mod(", expr)
+        self.assertIn("0.170", expr)
+        self.assertTrue(expr.startswith("1+"))
+        self.assertGreaterEqual(expr.count("0.170"), 2)
 
     def test_zoom_is_keyed_to_phrases_not_every_second(self) -> None:
         words=[]
