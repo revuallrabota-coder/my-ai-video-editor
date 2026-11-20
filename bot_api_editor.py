@@ -129,6 +129,10 @@ def main() -> None:
     color = os.environ.get("SUBTITLE_COLOR", "#E8A0C0")
     audio_profile = os.environ.get("AUDIO_PROFILE", "balanced")
     audio_filterchain(audio_profile)  # early validation
+    subtitle_style = os.environ.get("SUBTITLE_STYLE", "signature")
+    if subtitle_style not in ("signature", "classic"):
+        raise ValueError("Неизвестный стиль субтитров.")
+    hook = os.environ.get("HOOK_TEXT", "").strip()[:70]
     if mode not in ("auto", "captions", "cuts", "reference"):
         raise RuntimeError("Неизвестный режим обработки.")
 
@@ -229,7 +233,8 @@ def main() -> None:
                     download_video(token, media["file_id"], original_file)
                     if mode == "reference":
                         details = montage_by_reference(
-                            original_file, reference_file, output_file, color, audio_profile
+                            original_file, reference_file, output_file, color, audio_profile,
+                            subtitle_style, hook
                         )
                         caption = (
                             "✅ Первая версия монтажа по референсу готова!\n"
@@ -240,7 +245,10 @@ def main() -> None:
                             "Это подбор темпа, не точное копирование графики и переходов."
                         )
                     else:
-                        details = edit_video(original_file, output_file, mode, color, audio_profile)
+                        details = edit_video(
+                            original_file, output_file, mode, color, audio_profile,
+                            subtitle_style, hook
+                        )
                         caption = (
                             "✅ Готово!\n"
                             f"Видео: {details['before']} → {details['after']} сек.\n"
