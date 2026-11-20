@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: my-ai-video-editor-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: OWNER_TELEGRAM_ID
+        sync: false
+      - key: CORS_ORIGINS
+        value: https://revuallrabota-coder.github.io
+      - key: MAX_FILE_MB
+        value: "50"
+      - key: RECOGNITION_MODEL
+        value: tiny
+      - key: SPEECH_LANGUAGE
+        value: ru
+      - key: PYTHONUNBUFFERED
+        value: "1"
