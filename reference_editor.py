@@ -324,8 +324,9 @@ def montage_by_reference(
     emoji_mode: str = "off",
     hook_position: str = "start",
     quality: str = "high",
+    subtitle_delay: float = 0.30,
 ) -> dict:
-    """Монтаж с нарезкой тишины, ритмом референса и живыми субтитрами."""
+    """Монтаж с точной синхронизацией речи, динамичным кадром и титрами."""
     from reels_effects import apply_effects, validate_effects
     validate_effects(sound_effects, emoji_mode, hook_position)
     # Без второго файла используем постоянный темп из разобранного
@@ -339,7 +340,11 @@ def montage_by_reference(
     source_duration, source_has_audio = duration_and_audio(original)
     if not source_has_audio:
         raise ValueError("Для разговорного монтажа нужен исходный ролик с речью.")
-    kept = get_keep_ranges(original, source_duration, source_has_audio)
+    # Главное исправление: в фирменном и референсном режимах не режем
+    # паузы перед словами. Исходная речь и видеоряд остаются на одной
+    # временной шкале. Динамика достигается движением камеры и титрами.
+    from telegram_editor import Segment
+    kept = [Segment(0.0, source_duration)]
     with tempfile.TemporaryDirectory(prefix="reference_render_") as tmp:
         folder = Path(tmp)
         joined = folder / "joined.mp4"
@@ -349,15 +354,19 @@ def montage_by_reference(
         base_video(
             original, joined, kept, source_has_audio,
             audio_profile=audio_profile, speed=speed, filter_style=filter_style,
-            quality=quality,
+            quality=quality, intermediate=True,
         )
-        from speech_review import map_words_to_ranges
+        from speech_review import map_words_to_ranges, shift_word_timestamps
         from telegram_editor import transcribe_words
 
         if words_override is not None:
             words = map_words_to_ranges(words_override, kept, speed)
         else:
             words = transcribe_words(joined)
+        # Добавляем небольшую задержку самих титров: надписи не обгоняют
+        # голос. Скорость исходного видео и речи остаётся равной 1.0.
+        joined_duration, _ = duration_and_audio(joined)
+        words = shift_word_timestamps(words, subtitle_delay, joined_duration)
         # Render title timings from the joined timeline, then burn those
         # titles while making the actual camera move (one less lossy pass).
         count = write_ass(
@@ -371,6 +380,7 @@ def montage_by_reference(
             joined, dynamic, profile.seconds_per_change,
             camera_style=camera_style, words=words,
             quality=quality, subtitles_ass=subtitles if count else None,
+            intermediate=(emoji_mode == "on"),
         )
         effect_stats = apply_effects(
             dynamic, output, words,
@@ -381,6 +391,7 @@ def montage_by_reference(
         "before": round(source_duration, 1),
         "after": round(sum(s.end - s.start for s in kept) / speed, 1),
         "subtitle_events": count,
+        "subtitle_delay": round(subtitle_delay, 2),
         **effect_stats,
         "reference_scene_changes": profile.scene_changes,
         "reference_pace_seconds": profile.seconds_per_change,
