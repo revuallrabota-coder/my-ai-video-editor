@@ -179,7 +179,7 @@
         <select id="fontBig">
           <option value="elegant">Элегантный курсив</option>
           <option value="clean">Минималистичный</option>
-          <option value="bold">Плотный акцент</option>
+          <option value="bold" selected>Плотный акцент</option>
           <option value="bebas">Bebas-стиль — высокий узкий</option>
           <option value="platform">Platform-стиль — широкий жирный</option>
           <option value="bubble">Bubble — округлый стикер с обводкой</option>
@@ -455,7 +455,11 @@
       platform:'Arial Black, Arial, sans-serif',
       bubble:'"Arial Rounded MT Bold", Trebuchet MS, sans-serif',
       script:'Georgia, "Times New Roman", serif',
-      modern:'Arial, sans-serif'
+      modern:'Arial, sans-serif',
+      old_money:'Georgia, "Times New Roman", serif',
+      vintage:'Georgia, "Times New Roman", serif',
+      street:'Impact, "Arial Narrow", sans-serif',
+      refined:'"Helvetica Neue", Arial, sans-serif'
     };
     big.style.fontFamily=styles[byId('fontBig').value]||'Arial,sans-serif';
     big.style.fontWeight=byId('fontBig').value==='clean'?'500':'900';
@@ -471,6 +475,26 @@
     }else{
       big.style.color=byId('color').value;
     }
+    var tiny=byId('sample').querySelector('.small');
+    tiny.style.fontFamily=styles[byId('fontSmall').value]||'Arial,sans-serif';
+    tiny.style.fontStyle=(['vintage','old_money','elegant','script'].includes(byId('fontSmall').value))?'italic':'normal';
+    tiny.style.fontWeight=(byId('fontSmall').value==='refined'||byId('fontSmall').value==='clean')?'500':'700';
+    var palette={
+      editorial:'#FFFFFF',old_money:'#FFF3E1',vintage:'#F4DFC7',
+      street:'#F5F5F0',elegant:'#FFFFFF',luxe:'#FFF4E5',
+      minimal:'#EFEFEF',neon:'#F3F7E7',pop:'#FFF3F9'
+    };
+    tiny.style.color=palette[byId('captionVariant').value]||'#FFFFFF';
+    var backing=byId('captionBackground').value;
+    var container=byId('sample');
+    container.style.background=backing==='off'?'transparent':
+      'rgba(18,13,20,'+(backing==='always'?'.52':backing==='frequent'?'.38':'.20')+')';
+    container.style.borderRadius='16px';
+    container.style.padding=backing==='off'?'0':'10px 7px';
+    var animate=byId('captionAnimation').value;
+    container.style.transition='transform .5s ease-out, background .4s ease-out';
+    container.style.transform=animate==='slide'?'translateX(4px)':
+      animate==='pop'?'scale(1.03)':'translateY(-4px)';
     var positions={top:'32%',middle:'62%',bottom:'78%'};
     byId('sample').style.top=positions[byId('position').value]||'60%';
     if(chosenFont!=='bubble')big.style.webkitTextStroke=byId('outline').value+'px #211832';
@@ -479,7 +503,38 @@
     byId('outlineValue').textContent=byId('outline').value;
     byId('shadowValue').textContent=byId('shadow').value;
   }
-  ['color','fontBig','position','outline','shadow','hookText','subtitleStyle'].forEach(function(id){byId(id).addEventListener('input',updateSample)});
+  var reelPresets={
+    editorial:{variant:'editorial',big:'bold',small:'modern',filter:'none',color:'#F0443E',backing:'occasional',animation:'float'},
+    old_money:{variant:'old_money',big:'old_money',small:'refined',filter:'old_money',color:'#CEB68A',backing:'occasional',animation:'float'},
+    vintage:{variant:'vintage',big:'vintage',small:'script',filter:'vintage',color:'#D79B6D',backing:'frequent',animation:'slide'},
+    street:{variant:'street',big:'street',small:'clean',filter:'street',color:'#DEEF5A',backing:'frequent',animation:'pop'},
+    elegant:{variant:'elegant',big:'refined',small:'elegant',filter:'elegant',color:'#F0DBDC',backing:'occasional',animation:'float'}
+  };
+  byId('reelsPreset').addEventListener('change',function(){
+    var cfg=reelPresets[this.value];
+    if(cfg){
+      byId('captionVariant').value=cfg.variant;
+      byId('fontBig').value=cfg.big;
+      byId('fontSmall').value=cfg.small;
+      byId('filter').value=cfg.filter;
+      byId('color').value=cfg.color;
+      byId('captionBackground').value=cfg.backing;
+      byId('captionAnimation').value=cfg.animation;
+      // All four curated looks are designed for mixed-size captions.
+      byId('subtitleStyle').value='reference_dynamic';
+    }
+    updateSample();
+  });
+  ['color','fontBig','fontSmall','captionVariant','captionBackground',
+   'captionAnimation','position','outline','shadow','hookText','subtitleStyle','filter'
+  ].forEach(function(id){
+    byId(id).addEventListener('input',function(){
+      // Пользователь изменил готовый набор: его выбор не перезаписываем.
+      if(['color','fontBig','fontSmall','captionVariant','captionBackground',
+          'captionAnimation','filter'].includes(id))byId('reelsPreset').value='custom';
+      updateSample();
+    });
+  });
   function go(dir){
     if(dir>0 && current===0 && !videoInput.files.length){alert('Сначала выбери хотя бы одно видео.');return}
     if(dir>0 && current===1 && photoInput.files.length>30){alert('Можно выбрать не больше 30 фото.');return}
@@ -596,6 +651,7 @@
       var parts=start.parts;
       var id=start.upload_id;
       try{localStorage.setItem('personalEditorLastUpload',JSON.stringify({id:id,url:url,created:Date.now()}))}catch(ignore){}
+      byId('checkUploadedResult').hidden=false;
       for(var i=0;i<parts;i++){
         var a=i*partSize,b=Math.min(file.size,(i+1)*partSize);
         // Blob.slice не держит весь файл в памяти iPad одновременно.
@@ -636,7 +692,7 @@
       var previous;
       try{previous=JSON.parse(localStorage.getItem('personalEditorLastUpload')||'null')}catch(ignore){}
       if(!previous || !previous.id || !previous.url){
-        throw new Error('Сначала загрузи видео кнопкой «До 50 МБ».');
+        throw new Error('Сначала загрузи исходник кнопкой «Смонтировать Reels».');
       }
       var proof=telegramProof();
       button.disabled=true;
@@ -908,6 +964,12 @@
     }
   });
 
+  try{
+    var pendingLast=JSON.parse(localStorage.getItem('personalEditorLastUpload')||'null');
+    if(pendingLast && pendingLast.id && Date.now()-pendingLast.created < 3*60*60*1000){
+      byId('checkUploadedResult').hidden=false;
+    }
+  }catch(ignore){}
   updateSample();draw();
 })();
 </script>
