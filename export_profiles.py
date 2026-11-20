@@ -32,7 +32,7 @@ class ExportProfile:
 
 
 PROFILES = {
-    "high": ExportProfile("high", 1080, 1920, 18, "medium"),
+    "high": ExportProfile("high", 1080, 1920, 16, "medium"),
     "balanced": ExportProfile("balanced", 720, 1280, 20, "fast", "160k"),
 }
 
