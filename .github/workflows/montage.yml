@@ -25,6 +25,7 @@ on:
         type: choice
         options:
           - signature
+          - contrast
           - classic
       hook_text:
         description: "Заголовок вверху первые 5 секунд (необязательно)"
