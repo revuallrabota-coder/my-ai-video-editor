@@ -309,8 +309,20 @@ def write_ass(
     style: str = "signature", hook: str = "",
     caption_position: str = "middle", font_profile: str = "elegant",
     words_override: list[tuple[float, float, str]] | None = None,
+    caption_animation: str = "word_pop",
 ) -> int:
     words = words_override if words_override is not None else transcribe_words(video_path)
+
+    if caption_animation == "word_pop":
+        from word_captions import build_word_pop_ass
+        content, count = build_word_pop_ass(
+            words, style=style, color=color, hook=hook,
+            caption_position=caption_position, font_profile=font_profile,
+        )
+        output_ass.write_text(content, encoding="utf-8")
+        return count
+    if caption_animation != "phrase_float":
+        raise ValueError("Неизвестная анимация субтитров.")
 
     if style == "signature":
         from signature_captions import build_signature_ass
@@ -399,6 +411,7 @@ def edit_video(
     caption_position: str = "middle",
     font_profile: str = "elegant",
     words_override: list[tuple[float, float, str]] | None = None,
+    caption_animation: str = "word_pop",
 ) -> dict:
     duration, has_audio = duration_and_audio(original)
     ranges = ([Segment(0.0, duration)] if mode == "captions"
@@ -419,6 +432,7 @@ def edit_video(
                     __import__("speech_review").map_words_to_ranges(words_override, ranges, speed)
                     if words_override is not None else None
                 ),
+                caption_animation=caption_animation,
             )
             if subtitle_events:
                 burn_subtitles(work, ass, output)
