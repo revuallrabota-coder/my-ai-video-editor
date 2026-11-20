@@ -129,13 +129,14 @@ async function validateTelegram(initData, token, owner) {
 
 export default {
   async fetch(request, env) {
-    const origin = request.headers.get("Origin");
-    if (origin !== ORIGIN) return json({ error: "Неверный источник запроса." }, 403, "null");
-    if (request.method === "OPTIONS") return json({}, 200);
     const path = new URL(request.url).pathname;
+    // Health can be checked in Safari; does not expose secrets.
     if (request.method === "GET" && path === "/health") {
       return json({ status: "online", mode: "github-actions-launcher" });
     }
+    const origin = request.headers.get("Origin");
+    if (origin !== ORIGIN) return json({ error: "Неверный источник запроса." }, 403, "null");
+    if (request.method === "OPTIONS") return json({}, 200);
     if (request.method !== "POST" || path !== "/launch") {
       return json({ error: "Маршрут не найден." }, 404);
     }
