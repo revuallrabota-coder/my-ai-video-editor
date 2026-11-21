@@ -124,4 +124,32 @@ const old=await request("/upload/start","POST",{
 });
 assert.equal(old.status,201);
 assert.equal(old.data.parts,3);
-console.log("✓ 500MB / 3 ordered files / 126 chunks / resume / 4MB boundaries / auth / dispatch");
+// Private user-supplied ZIP packs travel after the video, without counting
+// toward its 500MB source limit or getting published in a GitHub repository.
+const privatePack=await request("/upload/start","POST",{
+  files:[{name:"video.mp4",size:8_000_000}],size:8_000_000,
+  assets:[
+    {name:"Free-Animated-Icon-Sets(1).zip",size:20_000_000},
+    {name:"PB_TrailerConstructionSFXLite.zip",size:10_000_000}
+  ],settings:{}
+});
+assert.equal(privatePack.status,201,JSON.stringify(privatePack.data));
+assert.equal(privatePack.data.parts,10);
+const privateId=privatePack.data.upload_id;
+const privateMeta=await uploads.get("user-video:"+privateId+":meta","json");
+assert.deepEqual(privateMeta.assets.map(x=>[x.offset,x.parts,x.size]),[
+  [2,5,20_000_000],[7,3,10_000_000]
+]);
+const resumePack=(await request("/upload/"+privateId+"/status")).data;
+assert.equal(resumePack.input_size,8_000_000);
+assert.equal(resumePack.input_parts,10);
+assert.equal(resumePack.input_assets.length,2);
+assert.equal((await request("/upload/"+privateId+"/9","PUT",
+  new ArrayBuffer(2_000_000))).status,200);
+assert.equal((await request("/upload/"+privateId+"/9","PUT",
+  new ArrayBuffer(4_000_000))).status,400);
+assert.equal((await request("/upload/start","POST",{
+  files:[{name:"clip.mp4",size:8_000_000}],size:8_000_000,
+  assets:[{name:"oversize.zip",size:100_000_001}],settings:{}
+})).status,413);
+console.log("✓ 500MB / 3 ordered videos / private ZIP assets / 4MB chunks / resume / auth");
