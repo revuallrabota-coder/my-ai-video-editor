@@ -153,6 +153,7 @@ def validate_settings(config: dict) -> dict:
         "off","occasional","frequent","always"
     },"occasional")
     subject_layout=option("subject_layout",{"standard","behind","beside"},"standard")
+    talk_scene=option("talk_scene",{"off","contour","cream"},"off")
     animation_style=option("animation_style",{
         "float","pop","slide"
     },"float")
@@ -198,6 +199,7 @@ def validate_settings(config: dict) -> dict:
         "small_font_profile":small_font,"caption_variant":caption_variant,
         "background_style":background_style,"animation_style":animation_style,
         "subject_layout":subject_layout,
+        "talk_scene":talk_scene,
         "subtitle_sfx":subtitle_sfx,
         "insert_style":insert_style,
         "insert_density":insert_density,
@@ -301,6 +303,7 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 insert_sound=s["insert_sound"],
                 pause_removal=s["pause_removal"],
                 subject_layout=s["subject_layout"],
+                talk_scene=s["talk_scene"],
             )
         else:
             from telegram_editor import edit_video
@@ -317,6 +320,7 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 top_title=s["top_title"],top_title_mode=s["top_title_mode"],
                 pause_removal=s["pause_removal"],
                 subject_layout=s["subject_layout"],
+                talk_scene=s["talk_scene"],
             )
         if not output.is_file() or output.stat().st_size < 100:
             raise RuntimeError("Обработчик не создал готовый MP4.")
