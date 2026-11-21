@@ -107,7 +107,7 @@ def choose_semantic_cues(
         context=" ".join(near)
         if not context:continue
         for kind,stems,score,reason in PATTERNS:
-            if not any(stem in token for stem in stems):
+            if not any(_clean(stem) in token for stem in stems):
                 continue
             # "not a mistake" explicitly prevents a warning animation.
             if kind=="error" and any(p in context for p in (
@@ -119,13 +119,18 @@ def choose_semantic_cues(
             matching=sum(1 for stem in CONTEXT[kind] if stem in context)
             # Strong explicit concepts are enough; ambiguous weak signals
             # require support from a second nearby term.
-            strong=kind in {"error","success","compare","phone"} and (
+            strong=(kind in {"error","success","compare","phone","time"} and (
                 any(stem in token for stem in ("ошиб","брак","исправ",
-                    "результат","сравн","отличи","приложен","телефон")))
+                    "результат","сравн","отличи","приложен","телефон",
+                    "секунд","минут")))
             if not strong and matching<2:
                 continue
             label=token.upper()[:20]
             weight=score+min(1.5,matching*.24)
+            if kind=="inspect" and any(text in context for text in (
+                "найди ошиб", "найти ошиб", "посмотри на ошиб",
+                "обрати внимание")):
+                weight+=1.2
             candidates.append((weight,start,kind,label,reason))
     # Highest-confidence cue in a cluster, then enforce significant empty
     # space to preserve the person's face and the original speech rhythm.
