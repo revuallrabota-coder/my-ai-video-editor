@@ -45,8 +45,19 @@ class CascadeSubtitleTests(unittest.TestCase):
         # its own printed word, so it cannot hover away from the letters.
         for shadow,word in zip(halo_rows,text_rows):
             self.assertEqual(shadow.split(",")[1:3],word.split(",")[1:3])
-            move=lambda item:re.search(r"\\move\(([^)]+)\)",item).group(1)
-            self.assertEqual(move(shadow),move(word))
+            move=lambda item:tuple(int(k) for k in
+                re.search(r"\\move\(([^)]+)\)",item).group(1).split(","))
+            ax,ay,bx,by,_,_=move(shadow)
+            cx,cy,dx,dy,_,_=move(word)
+            # The shadow has TOP-LEFT ASS anchoring and the glyph CENTER:
+            # compare motion delta and measured capsule center, not x/y.
+            self.assertEqual((bx-ax,by-ay),(dx-cx,dy-cy))
+            shape=re.search(r"}m \d+ 0 l \d+ 0 b \d+ 0 (\d+)",shadow)
+            self.assertIsNotNone(shape)
+            width=int(shape.group(1))
+            radius=int(re.search(r"}m (\d+) 0",shadow).group(1))
+            self.assertLessEqual(abs(ax+width/2-cx),2)
+            self.assertLessEqual(abs(ay+radius-cy),2)
             self.assertIn(r"\p1",shadow)
             self.assertNotIn(r"\p1",word)
             self.assertIn(r"\blur5.3",shadow)
@@ -98,9 +109,13 @@ class CascadeSubtitleTests(unittest.TestCase):
             for im in crops:
                 outside=(im.crop((0,0,71,1280)),
                          im.crop((649,0,720,1280)))
-                background=Image.new("RGB",(71,1280),"#25202b")
+                # Avoid hardcoding uncompressed RGB: FFmpeg conversion from
+                # yuv420p shifts the nominal hex channels by 1-3 units.
+                background=Image.new("RGB",(71,1280),im.getpixel((0,0)))
                 for border in outside:
-                    self.assertIsNone(ImageChops.difference(border,background).getbbox())
+                    delta=ImageChops.difference(border,background)
+                    self.assertTrue(all(ch.getextrema()[1]<=3
+                                        for ch in delta.split()))
 
 
 if __name__=="__main__":
