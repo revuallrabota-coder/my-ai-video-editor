@@ -237,7 +237,7 @@ def main() -> None:
             )
             if mode in ("my_style", "reference"):
                 from reference_editor import montage_by_reference
-                montage_by_reference(
+                stats=montage_by_reference(
                     source,None,out,color=color,
                     audio_profile=audio_profile,subtitle_style=subtitle_style,
                     hook=str(config.get("hook","")),
@@ -255,7 +255,7 @@ def main() -> None:
                 )
             else:
                 from telegram_editor import edit_video
-                edit_video(
+                stats=edit_video(
                     source,out,mode,color,audio_profile,subtitle_style,
                     str(config.get("hook","")),
                     float(config.get("video_speed","1.0")),
@@ -267,13 +267,24 @@ def main() -> None:
                     quality,delay,
                     **caption_extras,
                 )
+            # Сохраняем фактические результаты наложения, а не обещаем
+            # эмодзи и звук, если они не были добавлены рендерером.
+            effect_report = (
+                "\n✨ Эмодзи: " + str(stats.get("emoji_count", 0))
+                + " · 🔊 акценты: " + str(stats.get("sfx_count", 0))
+                + " · 🎵 звуки титров: " + str(stats.get("caption_sfx_count", 0))
+            )
+            LOG.info("Reels effects counts %s", {
+                k:stats.get(k,0) for k in
+                ("emoji_count","sfx_count","caption_sfx_count")
+            })
             if not out.is_file() or out.stat().st_size < 1000:
                 raise RuntimeError("FFmpeg не создал готовый MP4.")
             if out.stat().st_size<=48_000_000:
                 send_result(
                     token,owner,out,
                     "🎬 Reels готов! Субтитры привязаны к речи, Full HD "
-                    "и монтаж сохранены в MP4."
+                    "и монтаж сохранены в MP4." + effect_report
                 )
             else:
                 send_text(
@@ -282,7 +293,7 @@ def main() -> None:
                     str(round(out.stat().st_size/1_000_000,1))+
                     " МБ). Он больше лимита отправки Telegram, "
                     "поэтому сохраняю оригинальный MP4 для скачивания "
-                    "через мини-приложение."
+                    "через мини-приложение." + effect_report
                 )
                 publish_large_mp4(worker_url,upload_id,token,out)
                 send_text(
