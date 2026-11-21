@@ -88,9 +88,10 @@ def _row_positions(words: Sequence[tuple[int,str]], cy: int,
 
 
 def _caption_slots(group: Sequence[Word], index: int, caption_position: str,
-                   small: FontSpec, big: FontSpec) -> tuple[dict[int,tuple[int,int,int,bool]],int]:
+                   small: FontSpec, big: FontSpec,
+                   animation_style: str="float") -> tuple[dict[int,tuple[int,int,int,bool]],int]:
     main=_pick_editorial_keyword(group)
-    cx,cy,*_=phrase_motion(index,caption_position,"float")
+    cx,cy,*_=phrase_motion(index,caption_position,animation_style)
     main_word=safe_text(group[main][2]).upper()
     accent_size=fit_caption_size(main_word,53,big,max_width=485)
     accent_size=max(23,accent_size)
@@ -177,7 +178,9 @@ def build_reference_cascade_ass(
     events=[]
     for group_index,group in enumerate(groups):
         if not group:continue
-        slots,main=_caption_slots(group,group_index,caption_position,small,big)
+        slots,main=_caption_slots(
+            group,group_index,caption_position,small,big,animation_style
+        )
         group_start=max(0.0,float(group[0][0]))
         end=max(group[-1][1]+.20,group_start+.68)
         if group_index+1<len(groups):
@@ -196,8 +199,16 @@ def build_reference_cascade_ass(
             shown=spoken.upper() if is_big else spoken
             font=big if is_big else small
             measured=_measure_width(shown,size,font)
-            drift=side*(9 if is_big else 7)
-            rise=9 if is_big else 7
+            # These are optional, subtle entrance variants inside the SAME
+            # cumulative layout; changing them cannot reset other effects.
+            drift=side*(
+                (17 if is_big else 13) if animation_style=="slide"
+                else (4 if is_big else 3) if animation_style=="pop"
+                else (9 if is_big else 7)
+            )
+            rise=(4 if animation_style=="slide" else
+                  12 if animation_style=="pop" else
+                  9 if is_big else 7)
             # Over 200-260ms the word settles, not a sharp jump or bounce.
             entrance=min(260,max(135,round((end-start)*1000*.20)))
             fadein=min(210,max(95,round((end-start)*1000*.15)))
