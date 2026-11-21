@@ -116,166 +116,234 @@ def _wrap_two_lines(text: str, font: FontSpec, requested: int) -> tuple[str,int,
                 _measure_width(right,size2,font)),2)
 
 
+def phrase_groups(words: Sequence[Word]) -> list[list[Word]]:
+    """Join spoken words into readable 2–5-word phrases, never into single pops.
+
+    Whisper's word timestamps define phrase boundaries; short natural pauses
+    stay inside a single phrase. A rare isolated word remains only if a pause
+    or punctuation makes it unavoidable.
+    """
+    ordered=sorted(
+        ((max(0.0,float(a)),float(b),safe_text(w)) for a,b,w in words
+         if b>a and safe_text(w)),
+        key=lambda row:(row[0],row[1]),
+    )
+    groups: list[list[Word]]=[]
+    current: list[Word]=[]
+    for a,b,word in ordered:
+        if current:
+            last=current[-1]
+            total_chars=sum(len(w[2])+1 for w in current)+len(word)
+            boundary=(
+                len(current)>=5
+                or (a-last[1])>0.42
+                or (b-current[0][0])>2.55
+                or total_chars>42
+                or bool(re.search(r"[.!?…]$",last[2]))
+            )
+            if boundary:
+                groups.append(current)
+                current=[]
+        current.append((a,b,word))
+    if current:groups.append(current)
+    # Avoid a one-word flash at the end of a sentence where the timings allow
+    # that word to join its preceding phrase without excessive width.
+    if len(groups)>1 and len(groups[-1])==1:
+        previous=groups[-2]
+        tail=groups[-1][0]
+        if (len(previous)<=3 and tail[0]-previous[-1][1]<=0.44
+                and sum(len(x[2])+1 for x in previous)+len(tail[2])<=44):
+            previous.append(tail)
+            groups.pop()
+    return groups
+
+
+def _line_length(
+    group: Sequence[Word], indexes: Sequence[int], main_index: int,
+    base: int, accent: int, little: FontSpec, big: FontSpec,
+) -> float:
+    total=0.0
+    for j,i in enumerate(indexes):
+        text=group[i][2].upper() if i==main_index else group[i][2]
+        total+=_measure_width(text,accent if i==main_index else base,
+                              big if i==main_index else little)
+        if j:total+=base*0.37
+    return total
+
+
+def _phrase_layout(
+    group: Sequence[Word], little: FontSpec, big: FontSpec,
+) -> tuple[list[list[int]],int,int,float,int]:
+    """Pick one balanced two-line composition and fit both fonts together."""
+    emphasis=pick_main_word(group)
+    indexes=list(range(len(group)))
+    options=[ [indexes] ]
+    if len(group)>=2:
+        options.extend([
+            [indexes[:cut],indexes[cut:]]
+            for cut in range(1,len(group))
+        ])
+    for base in range(30,21,-1):
+        accent=min(42,round(base*1.37))
+        matches=[]
+        for lines in options:
+            widths=[_line_length(group,line,emphasis,base,accent,little,big)
+                    for line in lines]
+            widest=max(widths)
+            # Prefer 2-line phrases (small context + highlighted main word)
+            # when at least three words. Single-line phrases are fine if short.
+            balance=abs(widths[0]-widths[1]) if len(lines)==2 else 0
+            penalty=(0 if len(lines)==2 and len(group)>=3 else
+                     26 if len(lines)==1 and len(group)>=3 else 8)
+            if widest<=452:
+                matches.append((widest*0.32+balance*0.14+penalty,
+                                lines,widest))
+        if matches:
+            score,chosen,width=min(matches,key=lambda item:item[0])
+            return chosen,base,accent,width,emphasis
+    # Very long, unusual Russian tokens are never allowed offscreen.
+    base=20
+    accent=26
+    widths=[_line_length(group,[i],emphasis,base,accent,little,big)
+            for i in indexes]
+    return [[i] for i in indexes[:2]],base,accent,max(widths),emphasis
+
+
+def phrase_geometry(
+    words: Sequence[Word], caption_position: str,
+    small_font_profile: str="modern", font_profile: str="bold",
+) -> list[tuple[float,float,float,int,int]]:
+    """(start,end,visual_width,center_x,center_y) shared with emoji compositor."""
+    little=choose_font(small_font_profile)
+    big=choose_font(font_profile)
+    y={"top":410,"middle":692,"bottom":868}[caption_position]
+    result=[]
+    phrases=phrase_groups(words)
+    for i,group in enumerate(phrases):
+        lines,base,accent,width,main=_phrase_layout(group,little,big)
+        next_start=(phrases[i+1][0][0] if i+1<len(phrases) else None)
+        a=group[0][0]
+        b=max(group[-1][1]+0.15,a+0.66)
+        if next_start is not None:b=min(b,max(a+0.25,next_start-0.015))
+        result.append((a,b,min(455,width),CENTER_X,y))
+    return result
+
+
 def build_reference_dynamic_ass(
     words: Sequence[Word],
     *,
-    color: str = "auto",
-    caption_position: str = "middle",
-    font_profile: str = "bold",
-    small_font_profile: str = "modern",
-    caption_variant: str = "editorial",
-    background_style: str = "occasional",
-    animation_style: str = "float",
-) -> tuple[str, int]:
-    if caption_position not in ("top", "middle", "bottom"):
-        raise ValueError("Недопустимое положение субтитров.")
+    color: str="auto",
+    caption_position: str="middle",
+    font_profile: str="bold",
+    small_font_profile: str="modern",
+    caption_variant: str="editorial",
+    background_style: str="occasional",
+    animation_style: str="float",
+) -> tuple[str,int]:
+    """Gentle phrase-level Reels typography: one phrase, one animated layer.
+
+    Instead of popping every word separately, all words appear in one
+    synchronized event, with only the meaningful word larger and tinted.
+    A plate, if selected, is part of THAT SAME dialogue style, so it can
+    never float independently from the words.
+    """
+    if caption_position not in ("top","middle","bottom"):
+        raise ValueError("Неверное положение субтитров.")
     if caption_variant not in COLOR_PALETTES:
-        raise ValueError("Неизвестный вариант оформления субтитров.")
-    if background_style not in ("off", "occasional", "frequent", "always"):
-        raise ValueError("Недопустимый режим подложки субтитров.")
-    if animation_style not in ("float", "pop", "slide"):
-        raise ValueError("Недопустимая анимация текста.")
+        raise ValueError("Неизвестный вариант цвета титров.")
+    if background_style not in ("off","occasional","frequent","always"):
+        raise ValueError("Недопустимая подложка субтитров.")
+    if animation_style not in ("float","pop","slide"):
+        raise ValueError("Недопустимый тип анимации.")
 
-    big_font = choose_font(font_profile)
-    small_font = choose_font(small_font_profile)
-    accent_hex, small_hex = COLOR_PALETTES[caption_variant]
-    primary = ass_color(accent_hex if color == "auto" else color)
-    white = ass_color(small_hex)
-
-    # The whole readable composition stays in the central 70% of the frame.
-    # y changes by <=14 px: no more scattered words across the salon background.
-    ybase = {"top": 400, "middle": 713, "bottom": 866}[caption_position]
-
-    header = (
+    little=choose_font(small_font_profile)
+    big=choose_font(font_profile)
+    accent_hex,base_hex=COLOR_PALETTES[caption_variant]
+    accent_color=ass_color(accent_hex if color=="auto" else color)
+    small_color=ass_color(base_hex)
+    y={"top":410,"middle":692,"bottom":868}[caption_position]
+    # A small soft shadow on ALL text. No gigantic blurry black bars.
+    header=(
         "[Script Info]\nScriptType: v4.00+\n"
-        "PlayResX: 720\nPlayResY: 1280\n"
-        "WrapStyle: 2\nScaledBorderAndShadow: yes\n\n"
+        "PlayResX: 720\nPlayResY: 1280\nWrapStyle: 2\n"
+        "ScaledBorderAndShadow: yes\n\n"
         "[V4+ Styles]\n"
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour,"
         " OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut,"
         " ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow,"
         " Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Main,{big_font.name},69,{primary},{primary},&H0020191C,"
-        f"&H99000000,{big_font.bold},{big_font.italic},0,0,"
-        f"{big_font.scale_x},{big_font.scale_y},0,0,"
-        f"1,{big_font.outline},0.8,5,64,64,40,1\n"
-        f"Style: Tiny,{small_font.name},36,{white},{white},&H0020191C,"
-        f"&H89000000,{small_font.bold},{small_font.italic},0,0,"
-        f"{small_font.scale_x},{small_font.scale_y},0,0,"
-        "1,1.0,0.5,5,64,64,40,1\n"
-        "Style: Plate,DejaVu Sans,12,&H00FFFFFF,&H00FFFFFF,&H00101010,"
-        "&H73000000,0,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1\n"
+        f"Style: Phrase,{little.name},30,{small_color},{small_color},"
+        "&H98201418,&HD31A1520,"
+        f"{little.bold},{little.italic},0,0,"
+        f"{little.scale_x},{little.scale_y},0,0,1,0.65,0.75,5,72,72,20,1\n"
+        f"Style: PhrasePlate,{little.name},30,{small_color},{small_color},"
+        "&H98201418,&HBA1A1520,"
+        f"{little.bold},{little.italic},0,0,"
+        f"{little.scale_x},{little.scale_y},0,0,3,1.4,0.45,5,72,72,20,1\n"
         "\n[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
-
-    # Pick one emphasized semantic word per 2–3 word group. Every other word
-    # appears as one small subtitle, without a duplicated distant "context".
-    groups = split_groups(words)
-    main_indexes: set[int] = set()
-    offset = 0
-    for group in groups:
-        main_indexes.add(offset + pick_main_word(group))
-        offset += len(group)
-    events = word_events(words)
-    readable: list[tuple[float, float, str, bool]] = []
-    i = 0
-    while i < len(events):
-        start, end, word = events[i]
-        if i in main_indexes:
-            readable.append((start, end, word, True))
-            i += 1
-            continue
-        parts = [word]
-        j = i + 1
-        while j < len(events) and j not in main_indexes and len(parts) < 3:
-            nxt_start, nxt_end, nxt_word = events[j]
-            if nxt_start - end > 0.16 or nxt_end - start > 1.05:
-                break
-            parts.append(nxt_word)
-            end = nxt_end
-            j += 1
-        readable.append((start, end, " ".join(parts), False))
-        i = j
-
-    lines: list[str] = []
-    for index, (begin, end, raw, strong) in enumerate(readable):
-        if end - begin < 0.07:
-            continue
-        clean = safe_text(raw)
-        if not clean:
-            continue
-        shown = clean.upper() if strong else clean
-        # Short accent = punchy but not huge. Even a 16-letter word is fitted.
-        desired = (66, 61, 64, 59)[index % 4] if strong else (34, 31, 35)[index % 3]
-        face = big_font if strong else small_font
-        shown, size, measured, line_count = _wrap_two_lines(shown, face, desired)
-        # Recompute based on actual glyph size. Never trust the text length.
-        if measured > TEXT_SAFE_WIDTH*0.88:
-            size=fit_caption_size(shown.replace(r"\N"," "),size,face)
-            measured=min(measured,TEXT_SAFE_WIDTH*0.88)
-        y=ybase+(-4,0,4)[index%3]
-        lifetime = max(100, int((end - begin)*1000))
-        rise = min(235, max(60, int(lifetime*0.48)))
-        fade = min(130, max(25, int(lifetime*0.22)))
-        fade_out = min(105, max(20, int(lifetime*0.20)))
-        if fade + fade_out >= lifetime:
-            fade = int(lifetime*0.22)
-            fade_out = int(lifetime*0.18)
-        delta = 11 if strong else 7
-        if animation_style == "float":
-            movement = (
-                rf"\move({CENTER_X},{y+delta},{CENTER_X},{y},0,{rise})"
-            )
-        elif animation_style == "slide":
-            movement = (
-                rf"\move({CENTER_X+delta},{y},{CENTER_X},{y},0,{rise})"
-            )
+    phrases=phrase_groups(words)
+    events=[]
+    for index,group in enumerate(phrases):
+        if not group:continue
+        lines,base_size,big_size,width,main=_phrase_layout(group,little,big)
+        start=group[0][0]
+        natural_end=group[-1][1]+0.16
+        next_start=(phrases[index+1][0][0] if index+1<len(phrases)
+                    else None)
+        end=max(natural_end,start+0.66)
+        if next_start is not None:
+            end=min(end,max(start+0.24,next_start-0.015))
+        if end-start<0.12:continue
+        duration_ms=max(120,int((end-start)*1000))
+        # 250–340ms entrance, independent of word count; no harsh scale jump.
+        fade_in=min(340,max(145,int(duration_ms*.24)))
+        fade_out=min(235,max(90,int(duration_ms*.18)))
+        if fade_in+fade_out>duration_ms*.8:
+            fade_in=int(duration_ms*.35)
+            fade_out=int(duration_ms*.20)
+        rise=min(520,max(260,int(duration_ms*.45)))
+        delta=8
+        if animation_style=="float":
+            move=rf"\move(360,{y+delta},360,{y},0,{rise})"
+        elif animation_style=="slide":
+            move=rf"\move({360+delta},{y},360,{y},0,{rise})"
         else:
-            movement = rf"\pos({CENTER_X},{y})"
-        # A condensed or expanded Cyrillic font must retain its intended
-        # width. Previously tweening all presets to 100% caused clipping.
-        sx,sy=face.scale_x,face.scale_y
-        initial_x=round(sx*(0.965 if strong else 0.98))
-        initial_y=round(sy*(0.965 if strong else 0.98))
-        fade_tag=rf"\fad({fade},{fade_out})"
-        text_tag=(
-            r"{\an5"+movement+fade_tag
-            +rf"\fscx{initial_x}\fscy{initial_y}"
-            +rf"\t(0,{rise},0.65,\fscx{sx}\fscy{sy})"
-            +rf"\fs{size}\q2\blur0.35"
-            +r"\clip(65,170,655,1140)"+"}"
+            # Tiny settle instead of the old abrupt 91% -> 100% pop.
+            move=rf"\move(360,{y+4},360,{y},0,{rise})"
+
+        plate=(
+            background_style=="always"
+            or background_style=="frequent" and index%3==0
+            or background_style=="occasional" and index%6==2
         )
-        # Put backing behind the ACTUAL event at the SAME x/y and begin/end.
-        # 6–12 px padding, with max width capped inside Reels safe margins.
-        plate = (
-            background_style == "always"
-            or background_style == "frequent" and index % 2 == 0
-            or background_style == "occasional" and (index % 3 == 0)
+        style="PhrasePlate" if plate else "Phrase"
+        parts=[]
+        for number,line in enumerate(lines):
+            if number:parts.append(r"\N")
+            for j,k in enumerate(line):
+                if j:parts.append(" ")
+                clean=safe_text(group[k][2])
+                if k==main:
+                    parts.append(
+                        "{"+rf"\fn{big.name}\b{big.bold}\i{big.italic}"
+                        +rf"\fs{big_size}\fscx{big.scale_x}\fscy{big.scale_y}"
+                        +rf"\c{accent_color}"+"}"
+                        +clean.upper()
+                        +"{"+rf"\fn{little.name}\b{little.bold}\i{little.italic}"
+                        +rf"\fs{base_size}\fscx{little.scale_x}\fscy{little.scale_y}"
+                        +rf"\c{small_color}"+"}"
+                    )
+                else:parts.append(clean)
+        prefix=(
+            "{"+r"\an5"+move+rf"\fad({fade_in},{fade_out})"
+            +rf"\fs{base_size}"
+            +rf"\fscx{little.scale_x}\fscy{little.scale_y}"
+            +r"\blur0.20\clip(72,175,648,1105)"+"}"
         )
-        if plate:
-            half_w=min(246,max(44,int(math.ceil(measured/2))+15))
-            # Compact, text-sized backplate; no giant detached banner.
-            half_h=int(size*(0.48 if line_count==1 else 0.95))+6
-            left,top=CENTER_X-half_w,y-half_h
-            if animation_style=="float":
-                plate_move=rf"\move({left},{top+delta},{left},{top},0,{rise})"
-            elif animation_style=="slide":
-                plate_move=rf"\move({left+delta},{top},{left},{top},0,{rise})"
-            else:
-                plate_move=rf"\pos({left},{top})"
-            # \an7 + positive draw coordinates anchor background precisely:
-            # unlike \an5 with negative path bounds it cannot drift sideways.
-            shape=(r"{\an7"+plate_move+fade_tag
-                   +r"\p1\1c&H181616&\1a&H87&\bord0\shad0"
-                   +r"\clip(65,170,655,1140)}"
-                   +_rounded_plate(half_w,half_h)+r"{\p0}")
-            lines.append(
-                f"Dialogue: 0,{ass_time(begin)},{ass_time(end)},Plate,,0,0,0,,{shape}\n"
-            )
-        style = "Main" if strong else "Tiny"
-        lines.append(
-            f"Dialogue: 2,{ass_time(begin)},{ass_time(end)},{style},,0,0,0,,"
-            + text_tag + shown + "\n"
+        events.append(
+            f"Dialogue: 2,{ass_time(start)},{ass_time(end)},"
+            f"{style},,0,0,0,,{prefix}{''.join(parts)}\n"
         )
-    return header + "".join(lines), len(lines)
+    return header+"".join(events),len(events)
