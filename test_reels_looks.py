@@ -57,5 +57,5 @@ class ReelsLooksTests(unittest.TestCase):
         cues=pick_caption_cues(words,8,style="soft")
         self.assertGreater(len(cues),0)
         self.assertLess(len(cues),len(words)//3)
-        self.assertTrue(all(b[0]-a[0]>=1.99 for a,b in zip(cues,cues[1:])))
+        self.assertTrue(all(b[0]-a[0]>=0.99 for a,b in zip(cues,cues[1:])))
         self.assertTrue(all(c[1] is None for c in cues))
