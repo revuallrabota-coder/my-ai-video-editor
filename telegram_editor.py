@@ -475,12 +475,12 @@ def edit_video(
     background_style: str = "occasional",
     animation_style: str = "float",
     subtitle_sfx: str = "off",
-    top_title: str = "",
-    top_title_mode: str = "auto",
     insert_style: str = "off",
     insert_density: str = "balanced",
     insert_sound: str = "on",
     private_assets = None,
+    top_title: str = "",
+    top_title_mode: str = "auto",
 ) -> dict:
     from reels_effects import apply_effects, validate_effects
     from speech_review import map_words_to_ranges, shift_word_timestamps
