@@ -23,12 +23,13 @@ from speech_review import (
 from telegram_editor import duration_and_audio, transcribe_words
 
 LOG = logging.getLogger("private_upload_montage")
-MAX_BYTES = 300_000_000  # 300MB, 75 x 4MB KV fragments
+MAX_BYTES = 500_000_000  # entire multi-video project
 
 
-def read_chunked_video(
-    worker_url: str, upload_id: str, token: str, target: Path,
-) -> dict:
+def read_chunked_project(
+    worker_url: str, upload_id: str, token: str, folder: Path,
+) -> tuple[dict, list[Path]]:
+    """Restore each original video independently in the user's chosen order."""
     if not re.fullmatch(r"https://[a-z0-9-]+(?:\.[a-z0-9-]+)*\.workers\.dev", worker_url):
         raise ValueError("Неожиданный адрес Cloudflare Worker.")
     if not re.fullmatch(r"[a-f0-9-]{36}", upload_id):
@@ -51,45 +52,96 @@ def read_chunked_video(
                 raise
             time.sleep(min(3 + attempt * 2, 15))
     if not isinstance(meta, dict):
-        raise RuntimeError("Не удалось получить загруженный файл из Cloudflare KV.")
+        raise RuntimeError("Не удалось получить загруженные файлы из Cloudflare KV.")
     size = meta.get("size")
     parts = meta.get("parts")
     chunk_size = meta.get("chunk_size")
-    if (
-        not isinstance(size, int) or size < 4096 or size > MAX_BYTES
-        or not isinstance(chunk_size, int) or chunk_size != 4_000_000
-        or not isinstance(parts, int) or parts != (size + chunk_size-1)//chunk_size
-        or not 1 <= parts <= 75
-    ):
-        raise ValueError("Недостоверные размеры файла из Cloudflare.")
-    downloaded = 0
-    with target.open("wb") as file:
-        for index in range(parts):
-            data = None
-            for attempt in range(12):
-                try:
-                    response = session.get(
-                        base + "/chunk/" + str(index), headers=headers,
-                        timeout=(20, 90),
+    files = meta.get("files")
+    if not isinstance(files, list):
+        # Compatibility with existing one-file sessions.
+        files = [{"name":meta.get("original_name","original.mp4"),
+                  "size":size,"parts":parts,"offset":0}]
+    if not isinstance(size,int) or size<4096 or size>MAX_BYTES or \
+       not isinstance(chunk_size,int) or chunk_size!=4_000_000 or \
+       not isinstance(parts,int) or not 1<=parts<=136 or \
+       not 1<=len(files)<=12:
+        raise ValueError("Недостоверные размеры проекта из Cloudflare.")
+    validated=[]
+    expected_offset=0
+    total=0
+    for item in files:
+        if not isinstance(item,dict):
+            raise ValueError("Повреждён список исходных видео.")
+        name=item.get("name")
+        file_size=item.get("size")
+        count=item.get("parts")
+        offset=item.get("offset")
+        if not isinstance(name,str) or not re.search(
+            r"\.(mp4|mov|m4v|webm|mkv)$",name,re.I
+        ) or not isinstance(file_size,int) or \
+           not 4096<=file_size<=MAX_BYTES or \
+           not isinstance(count,int) or count!=(file_size+chunk_size-1)//chunk_size or \
+           not isinstance(offset,int) or offset!=expected_offset:
+            raise ValueError("Не совпадает список видео и фрагментов.")
+        expected_offset+=count
+        total+=file_size
+        validated.append((name,file_size,count,offset))
+    if total!=size or expected_offset!=parts:
+        raise ValueError("Размеры проекта и всех его частей не совпадают.")
+
+    folder.mkdir(parents=True,exist_ok=True)
+    targets=[]
+    downloaded=0
+    for file_no,(name,file_size,count,offset) in enumerate(validated):
+        ext=Path(name).suffix.lower()
+        target=folder/f"clip_{file_no+1:03d}{ext}"
+        with target.open("wb") as output:
+            for index in range(count):
+                part_no=offset+index
+                expected=min(chunk_size,file_size-index*chunk_size)
+                data=None
+                for attempt in range(12):
+                    try:
+                        response=session.get(
+                            base + "/chunk/" + str(part_no), headers=headers,
+                            timeout=(20,90)
+                        )
+                        if response.status_code in (404,409):
+                            time.sleep(min(3+attempt*2,15))
+                            continue
+                        response.raise_for_status()
+                        data=response.content
+                        break
+                    except requests.RequestException:
+                        if attempt==11:
+                            raise
+                        time.sleep(min(3+attempt*2,15))
+                if data is None or len(data)!=expected:
+                    raise RuntimeError(
+                        "Не удалось восстановить часть "+str(index+1)+
+                        " исходного видео №"+str(file_no+1)
                     )
-                    if response.status_code in (404, 409):
-                        time.sleep(min(3 + attempt * 2, 15))
-                        continue
-                    response.raise_for_status()
-                    data = response.content
-                    break
-                except requests.RequestException:
-                    if attempt == 11:
-                        raise
-                    time.sleep(min(3 + attempt * 2, 15))
-            expected = min(chunk_size, size-index*chunk_size)
-            if data is None or len(data) != expected:
-                raise RuntimeError("Не удалось восстановить часть видео №" + str(index+1))
-            file.write(data)
-            downloaded += len(data)
-            LOG.info("Downloaded secured video chunk %s/%s", index+1, parts)
-    if downloaded != size:
-        raise RuntimeError("Загруженное видео неполное.")
+                output.write(data)
+                downloaded+=len(data)
+                LOG.info("Downloaded source %d/%d, chunk %d/%d",
+                         file_no+1,len(validated),index+1,count)
+        if target.stat().st_size!=file_size:
+            raise RuntimeError("Размер восстановленного видео не совпадает.")
+        targets.append(target)
+    if downloaded!=size:
+        raise RuntimeError("Загруженный видеопроект восстановлен не полностью.")
+    return meta,targets
+
+
+def read_chunked_video(
+    worker_url: str, upload_id: str, token: str, target: Path,
+) -> dict:
+    """Compatibility wrapper for callers expecting a single video file."""
+    meta,files=read_chunked_project(worker_url,upload_id,token,target.parent)
+    if len(files)!=1:
+        raise ValueError("Для нескольких видео используй read_chunked_project.")
+    import shutil
+    shutil.move(str(files[0]),str(target))
     return meta
 
 
@@ -160,7 +212,7 @@ def wait_for_transcript_review(
     offset = recent[-1]["update_id"]+1 if recent else None
     send_text(
         token,chat_id,
-        "📝 Черновик субтитров для видео до 300 МБ:\n\n"
+        "📝 Черновик субтитров для видео до 500 МБ:\n\n"
         + transcript[:3500]
         + "\n\n⏱ Сдвиг титров: +"+str(round(delay,2))+" сек.\n"
         "Ответь /ok или /fix ошибка=правильно, /text ПОЛНЫЙ ТЕКСТ.\n"
@@ -213,11 +265,19 @@ def main() -> None:
         reference = root/"reference.mp4"
         out = root/"finished-reels.mp4"
         try:
-            send_text(token,owner,"📥 Получаю исходник до 300 МБ через защищённый Cloudflare.")
-            metadata=read_chunked_video(worker_url,upload_id,token,source)
+            send_text(token,owner,"📥 Получаю исходные видео (до 500 МБ суммарно) через защищённый Cloudflare.")
+            metadata,clips=read_chunked_project(
+                worker_url,upload_id,token,root/"source_clips"
+            )
             config=metadata.get("settings") or {}
             mode=config.get("mode","my_style")
-            seconds,audio=duration_and_audio(source)
+            from clip_montage import join_clips
+            seconds,audio=join_clips(
+                clips,source,quality=str(config.get("export_quality","high"))
+            )
+            send_text(token,owner,
+                "🎞️ Объединил "+str(len(clips))+
+                " видео в один ролик. Анализирую общую звуковую дорожку.")
             if not 0 < seconds <= 125:
                 raise ValueError("Видео должно быть не длиннее 2 минут.")
             if not audio and mode!="cuts":
@@ -332,7 +392,7 @@ def main() -> None:
             LOG.exception("Private upload montage failed")
             send_text(
                 token,owner,
-                "⚠️ Монтаж 300 МБ завершился с ошибкой: "
+                "⚠️ Монтаж 500 МБ завершился с ошибкой: "
                 + str(exc)[:220]
                 + "\nПроверь журнал GitHub Actions → upload-video-50mb."
             )
