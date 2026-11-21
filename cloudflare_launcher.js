@@ -20,7 +20,21 @@ const MAX_UPLOAD_FILES = 12; // Avoid exhausting free KV quotas
 const MAX_ASSET_FILES = 4; // User-owned optional media packs, not published
 const MAX_ASSET_BYTES = 100_000_000; // Separate from 500MB video cap
 const UPLOAD_PART_BYTES = 4_000_000;
-const UPLOAD_TTL = 3 * 60 * 60; // 3h automatic deletion if runner fails
+// Exactly 72h of temporary KV retention; no cron/manual cleaning required.
+// Source parts are also deleted by the runner as soon as montage finishes.
+const UPLOAD_TTL = 3 * 24 * 60 * 60;
+const PROGRESS_STAGES = Object.freeze({
+  queued:[35,"Ожидает запуска монтажного сервера"],
+  downloading:[42,"Скачиваю исходники в монтаж"],
+  joining:[53,"Склеиваю выбранные видео"],
+  transcribing:[63,"Распознаю речь"],
+  review:[72,"Жду подтверждения текста в Telegram"],
+  planning:[78,"Подбираю вставки по смыслу речи"],
+  rendering:[86,"Накладываю субтитры и анимацию"],
+  publishing:[94,"Экспортирую и отправляю готовое MP4"],
+  done:[100,"Видео готово"],
+  failed:[100,"Монтаж завершился с ошибкой"]
+});
 
 const CHOICES = {
   mode: ["my_style", "auto", "captions", "cuts", "reference"],
@@ -289,12 +303,32 @@ async function workerUploadRoute(request, env, path) {
         !equalHex(bearer, env.TELEGRAM_BOT_TOKEN)) {
       return json({error:"Unauthorized"},401);
     }
-    const match = path.match(/^\/internal\/upload\/([a-f0-9-]{36})(?:\/(manifest|chunk\/\d+|result\/start|result\/finish|result\/\d+|release))?$/);
+    const match = path.match(/^\/internal\/upload\/([a-f0-9-]{36})(?:\/(manifest|chunk\/\d+|result\/start|result\/finish|result\/\d+|release|progress))?$/);
     if (!match || !idMatches(match[1])) return json({error:"Not found"},404);
     const id = match[1], operation=match[2] ?? "manifest";
     const meta = await env.UPLOADS.get(uploadKey(id,"meta"),"json");
     if (!meta || !["queued","done"].includes(meta.state)) {
       return json({error:"Upload metadata is not yet available"},409);
+    }
+    if (request.method === "POST" && operation === "progress") {
+      // Authenticated server-only stage events; one KV key per stage avoids
+      // Cloudflare's 1-write-per-second restriction on an individual key.
+      let body;
+      try {body=await request.json();}
+      catch {return json({error:"Bad progress payload"},400);}
+      const stage=String(body?.stage??"");
+      if (!Object.hasOwn(PROGRESS_STAGES,stage))
+        return json({error:"Unknown progress stage"},400);
+      const info=String(body?.message??"").trim().slice(0,180);
+      const [percent,defaultLabel]=PROGRESS_STAGES[stage];
+      const at=Date.now();
+      await env.UPLOADS.put(
+        uploadKey(id,"progress:"+stage),"1",
+        {expirationTtl:UPLOAD_TTL,metadata:{
+          stage,percent,message:info||defaultLabel,at
+        }}
+      );
+      return json({ok:true,stage,percent});
     }
     if (request.method === "GET" && operation === "manifest") {
       return json({
@@ -326,8 +360,10 @@ async function workerUploadRoute(request, env, path) {
       }
       const count=Math.ceil(size/UPLOAD_PART_BYTES);
       if (meta.state !== "queued") return json({error:"Already finished"},409);
+      const expiresAt=Date.now()+UPLOAD_TTL*1000;
       await env.UPLOADS.put(uploadKey(id,"meta"),
-        JSON.stringify({...meta,output:{size,parts:count,state:"uploading"}}),
+        JSON.stringify({...meta,expires_at:expiresAt,
+          output:{size,parts:count,state:"uploading",expires_at:expiresAt}}),
         {expirationTtl:UPLOAD_TTL});
       return json({ok:true,parts:count});
     }
@@ -340,7 +376,8 @@ async function workerUploadRoute(request, env, path) {
       const buffer=await request.arrayBuffer();
       if(buffer.byteLength!==expected)return json({error:"Incorrect result chunk"},400);
       await env.UPLOADS.put(uploadKey(id,"output:"+i),buffer,
-        {expirationTtl:UPLOAD_TTL,metadata:{bytes:buffer.byteLength}});
+        {expiration:Math.ceil(o.expires_at/1000),
+         metadata:{bytes:buffer.byteLength}});
       return json({ok:true,index:i});
     }
     if (request.method === "POST" && operation === "result/finish") {
@@ -366,9 +403,9 @@ async function workerUploadRoute(request, env, path) {
       await Promise.all(
         Array.from({length:stop-from},(_,i)=>env.UPLOADS.delete(uploadKey(id,from+i)))
       );
-      if (stop===meta.parts && (!meta.output || meta.output.state!=="ready")) {
-        await env.UPLOADS.delete(uploadKey(id,"meta"));
-      }
+      // Keep the tiny manifest and stage history for 72h, even when the
+      // small completed MP4 was sent directly to Telegram. Only video chunks
+      // are removed here; metadata is not a 500MB storage burden.
       return json({released:true,next:stop,has_more:stop<meta.parts});
     }
     return json({error:"Unknown internal route"},404);
@@ -388,6 +425,14 @@ async function workerUploadRoute(request, env, path) {
     const meta=await env.UPLOADS.get(uploadKey(clientStatus[1],"meta"),"json");
     if (!meta) return json({error:"Файл уже удалён или время хранения истекло."},404);
     const o=meta.output;
+    const stages=await env.UPLOADS.list({
+      prefix:uploadKey(clientStatus[1],"progress:"),limit:50
+    });
+    const latest=(stages.keys??[])
+      .map(k=>k.metadata)
+      .filter(v=>v&&Object.hasOwn(PROGRESS_STAGES,v.stage))
+      .sort((a,b)=>(b.at??0)-(a.at??0) ||
+        PROGRESS_STAGES[b.stage][0]-PROGRESS_STAGES[a.stage][0])[0]??null;
     const uploaded=meta.state==="uploading"
       ? await storedChunkIndexes(env,clientStatus[1],"",meta.parts,meta.size,
           [...(meta.files||[]),...(meta.assets||[])])
@@ -399,7 +444,18 @@ async function workerUploadRoute(request, env, path) {
       input_files:(meta.files||[]).map(f=>({name:f.name,size:f.size})),
       input_assets:(meta.assets||[]).map(f=>({name:f.name,size:f.size})),
       uploaded_parts:[...uploaded].sort((a,b)=>a-b),
-      state:meta.state
+      state:meta.state,
+      stage:latest?.stage??(meta.state==="uploading"?"uploading":
+                           meta.state==="done"?"done":"queued"),
+      stage_label:latest?.message??(meta.state==="uploading"
+        ?"Загружаю видео":meta.state==="done"?"Видео готово":
+        "Задача передана монтажному серверу"),
+      progress_percent:latest?.percent??(meta.state==="uploading"
+        ? Math.round(uploaded.size*32/Math.max(meta.parts,1))
+        : meta.state==="done"?100:35),
+      updated_at:latest?.at??meta.created,
+      expires_at:o?.expires_at??meta.expires_at??meta.created+UPLOAD_TTL*1000,
+      retention_days:3
     });
   }
   const clientResult=path.match(/^\/upload\/([a-f0-9-]{36})\/result\/(\d+)$/);
@@ -485,7 +541,8 @@ async function workerUploadRoute(request, env, path) {
     await env.UPLOADS.put(
       uploadKey(id,"meta"),
       JSON.stringify({id,size,parts,files,assets,asset_size:assetSize,
-        original_name:original,settings,state:"uploading",created:Date.now()}),
+        original_name:original,settings,state:"uploading",
+        created:Date.now(),expires_at:Date.now()+UPLOAD_TTL*1000}),
       {expirationTtl:UPLOAD_TTL}
     );
     return json({upload_id:id,chunk_size:UPLOAD_PART_BYTES,parts},201);
@@ -547,6 +604,13 @@ async function workerUploadRoute(request, env, path) {
       JSON.stringify({...meta,state:"queued"}),
       {expirationTtl:UPLOAD_TTL}
     );
+    // Progress in its own key is independent from the manifest and survives
+    // closing the iPad Mini App.
+    await env.UPLOADS.put(uploadKey(id,"progress:queued"),"1",{
+      expirationTtl:UPLOAD_TTL,
+      metadata:{stage:"queued",percent:35,
+        message:"Видео загружено. Задача поставлена в очередь",at:Date.now()}
+    });
     return json({
       started:true,
       message:"Видео и приватные ZIP-пакеты переданы. GitHub соединит клипы и выберет эффекты только по смыслу речи."
@@ -564,7 +628,8 @@ export default {
         uploads_50mb_configured: Boolean(env.UPLOADS),
          uploads_300mb_configured: Boolean(env.UPLOADS),
          uploads_500mb_configured: Boolean(env.UPLOADS),
-         max_upload_mb: 500,max_files:MAX_UPLOAD_FILES });
+         max_upload_mb: 500,max_files:MAX_UPLOAD_FILES,
+         retention_days:3,status_tracking:true });
     }
     if (path.startsWith("/internal/upload/")) {
       return workerUploadRoute(request, env, path);
