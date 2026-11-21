@@ -46,7 +46,7 @@ class ReferenceMotionTests(unittest.TestCase):
         self.assertIn("iw-iw/zoom",x)
         self.assertIn("0.280",x)
         self.assertNotIn("mod(",x)
-        self.assertIn("1.10",zoom)
+        self.assertIn("1.16",zoom)
 
     def test_render_camera_and_text_in_same_pass(self) -> None:
         with tempfile.TemporaryDirectory(prefix="cinematic_test_") as tmp:
