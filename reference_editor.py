@@ -336,6 +336,8 @@ def montage_by_reference(
     insert_density: str = "balanced",
     insert_sound: str = "on",
     private_assets = None,
+    top_title: str = "",
+    top_title_mode: str = "auto",
 ) -> dict:
     """Монтаж с точной синхронизацией речи, динамичным кадром и титрами."""
     from reels_effects import apply_effects, validate_effects
@@ -390,6 +392,7 @@ def montage_by_reference(
             caption_variant=caption_variant,
             background_style=background_style,
             animation_style=animation_style,
+            top_title=top_title, top_title_mode=top_title_mode,
         )
         add_virtual_camera(
             joined, dynamic, profile.seconds_per_change,
