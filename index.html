@@ -138,8 +138,17 @@
       <option value="old_money">🤎 Old Money — кремовый и антиква</option>
       <option value="editorial">🎬 Editorial — контрастный гротеск</option>
       <option value="minimal">🤍 Минимализм — чистый белый</option>
+      <option value="contour_talk">🌿 Contour Talk — тёмный фон, волны, стикеры, арка с человеком</option>
+      <option value="cream_talk">🍦 Cream Talk — кремовый фон, арка, чёрные титры и рисунки</option>
       <option value="custom">⚙️ Мои настройки — вручную</option>
     </select>
+    <label class="field" for="talkScene">🎭 Композиция разговорного Reels</label>
+    <select id="talkScene">
+      <option value="off" selected>Обычное видео на весь экран</option>
+      <option value="contour">Contour Talk — дизайнерский тёмный фон + арка</option>
+      <option value="cream">Cream Talk — светлый фон + арка и акценты</option>
+    </select>
+    <p class="note">Можно выбрать любой из 6 готовых стилей. Композиция кадра, шрифт, цвет и анимация меняются отдельно. В студийных форматах титры располагаются над аркой с говорящим человеком.</p>
     <label class="field" for="previewPhoto">📷 Фото для примерки оформления</label>
     <input id="previewPhoto" type="file" accept="image/*">
     <p class="note">Прикрепи любой кадр или фотографию: здесь сразу увидишь шрифт, размер, положение, цвет и овальную тень. Фото останется на iPad и не отправится для монтажа.</p>
@@ -403,6 +412,7 @@
       largeFont:byId('fontBig').value,
       smallFont:byId('fontSmall').value,
       reelsPreset:byId('reelsPreset').value,
+      talkScene:byId('talkScene').value,
       captionVariant:byId('captionVariant').value,
       captionAnimation:byId('captionAnimation').value,
       captionBackground:byId('captionBackground').value,
@@ -451,7 +461,7 @@
     byId('next').hidden=current===3;
     if(current===3){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Текст относительно человека',s.subjectLayout==='behind'?'за человеком':s.subjectLayout==='beside'?'рядом с человеком':'обычно'],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Текст относительно человека',s.subjectLayout==='behind'?'за человеком':s.subjectLayout==='beside'?'рядом с человеком':'обычно'],['Композиция',s.talkScene==='contour'?'Contour Talk':s.talkScene==='cream'?'Cream Talk':'обычный кадр'],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -600,7 +610,14 @@
       reference_soft:'#FFF6F8',editorial:'#FFFFFF',old_money:'#FFF3E1',
       minimal:'#F9F9F8',elegant:'#FFFFFF'
     };
-    var helper=palette[byId('captionVariant').value]||'#FFFFFF';
+    var scene=byId('talkScene').value;
+    var box=byId('previewBox');
+    box.style.background=scene==='contour'
+      ?'repeating-radial-gradient(ellipse at 40% 55%, #243e35 0 2px, #1b3029 4px 11px, #355749 12px 13px, #1b3029 14px 22px)'
+      :scene==='cream'?'#FFF0BF':'';
+    var helper=scene==='cream'?'#28231A':
+      scene==='contour'?'#FFF8E8':
+      palette[byId('captionVariant').value]||'#FFFFFF';
     before.style.color=helper;
     after.style.color=helper;
     var title=byId('topTitleText').value.trim();
@@ -633,7 +650,15 @@
     after.style.textShadow='0 1px 5px #160d1b9c';
     sample.style.transition='top .26s ease-out, left .26s ease-out, transform .3s ease-out';
     var spots={top:'33%',middle:'56%',bottom:'73%'};
-    sample.style.top=spots[byId('position').value]||'56%';
+    sample.style.top=scene!=='off'?'17%':spots[byId('position').value]||'56%';
+    var media=[byId('previewPhotoImage'),byId('captionVideo')];
+    media.forEach(function(node){
+      node.style.top=scene!=='off'?'37%':'0';
+      node.style.height=scene!=='off'?'63%':'100%';
+      node.style.width='100%';
+      node.style.borderRadius=scene!=='off'?'50% 50% 0 0 / 14% 14% 0 0':'0';
+      node.style.objectFit='cover';
+    });
     var layout=byId('subjectLayout').value;
     // Beside-person is a schematic preview; the renderer automatically
     // determines the true side from the person's segmentation mask.
@@ -686,10 +711,12 @@
   // Presets modify *only* visual typography: no audio, camera, pause, or
   // semantic editing setting changes when a style is selected.
   var reelPresets={
-    reference_soft:{variant:'reference_soft',big:'old_money',small:'refined',color:'#E8A4B5'},
-    old_money:{variant:'old_money',big:'vintage',small:'old_money',color:'#CEB68A'},
-    editorial:{variant:'editorial',big:'bold',small:'modern',color:'#F0443E'},
-    minimal:{variant:'minimal',big:'refined',small:'clean',color:'#FFFFFF'}
+    reference_soft:{variant:'reference_soft',big:'old_money',small:'refined',color:'#E8A4B5',scene:'off'},
+    old_money:{variant:'old_money',big:'vintage',small:'old_money',color:'#CEB68A',scene:'off'},
+    editorial:{variant:'editorial',big:'bold',small:'modern',color:'#F0443E',scene:'off'},
+    minimal:{variant:'minimal',big:'refined',small:'clean',color:'#FFFFFF',scene:'off'},
+    contour_talk:{variant:'contour_talk',big:'bebas',small:'modern',color:'#F6EDD6',scene:'contour'},
+    cream_talk:{variant:'cream_talk',big:'bold',small:'modern',color:'#191710',scene:'cream'}
   };
   byId('reelsPreset').addEventListener('change',function(){
     var cfg=reelPresets[this.value];
@@ -698,19 +725,20 @@
       byId('fontBig').value=cfg.big;
       byId('fontSmall').value=cfg.small;
       byId('color').value=cfg.color;
+      byId('talkScene').value=cfg.scene;
       // All four curated looks are designed for mixed-size captions.
       byId('subtitleStyle').value='reference_dynamic';
     }
     updateSample();
   });
   ['color','fontBig','fontSmall','captionVariant','captionBackground',
-   'captionAnimation','position','subjectLayout','outline','shadow','hookText','subtitleStyle','filter',
+   'captionAnimation','position','subjectLayout','talkScene','outline','shadow','hookText','subtitleStyle','filter',
    'topTitleText','topTitleMode','previewKeyword'
   ].forEach(function(id){
     byId(id).addEventListener('input',function(){
       // Пользователь изменил готовый набор: его выбор не перезаписываем.
       if(['color','fontBig','fontSmall','captionVariant','captionBackground',
-          'captionAnimation'].includes(id))byId('reelsPreset').value='custom';
+          'captionAnimation','talkScene'].includes(id))byId('reelsPreset').value='custom';
       updateSample();
     });
   });
@@ -1136,6 +1164,7 @@
       caption_variant:s.captionVariant,
       background_style:s.captionBackground,
       subject_layout:s.subjectLayout,
+      talk_scene:s.talkScene,
       top_title:s.topTitleMode==='off'?'':s.topTitle,
       top_title_mode:s.topTitleMode,
       animation_style:s.captionAnimation,
