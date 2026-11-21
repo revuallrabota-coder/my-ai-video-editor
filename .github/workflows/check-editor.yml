@@ -25,7 +25,6 @@ on:
       - "test_reference_motion.py"
       - "process_uploaded_video.py"
       - "cloudflare_launcher.js"
-      - "test_upload_300mb.mjs"
       - "test_upload_500mb.mjs"
       - "clip_montage.py"
       - "test_clip_montage.py"
