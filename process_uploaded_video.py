@@ -229,19 +229,13 @@ def main() -> None:
             emoji=str(config.get("emoji_mode","on"))
             subtitle_style=style
             caption_extras = dict(
-                small_font_profile=str(config.get("small_font_profile","modern")),
-                caption_variant=str(config.get("caption_variant","editorial")),
+                small_font_profile=str(config.get("small_font_profile","refined")),
+                caption_variant=str(config.get("caption_variant","reference_soft")),
                 background_style=str(config.get("background_style","occasional")),
                 animation_style=str(config.get("animation_style","float")),
                 subtitle_sfx=str(config.get("subtitle_sfx","soft")),
-                # Existing Cloudflare already sends caption_variant.
-                # The matching insert style is selected on the GitHub runner,
-                # so users need no extra Cloudflare deploy for new cutaway looks.
-                insert_style=str(config.get(
-                    "insert_style",
-                    str(config.get("caption_variant","editorial"))
-                    if str(config.get("emoji_mode","on"))=="on" else "off",
-                )),
+                # Small emoji never enable oversized themed cards.
+                insert_style=str(config.get("insert_style","off")),
                 insert_density=str(config.get(
                     "insert_density",
                     "subtle" if style=="reference_dynamic" else "balanced",
@@ -261,7 +255,7 @@ def main() -> None:
                     speed=float(config.get("video_speed","1.0")),
                     filter_style=str(config.get("video_filter","none")),
                     caption_position=str(config.get("caption_position","middle")),
-                    font_profile=str(config.get("font_profile","elegant")),
+                    font_profile=str(config.get("font_profile","old_money")),
                     words_override=words,
                     caption_animation=animation,
                     sound_effects=sound,emoji_mode=emoji,
