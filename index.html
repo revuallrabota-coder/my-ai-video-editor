@@ -160,6 +160,9 @@
     </div>
     <label class="field" for="previewKeyword">✍️ Ключевое слово в предпросмотре</label>
     <input id="previewKeyword" type="text" maxlength="34" value="ОШИБКУ" placeholder="Например, РЕЗУЛЬТАТ">
+    <div class="font-live-hint" id="fontPreviewStatus" aria-live="polite">
+      Крупный шрифт: Антиква · Мелкий шрифт: Lato · Стиль: Нежный референс
+    </div>
     <label class="field" for="captionDelay">Синхронизация: надпись позже голоса</label>
     <select id="captionDelay">
       <option value="0.0" selected>Без задержки — точная синхронизация с речью</option>
@@ -600,6 +603,12 @@
     titleNode.style.fontFamily=bigFont.family;
     titleNode.style.fontStyle=bigFont.italic?'italic':'normal';
     titleNode.style.fontWeight=bigFont.weight;
+    var bigSelect=byId('fontBig'),smallSelect=byId('fontSmall');
+    var presetSelect=byId('reelsPreset');
+    byId('fontPreviewStatus').textContent=
+      'Крупный: '+bigSelect.options[bigSelect.selectedIndex].text+
+      ' · Мелкий: '+smallSelect.options[smallSelect.selectedIndex].text+
+      ' · Оформление: '+presetSelect.options[presetSelect.selectedIndex].text;
     var backing=byId('captionBackground').value;
     var sample=byId('sample');
     // Tight blur directly behind the highlighted word instead of one
