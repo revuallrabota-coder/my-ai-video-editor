@@ -47,7 +47,7 @@ const CHOICES = {
   audio_profile: ["off", "balanced", "strong"],
   video_speed: ["1.0", "1.1", "1.2", "1.3", "1.5"],
   pause_removal: ["off", "gentle", "balanced", "tight"],
-  caption_variant: ["reference_soft","editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant"],
+  caption_variant: ["reference_soft","editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant","contour_talk","cream_talk"],
   small_font_profile: ["elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined","roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed"],
   background_style: ["off","occasional","frequent","always"],
   subject_layout: ["standard","behind","beside"],
