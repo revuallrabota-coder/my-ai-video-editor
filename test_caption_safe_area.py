@@ -40,7 +40,7 @@ class CaptionSafeAreaTests(unittest.TestCase):
         words = [
             (0.1,0.42,"Я"),(0.44,0.74,"так"),
             (0.76,1.25,"параллельна"),
-            (1.6,1.9,"работа"),(1.94,2.4,"мастера"),
+            (1.90,2.20,"работа"),(2.24,2.70,"мастера"),
         ]
         ass, count = build_reference_dynamic_ass(
             words, background_style="always",
