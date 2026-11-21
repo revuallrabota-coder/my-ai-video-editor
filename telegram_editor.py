@@ -549,12 +549,15 @@ def edit_video(
     top_title_mode: str = "auto",
     pause_removal: str = "tight",
     subject_layout: str = "standard",
+    talk_scene: str = "off",
 ) -> dict:
     from reels_effects import apply_effects, validate_effects
     from speech_review import map_words_to_ranges, shift_word_timestamps
     validate_effects(sound_effects, emoji_mode, hook_position)
     from portrait_caption_layer import check_layout
     subject_layout = check_layout(subject_layout)
+    from talking_scene_styles import validate_talk_scene, render_scene, append_scene_ornaments
+    talk_scene = validate_talk_scene(talk_scene)
 
     duration, has_audio = duration_and_audio(original)
     ranges = ([Segment(0.0, duration)] if mode == "captions"
@@ -577,14 +580,19 @@ def edit_video(
         )
         work_duration, _ = duration_and_audio(work)
         words = shift_word_timestamps(words, subtitle_delay, work_duration)
+        video_for_titles = work
+        if talk_scene != "off":
+            video_for_titles = folder / "talking_canvas.mp4"
+            render_scene(work, video_for_titles, talk_scene, quality=quality)
         subtitle_events = 0
         if mode != "cuts" and has_audio:
             from portrait_caption_layer import choose_text_side
-            subject_side = choose_text_side(work) if subject_layout == "beside" else "center"
+            subject_side = choose_text_side(work) if talk_scene == "off" and subject_layout == "beside" else "center"
             ass = folder / "captions.ass"
             subtitle_events = write_ass(
                 work, ass, color, style=subtitle_style, hook=hook,
-                caption_position=caption_position, font_profile=font_profile,
+                caption_position="studio" if talk_scene!="off" else caption_position,
+                font_profile=font_profile,
                 words_override=words, caption_animation=caption_animation,
                 hook_position=hook_position,
                 small_font_profile=small_font_profile,
@@ -595,16 +603,18 @@ def edit_video(
                 subject_side=subject_side,
             )
             if subtitle_events:
-                burn_subtitles(work, ass, staged, quality=quality)
-                if subject_layout != "standard":
+                if talk_scene!="off":
+                    append_scene_ornaments(ass, words, talk_scene)
+                burn_subtitles(video_for_titles, ass, staged, quality=quality)
+                if talk_scene=="off" and subject_layout != "standard":
                     from portrait_caption_layer import protect_subject
                     masked = folder / "foreground_protected.mp4"
                     protect_subject(work, staged, masked, quality=quality)
                     staged = masked
             else:
-                work.replace(staged)
+                video_for_titles.replace(staged)
         else:
-            work.replace(staged)
+            video_for_titles.replace(staged)
 
         # Звуковые акценты и эмодзи накладываются только после одобрения
         # слов, чтобы не менять тайминги подписи и не заглушить речь.
