@@ -46,6 +46,7 @@ const CHOICES = {
   font_profile: ["elegant", "clean", "bold", "bebas", "platform", "bubble", "script", "modern", "old_money","vintage","street","refined","roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed"],
   audio_profile: ["off", "balanced", "strong"],
   video_speed: ["1.0", "1.1", "1.2", "1.3", "1.5"],
+  pause_removal: ["off", "gentle", "balanced", "tight"],
   caption_variant: ["reference_soft","editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant"],
   small_font_profile: ["elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined","roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed"],
   background_style: ["off","occasional","frequent","always"],
@@ -98,7 +99,7 @@ function workflowInputs(settings) {
       "Для хука в конце напиши боту /hook end ТВОЙ ТЕКСТ перед отправкой видео."
     );
   }
-  const speed = Number(settings.speed ?? 1);
+  const speed = Number(settings.speed ?? 1.2);
   return {
     mode: field(settings.mode, "mode", "my_style"),
     subtitle_style: field(settings.subtitle_style, "subtitle_style", "reference_dynamic"),
@@ -201,7 +202,7 @@ function verifiedWorkerSettings(config) {
   if (!["high", "balanced"].includes(quality)) {
     throw new Error("Недопустимое качество.");
   }
-  const delay = Number(config.subtitle_delay ?? 0.30);
+  const delay = Number(config.subtitle_delay ?? 0.0);
   if (!Number.isFinite(delay) || delay < -0.5 || delay > 1.5) {
     throw new Error("Синхронизация титров: от -0.5 до +1.5 сек.");
   }
@@ -211,6 +212,7 @@ function verifiedWorkerSettings(config) {
     subtitle_style: original.subtitle_style,
     camera_style: original.camera_style,
     video_speed: original.video_speed,
+    pause_removal: field(config.pause_removal,"pause_removal","tight"),
     video_filter: original.video_filter,
     caption_position: original.caption_position,
     font_profile: original.font_profile,
