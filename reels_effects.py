@@ -264,8 +264,11 @@ def apply_effects(
     caption_position: str = "middle",
     quality: str = "high",
     caption_sound: str = "off",
+    insert_style: str = "off",
+    insert_density: str = "balanced",
+    insert_sound: str = "on",
 ) -> dict:
-    """Наложить эмодзи и отдельные тихие звуки слов, сохраняя качество."""
+    """Тематические винтажные cutaway, эмодзи, звук, без изменения речи."""
     from telegram_editor import duration_and_audio, execute
     from export_profiles import get_export_profile
     export = get_export_profile(quality)
@@ -273,16 +276,29 @@ def apply_effects(
     validate_effects(sound, emoji, "off")
     if caption_sound not in _ALLOWED_CAPTION_SFX:
         raise ValueError("Звуки субтитров: off, soft или tick.")
+    if insert_style not in ("off", "retro", "minimal"):
+        raise ValueError("Вставки: off, retro или minimal.")
+    if insert_density not in ("subtle", "balanced", "dynamic"):
+        raise ValueError("Плотность вставок: subtle, balanced или dynamic.")
+    if insert_sound not in ("on", "off"):
+        raise ValueError("Звуки вставок: on или off.")
     if caption_position not in ("top", "middle", "bottom"):
         raise ValueError("Неверная позиция эмодзи.")
     duration, has_audio = duration_and_audio(source)
+    from retro_inserts import choose_retro_cues, make_retro_card, make_retro_sound_track
+    retro = (choose_retro_cues(words, duration, density=insert_density)
+             if insert_style != "off" else [])
     cues = pick_cues(words, duration)
     caption_cues = (pick_caption_cues(words,duration,style=caption_sound)
                     if caption_sound != "off" else [])
-    visual = [(t, symbol) for t, symbol in cues if symbol] if emoji == "on" else []
-    if (sound == "off" and not visual and not caption_cues):
+    # Обычные смайлы не перекрывают большую иллюстрированную карточку.
+    visual = [(t, symbol) for t, symbol in cues if symbol
+              and all(abs(t - r.time) > 1.15 for r in retro)
+             ] if emoji == "on" else []
+    if (sound == "off" and not visual and not caption_cues and not retro):
         source.replace(target)
-        return {"emoji_count": 0, "sfx_count": 0, "caption_sfx_count": 0}
+        return {"emoji_count": 0, "sfx_count": 0, "caption_sfx_count": 0,
+                "insert_count": 0, "insert_sfx_count": 0}
 
     with tempfile.TemporaryDirectory(prefix="reels_effects_") as tmp:
         folder = Path(tmp)
@@ -319,8 +335,36 @@ def apply_effects(
                 current_input += 1
                 emoji_count += 1
 
+        insert_count = 0
+        for i, insert in enumerate(retro):
+            card = folder / f"vintage_card_{i}.png"
+            try:
+                make_retro_card(card, insert.label, insert.symbol, style=insert_style)
+            except Exception as exc:
+                LOG.warning("Не удалось подготовить винтажную карточку: %s",exc)
+                continue
+            args.extend(["-loop","1","-framerate","30","-i",str(card)])
+            start=insert.time
+            finish=min(duration,start+1.35)
+            filters.append(
+                f"[{current_input}:v]format=rgba,"
+                f"fade=t=in:st={start:.3f}:d=0.19:alpha=1,"
+                f"fade=t=out:st={max(start+0.25,finish-0.22):.3f}:d=0.22:"
+                f"alpha=1[insert{i}]"
+            )
+            dest=f"[cardstage{i}]"
+            filters.append(
+                f"{prev}[insert{i}]overlay=x='(main_w-overlay_w)/2':"
+                f"y='main_h*0.16+26*max(0,1-(t-{start:.3f})*5)':"
+                f"enable='between(t,{start:.3f},{finish:.3f})':shortest=1{dest}"
+            )
+            prev=dest
+            current_input += 1
+            insert_count += 1
+
         sfx_count = 0
         caption_sfx_count = 0
+        insert_sfx_count = 0
         sound_output = "0:a:0?"
         track_inputs = ["[0:a:0]"]
         if sound != "off" and has_audio and cues:
@@ -338,6 +382,13 @@ def apply_effects(
             track_inputs.append(f"[{current_input}:a:0]")
             current_input += 1
             caption_sfx_count = len(caption_cues)
+        if insert_sound=="on" and has_audio and insert_count:
+            cue_track=folder/"retro_insert_accents.wav"
+            make_retro_sound_track(cue_track, retro[:insert_count], duration)
+            args.extend(["-i",str(cue_track)])
+            track_inputs.append(f"[{current_input}:a:0]")
+            current_input+=1
+            insert_sfx_count=insert_count
         if len(track_inputs)>1:
             filters.append(
                 "".join(track_inputs)
@@ -346,20 +397,22 @@ def apply_effects(
             )
             sound_output = "[mixed]"
 
-        if emoji_count:
+        if emoji_count or insert_count:
             args.extend(["-filter_complex",";".join(filters),"-map",prev,
                          "-c:v","libx264","-preset",export.preset,"-crf",str(export.crf)])
-        elif sfx_count or caption_sfx_count:
+        elif sfx_count or caption_sfx_count or insert_sfx_count:
             args.extend(["-filter_complex",";".join(filters),"-map","0:v:0",
                          "-c:v","copy"])
         else:
             source.replace(target)
-            return {"emoji_count":0,"sfx_count":0,"caption_sfx_count":0}
-        if sfx_count or caption_sfx_count:
+            return {"emoji_count":0,"sfx_count":0,"caption_sfx_count":0,
+                    "insert_count":0,"insert_sfx_count":0}
+        if sfx_count or caption_sfx_count or insert_sfx_count:
             args.extend(["-map",sound_output,"-c:a","aac","-b:a",export.audio_bitrate])
         else:
             args.extend(["-map","0:a:0?","-c:a","copy"])
         args.extend(["-t",f"{duration:.3f}","-movflags","+faststart",str(target)])
         execute(args)
         return {"emoji_count":emoji_count, "sfx_count":sfx_count,
-                "caption_sfx_count":caption_sfx_count}
+                "caption_sfx_count":caption_sfx_count,
+                "insert_count":insert_count,"insert_sfx_count":insert_sfx_count}
