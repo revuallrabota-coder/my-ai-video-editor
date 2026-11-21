@@ -223,7 +223,7 @@ def side_pan_expressions(
     pan_ratio = "0.5" + "".join(ramps)
     # Always keep a modest crop margin for side movements.
     # Cut to slightly closer shot on selected phrase boundaries.
-    zoom = "1.10+0.38*(" + editorial_zoom_expression(words,duration,.16) + "-1)"
+    zoom = "1.16+1.05*(" + editorial_zoom_expression(words,duration,.16) + "-1)"
     return zoom, f"(iw-iw/zoom)*({pan_ratio})"
 
 
