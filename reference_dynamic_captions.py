@@ -522,13 +522,13 @@ def build_reference_dynamic_ass(
             f"{style},,0,0,0,,{prefix}{''.join(parts)}\n"
         )
     if intro_animated:
-        header=header.replace("\\n[Events]\\n",
+        header=header.replace("\n[Events]\n",
             f"Style: HeroSmall,{little.name},28,{small_color},{small_color},"
-            "&H80201620,&H990A1018,0,0,0,0,100,100,0,0,1,0.5,0.6,5,70,70,10,1\\n"
+            "&H80201620,&H990A1018,0,0,0,0,100,100,0,0,1,0.5,0.6,5,70,70,10,1\n"
             f"Style: HeroBig,{big.name},68,{accent_color},{accent_color},"
-            "&H70201620,&H9A0A1018,1,0,0,0,100,100,0,0,1,0.65,0.8,5,70,70,10,1\\n"
+            "&H70201620,&H9A0A1018,1,0,0,0,100,100,0,0,1,0.65,0.8,5,70,70,10,1\n"
             f"Style: HeroStar,DejaVu Sans,28,{small_color},{small_color},"
-            "&H801E1820,&H960A1018,0,0,0,0,100,100,0,0,1,0.4,0.4,5,70,70,10,1\\n"
-            "\\n[Events]\\n")
+            "&H801E1820,&H960A1018,0,0,0,0,100,100,0,0,1,0.4,0.4,5,70,70,10,1\n"
+            "\n[Events]\n")
         events.extend(_hero_events(words,intro_title,accent_color,small_color))
     return header+"".join(events),len(events)
