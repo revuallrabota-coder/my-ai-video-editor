@@ -921,7 +921,7 @@
       try{old=JSON.parse(localStorage.getItem('personalEditorLastUpload')||'null')}catch(ignore){}
       var id=null,partSize=4000000,parts=0,completed=new Set();
       if(old && old.url===url && old.fingerprint===fingerprint &&
-          old.settings===signature && Date.now()-old.created<2.5*60*60*1000){
+          old.settings===signature && Date.now()-old.created<71*60*60*1000){
         try{
           var resumed=await request('/upload/'+old.id+'/status','GET');
           if(resumed.input_size===totalSize && resumed.state==='uploading' &&
