@@ -1,4 +1,4 @@
-"""GitHub Actions: download private 300 MB chunks from Cloudflare KV, edit, send MP4.
+"""GitHub Actions: restore multi-source 500 MB projects from Cloudflare KV.
 
 Cloudflare Worker verifies Telegram initData on upload and GitHub's bot
 secret on downloads. Never print raw file, worker tokens, or full URLs.
@@ -146,13 +146,29 @@ def read_chunked_video(
 
 
 def release_upload(worker_url: str, upload_id: str, token: str) -> None:
+    """Delete source chunks in safe groups of 30 KV operations per request."""
+    url=worker_url.rstrip("/")+"/internal/upload/"+upload_id+"/release"
     try:
-        requests.delete(
-            worker_url.rstrip("/")+"/internal/upload/"+upload_id+"/release",
-            headers={"Authorization":"Bearer "+token}, timeout=70
-        )
-    except requests.RequestException:
+        with requests.Session() as session:
+            position=0
+            for _ in range(7):
+                response=session.delete(
+                    url+"?from="+str(position),
+                    headers={"Authorization":"Bearer "+token},timeout=70
+                )
+                if not response.ok:
+                    response.raise_for_status()
+                report=response.json()
+                if not report.get("has_more"):
+                    return
+                next_pos=report.get("next")
+                if not isinstance(next_pos,int) or next_pos<=position:
+                    break
+                position=next_pos
+            LOG.warning("KV cleanup incomplete; remaining fragments have TTL.")
+    except (requests.RequestException,ValueError):
         LOG.warning("KV cleanup unavailable; keys have automatic TTL.")
+
 
 
 def publish_large_mp4(worker_url: str, upload_id: str, token: str, file: Path) -> None:
