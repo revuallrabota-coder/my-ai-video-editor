@@ -221,6 +221,14 @@
     <!-- Кнопка загрузки неподдерживаемого TTF убрана, чтобы не обещать ложный функционал. -->
     <label class="field" for="position">Где стоят подписи</label>
     <select id="position"><option value="middle" selected>Средняя часть кадра</option><option value="top">Верхняя часть кадра</option><option value="bottom">Нижняя часть кадра</option></select>
+    <label class="field" for="subjectLayout">👤 Текст относительно человека · разговорный Reels</label>
+    <select id="subjectLayout">
+      <option value="standard" selected>Обычно — субтитры поверх видео</option>
+      <option value="behind">За человеком — лицо и фигура поверх букв</option>
+      <option value="beside">Рядом с человеком — на свободной стороне</option>
+    </select>
+    <p class="note" id="subjectLayoutHint">Плавная анимация слов и выбранный стиль сохраняются в любом формате.</p>
+    <p class="note">Для режимов «За человеком» и «Рядом» монтажёр автоматически выделяет силуэт человека. Это требует дополнительной обработки видео. На фото выше показано приблизительное размещение; перекрытие букв фигурой будет видно в готовом MP4.</p>
     <input id="outline" type="range" value="0" min="0" max="8" hidden>
     <input id="shadow" type="range" value="1" min="0" max="10" hidden>
     <span id="outlineValue" hidden>0</span><span id="shadowValue" hidden>1</span>
@@ -401,6 +409,7 @@
       subtitleSfx:byId('subtitleSfx').value,
       customFont:null,
       captionPosition:byId('position').value,
+      subjectLayout:byId('subjectLayout').value,
       outline:Number(byId('outline').value),
       shadow:Number(byId('shadow').value),
       emoji:byId('emoji').checked,
@@ -442,7 +451,7 @@
     byId('next').hidden=current===3;
     if(current===3){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Текст относительно человека',s.subjectLayout==='behind'?'за человеком':s.subjectLayout==='beside'?'рядом с человеком':'обычно'],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -625,8 +634,18 @@
     sample.style.transition='top .26s ease-out, left .26s ease-out, transform .3s ease-out';
     var spots={top:'33%',middle:'56%',bottom:'73%'};
     sample.style.top=spots[byId('position').value]||'56%';
-    sample.style.left='50%';
-    sample.style.transform='translateX(-50%)';
+    var layout=byId('subjectLayout').value;
+    // Beside-person is a schematic preview; the renderer automatically
+    // determines the true side from the person's segmentation mask.
+    sample.style.left=layout==='beside'?'73%':'50%';
+    sample.style.maxWidth=layout==='beside'?'48%':'86%';
+    sample.style.minWidth=layout==='beside'?'0px':'90px';
+    sample.style.transform=layout==='beside'?'translateX(-50%) scale(.72)':'translateX(-50%)';
+    byId('subjectLayoutHint').textContent=layout==='behind'
+      ?'👤 В итоговом видео человек окажется ПЕРЕД текстом. На фотографии показано только положение: вырезание фигуры выполняет сервер.'
+      :layout==='beside'
+      ?'↔️ В итоговом видео текст появится сбоку от человека, с автоматическим выбором свободной стороны. Здесь условно показано справа.'
+      :'Плавная анимация слов и выбранный стиль сохраняются в любом формате.';
     // The animated reference alternates between gentle left and right
     // word placement rather than a single linear movement.
     sample.style.alignItems=byId('captionAnimation').value==='slide'?'flex-start':
@@ -685,7 +704,7 @@
     updateSample();
   });
   ['color','fontBig','fontSmall','captionVariant','captionBackground',
-   'captionAnimation','position','outline','shadow','hookText','subtitleStyle','filter',
+   'captionAnimation','position','subjectLayout','outline','shadow','hookText','subtitleStyle','filter',
    'topTitleText','topTitleMode','previewKeyword'
   ].forEach(function(id){
     byId(id).addEventListener('input',function(){
@@ -1116,6 +1135,7 @@
       small_font_profile:s.smallFont,
       caption_variant:s.captionVariant,
       background_style:s.captionBackground,
+      subject_layout:s.subjectLayout,
       top_title:s.topTitleMode==='off'?'':s.topTitle,
       top_title_mode:s.topTitleMode,
       animation_style:s.captionAnimation,
