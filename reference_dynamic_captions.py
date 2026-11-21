@@ -23,6 +23,7 @@ TEXT_SAFE_WIDTH = 500
 CENTER_X = PLAY_WIDTH // 2
 
 COLOR_PALETTES = {
+    "reference_soft": ("#E8A4B5", "#FFF6F8"),
     "editorial": ("#F0443E", "#FFFFFF"),
     "luxe": ("#D8BFA0", "#FFF4E5"),
     "minimal": ("#FFFFFF", "#EFEFEF"),
@@ -242,6 +243,31 @@ def phrase_geometry(
         b=max(group[-1][1]+0.15,a+0.66)
         if next_start is not None:b=min(b,max(a+0.25,next_start-0.015))
         result.append((a,b,min(455,width),CENTER_X,y))
+    return result
+
+
+def phrase_emoji_anchors(
+    words: Sequence[Word], caption_position: str,
+    small_font_profile: str="modern", font_profile: str="bold",
+) -> list[tuple[float,float,float,float]]:
+    """Start/end and position of a small emoji next to emphasized phrase line."""
+    little=choose_font(small_font_profile)
+    big=choose_font(font_profile)
+    y={"top":410,"middle":692,"bottom":868}[caption_position]
+    groups=phrase_groups(words)
+    result=[]
+    for i,group in enumerate(groups):
+        lines,base,accent,_,main=_phrase_layout(group,little,big)
+        main_line=next(j for j,line in enumerate(lines) if main in line)
+        width=_line_length(group,lines[main_line],main,base,accent,little,big)
+        x=CENTER_X+width/2+10
+        cy=y+(main_line-(len(lines)-1)/2)*base*1.45
+        start=group[0][0]
+        end=max(group[-1][1]+0.15,start+0.66)
+        next_start=groups[i+1][0][0] if i+1<len(groups) else None
+        if next_start is not None:
+            end=min(end,max(start+0.25,next_start-0.015))
+        result.append((start,end,min(600,max(75,x)),cy))
     return result
 
 
