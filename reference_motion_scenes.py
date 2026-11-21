@@ -45,7 +45,12 @@ def select_motion_cues(words: Sequence[Word], duration: float,
                     if anchor-0.8<=a<=anchor+2.6 and b>a
                     and len(re.sub(r"[^\wа-яё]","",w,re.I))>=4]
         if candidates:
-            timestamp,word=max(candidates,key=lambda it:len(it[1]))
+            from retro_inserts import TOPICS
+            stems=tuple(stem for roots,_,_,_ in TOPICS for stem in roots)
+            relevant=(c for c in candidates if any(
+                stem in re.sub(r"[^\wа-яё]","",c[1].lower())
+                for stem in stems))
+            timestamp,word=next(relevant,candidates[0])
             label=re.sub(r"[^\wа-яёА-ЯЁ\-]","",word)[:21].upper()
             start=max(anchor,timestamp)
         else:
