@@ -41,6 +41,16 @@ PRESETS: dict[str, FontSpec] = {
     "vintage": FontSpec("Liberation Serif", 78, 1, 1, 103, 99, 1.8, .8),
     "street": FontSpec("DejaVu Sans Condensed", 85, 1, 0, 90, 100, 2.6, 1.2),
     "refined": FontSpec("Lato", 72, 0, 0, 100, 100, .9, .55),
+    # Дополнительные гарнитуры с настоящей русской кириллицей.
+    # Их пакеты устанавливаются на runner (не храним шрифты в GitHub).
+    "roboto": FontSpec("Roboto", 70, 1, 0, 100, 100, 1.1, .65),
+    "open_sans": FontSpec("Open Sans", 69, 1, 0, 100, 100, 1.0, .6),
+    "noto_sans": FontSpec("Noto Sans", 69, 1, 0, 100, 100, .95, .55),
+    "ubuntu": FontSpec("Ubuntu", 72, 1, 0, 100, 100, 1.2, .65),
+    "carlito": FontSpec("Carlito", 72, 1, 0, 100, 100, 1.0, .55),
+    "lato_black": FontSpec("Lato Heavy", 73, 1, 0, 103, 100, 1.3, .75),
+    "modern_condensed": FontSpec("DejaVu Sans Condensed", 75, 1, 0, 88, 100, 1.2, .6),
+
 }
 
 def choose_font(name: str) -> FontSpec:
