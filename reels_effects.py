@@ -114,8 +114,11 @@ def add_hook_to_ass(
     duration: float,
     color: str,
     font_profile: str = "elegant",
+    y_center: int = 202,
 ) -> str:
-    """Хук в начале/конце с тёмной полупрозрачной подложкой ЗА текстом."""
+    """Хук с круглой тенью; с заголовком сверху сдвигается ниже него."""
+    if not 140 <= y_center <= 345:
+        raise ValueError("Недопустимая высота хука.")
     if position not in _ALLOWED_HOOK:
         raise ValueError("Недопустимое положение хука.")
     text = _escape_hook(text)
@@ -150,12 +153,12 @@ def add_hook_to_ass(
         oval_width=min(612,max(212,round(len(text)*27+66)))
         oval=_oval_phrase_shadow(oval_width,126)
         shape = (
-            r"{\an5\pos(360,202)\p1\blur6\1c&H272025&\1a&H8E&"
+            (r"{\an5\pos(360,"+str(y_center)+r")\p1\blur6\1c&H272025&\1a&H8E&")
             r"\fad("+str(fadein)+","+str(fadeout)+")}"
             +oval+r"{\p0}"
         )
         label = (
-            r"{\an5\pos(360,202)\fad("+str(fadein)+","+str(fadeout)+")"
+            r"{\an5\pos(360,"+str(y_center)+r")\fad("+str(fadein)+","+str(fadeout)+")"
             r"\fscx94\fscy94\t(0,320,\fscx100\fscy100)}"
             +text.upper()
         )
