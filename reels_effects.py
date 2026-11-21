@@ -266,7 +266,7 @@ def apply_effects(
     small_font_profile: str = "modern",
 ) -> dict:
     """Тематические винтажные cutaway, эмодзи, звук, без изменения речи."""
-    from telegram_editor import duration_and_audio, execute
+    from telegram_editor import duration_and_audio, media_info, execute
     from export_profiles import get_export_profile
     export = get_export_profile(quality)
 
@@ -283,6 +283,15 @@ def apply_effects(
     if caption_position not in ("top", "middle", "bottom"):
         raise ValueError("Неверная позиция эмодзи.")
     duration, has_audio = duration_and_audio(source)
+    # The subtitle ASS uses 720x1280 coordinates; Full HD output is 1080x1920.
+    # Scale emoji placement and size to the ACTUAL video stream dimensions.
+    info=media_info(source)
+    stream=next((it for it in info.get("streams",[])
+                 if it.get("codec_type")=="video"),{})
+    frame_width=int(stream.get("width") or 720)
+    frame_height=int(stream.get("height") or 1280)
+    sx=frame_width/720
+    sy=frame_height/1280
     from retro_inserts import choose_retro_cues, make_retro_card, make_retro_sound_track
     retro = (choose_retro_cues(words, duration, density=insert_density)
              if insert_style != "off" else [])
@@ -330,9 +339,13 @@ def apply_effects(
                     continue
                 args.extend(["-loop","1","-framerate","30","-i",str(path)])
                 clip_end=min(duration,clip_end)
-                sticker_x=min(610,max(74,round(cx+text_width/2+13)))
-                sticker_y=round(cy-23)
-                alpha = (f"[{current_input}:v]scale=52:52,format=rgba,"
+                sticker_size=max(36,round(52*sx))
+                sticker_x=min(frame_width-sticker_size-round(55*sx),
+                              max(round(72*sx),round((cx+text_width/2+13)*sx)))
+                sticker_y=round((cy-23)*sy)
+                bob=max(4,round(7*sy))
+                alpha = (f"[{current_input}:v]"
+                         f"scale={sticker_size}:{sticker_size},format=rgba,"
                          f"fade=t=in:st={start:.3f}:d=0.30:alpha=1,"
                          f"fade=t=out:st={max(start+0.31,clip_end-0.22):.3f}:"
                          f"d=0.22:alpha=1[emoji{i}]")
@@ -340,7 +353,7 @@ def apply_effects(
                 dest = f"[stage{i}]"
                 filters.append(
                     f"{prev}[emoji{i}]overlay=x='{sticker_x}':"
-                    f"y='{sticker_y+7}-7*min(1,max(0,(t-{start:.3f})/0.42))':"
+                    f"y='{sticker_y+bob}-{bob}*min(1,max(0,(t-{start:.3f})/0.42))':"
                     f"enable='between(t,{start:.3f},{clip_end:.3f})'"
                     f":shortest=1{dest}"
                 )
