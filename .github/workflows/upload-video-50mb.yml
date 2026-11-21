@@ -40,7 +40,7 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install "requests>=2.31,<3"
       - name: "Проверить синтаксис"
-        run: python -m py_compile process_uploaded_video.py montage_progress.py bot_api_editor.py telegram_editor.py reference_editor.py speech_review.py reels_effects.py export_profiles.py reference_dynamic_captions.py retro_inserts.py reference_motion_scenes.py clip_montage.py font_presets.py video_filters.py
+        run: python -m py_compile process_uploaded_video.py montage_progress.py bot_api_editor.py telegram_editor.py reference_editor.py speech_review.py reels_effects.py export_profiles.py reference_dynamic_captions.py reference_cascade_captions.py telegram_delivery.py retro_inserts.py reference_motion_scenes.py clip_montage.py font_presets.py video_filters.py
       - name: "Загрузить частями и выполнить монтаж"
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
