@@ -140,6 +140,7 @@
     </select>
     <div class="previewbox">
       <div class="caption-bg"></div>
+      <div id="topTitlePreview" style="position:absolute;top:10%;left:10%;right:10%;z-index:3;color:#fff;font-weight:800;font-size:clamp(15px,3.5vw,22px);letter-spacing:.25px;text-align:center;text-shadow:0 1px 5px #241a22c4;pointer-events:none" hidden></div>
       <video id="captionVideo" muted loop playsinline hidden></video>
       <div class="sample" id="sample">
         <span class="small">мягко всплывающие</span>
@@ -278,7 +279,17 @@
       <option value="tick">Короткий мягкий Tick</option>
       <option value="off">Без звука</option>
     </select>
-    <label class="option"><input id="hook" type="checkbox"> 🪧 Показать хук на полупрозрачной подложке</label>
+    <label class="field" for="topTitleText">🪧 Что написать вверху видео</label>
+    <input id="topTitleText" type="text" maxlength="70" placeholder="Например: РАЗБОР КОШМАРНОГО МАНИКЮРА">
+    <label class="field" for="topTitleMode">Когда показывать это название</label>
+    <select id="topTitleMode">
+      <option value="always" selected>В течение всего видео (неподвижно)</option>
+      <option value="intro">Только в начале, плавное появление</option>
+      <option value="off">Без названия сверху</option>
+      <option value="auto">Автоматический заголовок из моей речи</option>
+    </select>
+    <p class="note">Пустое поле означает «не писать название». Заголовок находится в верхней зоне и не заменяет разговорные субтитры. Можно написать свой текст для каждого ролика.</p>
+    <label class="option"><input id="hook" type="checkbox"> 🪧 Дополнительный хук / призыв (необязательно)</label>
     <label class="field" for="hookPosition">Где показать хук</label>
     <select id="hookPosition">
       <option value="start">В начале</option>
@@ -412,6 +423,8 @@
       motionInserts:byId('motionInserts').checked,
       motionDensity:byId('motionFrequency').value,
       soundEffects:byId('soundfx').value,
+      topTitle:byId('topTitleText').value.trim(),
+      topTitleMode:byId('topTitleMode').value,
       hook:byId('hook').checked,
       hookPosition:byId('hookPosition').value,
       hookText:byId('hookText').value,
@@ -444,7 +457,7 @@
     byId('next').hidden=current===4;
     if(current===4){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Референс',s.referenceVideo||'нет'],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['Референс',s.referenceVideo||'нет'],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -590,14 +603,21 @@
       minimal:'#EFEFEF',neon:'#F3F7E7',pop:'#FFF3F9'
     };
     tiny.style.color=palette[byId('captionVariant').value]||'#FFFFFF';
+    var selectedTitle=byId('topTitleText').value.trim();
+    var titleMode=byId('topTitleMode').value;
+    var titlePreview=byId('topTitlePreview');
+    titlePreview.hidden=titleMode==='off'||(!selectedTitle&&titleMode!=='auto');
+    titlePreview.textContent=selectedTitle.toUpperCase()||
+      (titleMode==='auto'?'ЗАГОЛОВОК ИЗ РЕЧИ':'');
     var backing=byId('captionBackground').value;
     var container=byId('sample');
     container.style.background=backing==='off'?'transparent':
       'rgba(18,13,20,'+(backing==='always'?'.52':backing==='frequent'?'.38':'.20')+')';
-    container.style.borderRadius='16px';
-    container.style.padding=backing==='off'?'0':'10px 7px';
+    container.style.borderRadius=backing==='off'?'0':'999px';
+    container.style.padding=backing==='off'?'0':'10px 22px';
     var animate=byId('captionAnimation').value;
     container.style.transition='transform .5s ease-out, background .4s ease-out';
+    container.style.boxShadow=backing==='off'?'none':'0 1px 18px 6px #18101960';
     container.style.transform=animate==='slide'?'translateX(4px)':
       animate==='pop'?'scale(1.03)':'translateY(-4px)';
     var positions={top:'32%',middle:'62%',bottom:'78%'};
@@ -632,7 +652,8 @@
     updateSample();
   });
   ['color','fontBig','fontSmall','captionVariant','captionBackground',
-   'captionAnimation','position','outline','shadow','hookText','subtitleStyle','filter'
+   'captionAnimation','position','outline','shadow','hookText','subtitleStyle','filter',
+   'topTitleText','topTitleMode'
   ].forEach(function(id){
     byId(id).addEventListener('input',function(){
       // Пользователь изменил готовый набор: его выбор не перезаписываем.
@@ -958,6 +979,8 @@
       small_font_profile:s.smallFont,
       caption_variant:s.captionVariant,
       background_style:s.captionBackground,
+      top_title:s.topTitleMode==='off'?'':s.topTitle,
+      top_title_mode:s.topTitleMode,
       animation_style:s.captionAnimation,
       subtitle_sfx:s.subtitleSfx,
       caption_position:s.captionPosition,
