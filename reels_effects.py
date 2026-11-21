@@ -336,6 +336,7 @@ def apply_effects(
                 emoji_count += 1
 
         insert_count = 0
+        rendered_retro = []
         for i, insert in enumerate(retro):
             card = folder / f"vintage_card_{i}.png"
             try:
@@ -361,6 +362,7 @@ def apply_effects(
             prev=dest
             current_input += 1
             insert_count += 1
+            rendered_retro.append(insert)
 
         sfx_count = 0
         caption_sfx_count = 0
@@ -384,7 +386,7 @@ def apply_effects(
             caption_sfx_count = len(caption_cues)
         if insert_sound=="on" and has_audio and insert_count:
             cue_track=folder/"retro_insert_accents.wav"
-            make_retro_sound_track(cue_track, retro[:insert_count], duration)
+            make_retro_sound_track(cue_track, rendered_retro, duration)
             args.extend(["-i",str(cue_track)])
             track_inputs.append(f"[{current_input}:a:0]")
             current_input+=1
