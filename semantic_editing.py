@@ -123,7 +123,10 @@ def choose_semantic_cues(
                 any(stem in token for stem in ("ошиб","брак","исправ",
                     "результат","сравн","отличи","приложен","телефон",
                     "секунд","минут")))
-            if not strong and matching<2:
+            strong_inspect=kind=="inspect" and any(
+                phrase in context for phrase in (
+                    "найди ошиб", "найти ошиб", "посмотри на ошиб"))
+            if not strong and not strong_inspect and matching<2:
                 continue
             label=token.upper()[:20]
             weight=score+min(1.5,matching*.24)
