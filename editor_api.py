@@ -183,6 +183,10 @@ def validate_settings(config: dict) -> dict:
     if not -0.5 <= subtitle_delay <= 1.5:
         raise HTTPException(400, "Сдвиг титров от -0.5 до +1.5 секунды.")
     hook_text = str(config.get("hook", "")).strip()[:58]
+    top_title=str(config.get("top_title","")).strip()
+    if len(top_title)>70 or any(char in top_title for char in "\\{}\n\r"):
+        raise HTTPException(400,"Название сверху: максимум 70 символов.")
+    top_title_mode=option("top_title_mode",{"auto","off","intro","always"},"auto")
     sound = option("sound_effects", {"off","soft","punch"}, "off")
     emoji = option("emoji_mode", {"off","on"}, "off")
     hook_position = option("hook_position", {"start","end","both","off"}, "start")
@@ -209,6 +213,8 @@ def validate_settings(config: dict) -> dict:
             "top","middle","bottom",
         }, "middle"),
         "hook": hook_text,
+        "top_title":top_title,
+        "top_title_mode":top_title_mode,
         "subtitle_delay": subtitle_delay,
         "export_quality": option("export_quality", {"high","balanced"}, "high"),
         "sound_effects": sound,
@@ -285,6 +291,7 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 background_style=s["background_style"],
                 animation_style=s["animation_style"],
                 subtitle_sfx=s["subtitle_sfx"],
+                top_title=s["top_title"],top_title_mode=s["top_title_mode"],
                 insert_style=s["insert_style"],
                 insert_density=s["insert_density"],
                 insert_sound=s["insert_sound"],
@@ -301,6 +308,7 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 s["small_font_profile"], s["caption_variant"],
                 s["background_style"], s["animation_style"], s["subtitle_sfx"],
                 s["insert_style"],s["insert_density"],s["insert_sound"],
+                top_title=s["top_title"],top_title_mode=s["top_title_mode"],
             )
         if not output.is_file() or output.stat().st_size < 100:
             raise RuntimeError("Обработчик не создал готовый MP4.")
