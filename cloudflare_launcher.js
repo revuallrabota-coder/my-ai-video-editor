@@ -389,7 +389,7 @@ async function workerUploadRoute(request, env, path) {
       }
       await env.UPLOADS.put(uploadKey(id,"meta"),
         JSON.stringify({...meta,state:"done",output:{...o,state:"ready"}}),
-        {expirationTtl:UPLOAD_TTL});
+        {expiration:Math.ceil(o.expires_at/1000)});
       return json({ok:true});
     }
     if (request.method === "DELETE" && operation === "release") {
