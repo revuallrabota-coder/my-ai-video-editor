@@ -343,14 +343,20 @@ async function workerUploadRoute(request, env, path) {
       return json({ok:true});
     }
     if (request.method === "DELETE" && operation === "release") {
+      // Free Workers may permit only 50 subrequests per invocation. Delete
+      // at most 30 source chunks per call; the GitHub runner pages through.
+      const from=Number(new URL(request.url).searchParams.get("from")??"0");
+      if (!Number.isInteger(from) || from<0 || from>=meta.parts) {
+        return json({error:"Incorrect cleanup position"},400);
+      }
+      const stop=Math.min(meta.parts,from+30);
       await Promise.all(
-        Array.from({length:meta.parts},(_,i)=>env.UPLOADS.delete(uploadKey(id,i)))
+        Array.from({length:stop-from},(_,i)=>env.UPLOADS.delete(uploadKey(id,from+i)))
       );
-      // Keep the authenticated output available for an iPad download.
-      if (!meta.output || meta.output.state!=="ready") {
+      if (stop===meta.parts && (!meta.output || meta.output.state!=="ready")) {
         await env.UPLOADS.delete(uploadKey(id,"meta"));
       }
-      return json({released:true});
+      return json({released:true,next:stop,has_more:stop<meta.parts});
     }
     return json({error:"Unknown internal route"},404);
   }
