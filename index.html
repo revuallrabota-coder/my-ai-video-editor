@@ -123,11 +123,7 @@
     <!-- Старый отдельный референс убран: один согласованный монтажный конвейер. -->
     <div hidden aria-hidden="true"><input id="referenceVideo" type="file" accept="video/*">
       <span id="referenceInfo"></span><video id="referencePreview" hidden></video></div>
-    <h3>Формат</h3>
-    <div class="segmented">
-      <button type="button" class="option selected" data-ratio="9:16">📱 Вертикально 9:16</button>
-      <button type="button" class="option" data-ratio="16:9">🖥️ Горизонтально 16:9</button>
-    </div>
+    <p class="note">📱 Формат Reels: вертикально 9:16. Все материалы будут собраны под этот кадр.</p>
   </section>
 
   <section class="card page" data-page="1">
@@ -136,9 +132,9 @@
     <label class="option selected mode"><input type="radio" name="mode" value="Мой стиль" checked> 🎬 Полный монтаж Reels
       <small>Склеиваем исходники → вырезаем паузы → ускоряем речь → расставляем субтитры → выбираем смысловые вставки → отправляем MP4 в Telegram.</small></label>
     <p class="note">На следующих экранах выбирай шрифт, цвет, скорость, количество вставок и звуки. Каждая функция работает независимо от выбранного оформления.</p>
-    <h3>Свои фото в ролик</h3>
-    <input type="file" id="photos" accept="image/*" multiple>
-    <div class="note" id="photoInfo">Можно выбрать до 30 фото.</div>
+    <p class="note">На следующем шаге выбери одну фотографию для проверки оформления на своём кадре. Она не добавляется в монтаж без отдельного действия.</p>
+    <input id="photos" type="file" accept="image/*" hidden>
+    <div class="note" id="photoInfo" hidden></div>
   </section>
 
   <section class="card page" data-page="2">
@@ -230,10 +226,9 @@
     <!-- Кнопка загрузки неподдерживаемого TTF убрана, чтобы не обещать ложный функционал. -->
     <label class="field" for="position">Где стоят подписи</label>
     <select id="position"><option value="middle" selected>Средняя часть кадра</option><option value="top">Верхняя часть кадра</option><option value="bottom">Нижняя часть кадра</option></select>
-    <label class="field" for="outline">Обводка: <span id="outlineValue">0</span></label>
-    <input id="outline" type="range" min="0" max="8" value="0">
-    <label class="field" for="shadow">Мягкая тень: <span id="shadowValue">1</span></label>
-    <input id="shadow" type="range" min="0" max="10" value="1">
+    <input id="outline" type="range" value="0" min="0" max="8" hidden>
+    <input id="shadow" type="range" value="1" min="0" max="10" hidden>
+    <span id="outlineValue" hidden>0</span><span id="shadowValue" hidden>1</span>
     <label class="option"><input id="emoji" type="checkbox" checked> ✨ Маленькие эмодзи возле смысловых фраз</label>
     <label class="option"><input id="motionInserts" type="checkbox" checked> 🎯 Смысловой монтаж: вставки только когда этого требует речь</label>
     <label class="field" for="assetPacks">Твои наборы анимированных вставок (необязательно)</label>
@@ -283,7 +278,11 @@
     <h2>Эффекты и фильтр</h2>
     <p>Выбери будущий стиль обработки изображения и звука.</p>
     <label class="field" for="camera">Динамика камеры</label>
-    <select id="camera"><option value="cinematic_pan" selected>🎥 Плавный вправо-влево + смена крупности</option><option value="editorial">Монтажный Zoom: крупный план с удержанием</option><option value="soft_punch">Старый плавный Zoom</option><option value="enhanced">Усиленный (старый)</option><option value="gentle">Очень мягкий одноразовый Zoom</option><option value="off">Без цифрового зума</option></select>
+    <select id="camera">
+      <option value="cinematic_pan" selected>🎥 Плавно влево-вправо + смена крупности</option>
+      <option value="editorial">🎬 Мягкий акцент на деталях</option>
+      <option value="off">Без движения камеры</option>
+    </select>
     <label class="field" for="audio">🎧 Улучшение звука</label>
     <select id="audio">
       <option value="balanced">Бережная очистка — рекомендую</option>
@@ -293,18 +292,9 @@
     <p class="note">Уменьшаем постоянный фон, сглаживаем громкость речи и защищаем от перегрузки. Голос не заменяется. Сильная очистка иногда искажает речь.</p>
     <label class="field" for="filter">Фильтр</label>
     <select id="filter">
-      <option value="none" selected>Без фильтра — точный цвет ногтей</option>
-      <option value="old_money">🤎 Old Money — дорогой сдержанный тон</option>
-      <option value="vintage">🎞️ Vintage — тёплая плёночная эстетика</option>
-      <option value="street">🖤 Street — контрастный уличный</option>
-      <option value="elegant">✨ Elegant — мягкий элегантный</option>
-      <option value="warm">Тёплый</option>
-      <option value="soft">Нежный</option>
-      <option value="cool">Холодный</option>
-      <option value="contrast">Контрастный</option>
-      <option value="clean">Clean Studio — чистый свет</option>
-      <option value="film">Film — мягкий кинотон</option>
-      <option value="matte">Matte — приглушённый</option>
+      <option value="none" selected>Без фильтра, сохранять натуральные цвета</option>
+      <option value="clean">Чистая студия</option>
+      <option value="film">Мягкий плёночный свет</option>
     </select>
     <p class="note">Для маникюра, где важен точный оттенок гель-лака, выбирай «Без фильтра» или Clean Studio.</p>
     <label class="field" for="pauseRemoval">✂️ Насколько сильно убирать паузы в речи</label>
@@ -453,7 +443,7 @@
     byId('next').hidden=current===4;
     if(current===4){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['Референс',s.referenceVideo||'нет'],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -542,9 +532,8 @@
     player.hidden=!referenceUrl;
     if(referenceUrl){player.src=referenceUrl;player.load()}else{player.removeAttribute('src')}
   });
-  photoInput.addEventListener('change',function(){
-    byId('photoInfo').textContent=photoInput.files.length+' фото из 30';
-  });
+  // The legacy photo-to-video picker is disabled; previewPhoto is
+  // intentionally local-only and never submitted with the video project.
   document.querySelectorAll('[data-ratio]').forEach(function(button){
     button.addEventListener('click',function(){
       ratio=button.dataset.ratio;
@@ -703,7 +692,6 @@
   });
   function go(dir){
     if(dir>0 && current===0 && !selectedClips.length){alert('Сначала выбери хотя бы одно видео.');return}
-    if(dir>0 && current===1 && photoInput.files.length>30){alert('Можно выбрать не больше 30 фото.');return}
     current=Math.max(0,Math.min(4,current+dir));draw();
   }
   byId('back').addEventListener('click',function(){go(-1)});
