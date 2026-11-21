@@ -332,6 +332,9 @@ def montage_by_reference(
     background_style: str = "occasional",
     animation_style: str = "float",
     subtitle_sfx: str = "off",
+    insert_style: str = "off",
+    insert_density: str = "balanced",
+    insert_sound: str = "on",
 ) -> dict:
     """Монтаж с точной синхронизацией речи, динамичным кадром и титрами."""
     from reels_effects import apply_effects, validate_effects
@@ -398,6 +401,8 @@ def montage_by_reference(
             sound=sound_effects, emoji=emoji_mode,
             caption_position=caption_position, quality=quality,
             caption_sound=subtitle_sfx,
+            insert_style=insert_style, insert_density=insert_density,
+            insert_sound=insert_sound,
         )
     return {
         "before": round(source_duration, 1),
