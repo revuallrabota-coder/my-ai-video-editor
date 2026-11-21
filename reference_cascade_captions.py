@@ -91,7 +91,11 @@ def _caption_slots(group: Sequence[Word], index: int, caption_position: str,
                    small: FontSpec, big: FontSpec,
                    animation_style: str="float", subject_side: str="center") -> tuple[dict[int,tuple[int,int,int,bool]],int]:
     main=_pick_editorial_keyword(group)
-    cx,cy,*_=phrase_motion(index,caption_position,animation_style)
+    cx,cy,*_=phrase_motion(index,"top" if caption_position=="studio" else caption_position,animation_style)
+    if caption_position=="studio":
+        # The entire upper 35% of the scene belongs to the animated words.
+        # The person's portrait begins at y ~= 474 (in 720x1280 units).
+        cy-=143
     main_word=safe_text(group[main][2]).upper()
     accent_size=fit_caption_size(main_word,53,big,max_width=485)
     accent_size=max(23,accent_size)
@@ -152,7 +156,7 @@ def build_reference_cascade_ass(
 ) -> tuple[str,int]:
     if subject_side not in ("center", "left", "right"):
         raise ValueError("Неизвестная сторона расположения текста.")
-    if caption_position not in ("top","middle","bottom"):
+    if caption_position not in ("top","middle","bottom","studio"):
         raise ValueError("Недопустимое положение субтитров.")
     if caption_variant not in COLOR_PALETTES:
         raise ValueError("Недопустимая палитра.")
