@@ -33,6 +33,8 @@ COLOR_PALETTES = {
     "vintage": ("#D79B6D", "#F4DFC7"),
     "street": ("#DEEF5A", "#F5F5F0"),
     "elegant": ("#F0DBDC", "#FFFFFF"),
+    "contour_talk": ("#F6EDD6", "#FFFFFF"),
+    "cream_talk": ("#191710", "#29251B"),
 }
 
 
