@@ -118,10 +118,23 @@ def publish_large_mp4(worker_url: str, upload_id: str, token: str, file: Path) -
         with file.open("rb") as stream:
             for i in range(parts):
                 data=stream.read(chunk_size)
-                response=session.put(
-                    url+"/"+str(i),headers=headers,data=data,timeout=(20,120)
-                )
-                response.raise_for_status()
+                for attempt in range(10):
+                    try:
+                        response=session.put(
+                            url+"/"+str(i),headers=headers,data=data,timeout=(20,120)
+                        )
+                        if response.ok:
+                            break
+                        if response.status_code not in (409,429,500,502,503,504):
+                            response.raise_for_status()
+                    except requests.RequestException:
+                        if attempt == 9:
+                            raise
+                    if attempt == 9:
+                        raise RuntimeError(
+                            "Не удалось передать часть готового MP4 №"+str(i+1)
+                        )
+                    time.sleep(min(3+attempt*2,15))
                 LOG.info("Secure output uploaded part %d/%d",i+1,parts)
         for attempt in range(10):
             response=session.post(url+"/finish",headers=headers,timeout=50)
