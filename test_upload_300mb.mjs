@@ -71,7 +71,7 @@ assert.equal(created.status,201,JSON.stringify(created.data));
 assert.equal(created.data.parts,75);
 assert.equal(created.data.chunk_size,4_000_000);
 const id=created.data.upload_id;
-const meta=(await request("/internal/upload/"+id+"/manifest","GET",null,true)).data;
+const meta=await uploads.get("user-video:"+id+":meta","json");
 assert.equal(meta.size,300_000_000);
 assert.equal(meta.parts,75);
 assert.equal(meta.settings.insert_style,"reference_soft");
