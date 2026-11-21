@@ -234,7 +234,16 @@ def main() -> None:
                 background_style=str(config.get("background_style","occasional")),
                 animation_style=str(config.get("animation_style","float")),
                 subtitle_sfx=str(config.get("subtitle_sfx","soft")),
-                insert_style=str(config.get("insert_style","off")),
+                # Существующий Cloudflare уже поддерживает эти старые параметры.
+                # Авто-режим включает ретро-карточки БЕЗ нового Deploy:
+                # Old Money/Vintage -> архивная бумага; остальные -> мягкий
+                # графичный вариант. Чекбокс эмодзи отключает вставки целиком.
+                insert_style=str(config.get(
+                    "insert_style",
+                    ("retro" if str(config.get("caption_variant","editorial"))
+                     in ("old_money","vintage","elegant") else "minimal")
+                    if str(config.get("emoji_mode","on"))=="on" else "off",
+                )),
                 insert_density=str(config.get("insert_density","balanced")),
                 insert_sound=str(config.get("insert_sound","on")),
             )
