@@ -81,6 +81,15 @@
     </div>
     <span class="tiny">Reels Studio</span>
   </div>
+  <section id="projectStatusCard" class="card" style="margin-bottom:16px" hidden aria-label="Статус последнего монтажа">
+    <h3 style="margin-top:0">📍 Статус последнего монтажа</h3>
+    <p class="mini" id="montageStage" role="status" aria-live="polite">Проверяю обработку…</p>
+    <progress id="montageStageProgress" max="100" value="0" style="width:100%;height:12px"></progress>
+    <p class="note" id="montageStageHint">Полоса показывает этап работы, а не точное оставшееся время.</p>
+    <p class="note" id="montageRetention"></p>
+    <button type="button" class="btn secondary" id="refreshMontageStatus" style="width:100%;margin:8px 0">🔄 Проверить этап монтажа</button>
+    <p class="note">Можно закрыть приложение: обработка продолжится в GitHub Actions. Уведомления о важных этапах придут в чат Telegram.</p>
+  </section>
   <div class="progress" id="progress"></div>
 
   <section class="card page active" data-page="0">
@@ -353,6 +362,8 @@
       <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
       <p class="mini" id="upload50Status" role="status" aria-live="polite">Поддержка до 500 МБ требует подключённого Cloudflare KV. Видео сохраняем в Full HD.</p>
       <button class="btn secondary" id="checkUploadedResult" type="button" style="width:100%;margin-top:8px" hidden>⬇️ Скачать готовое Full HD</button>
+      <button class="btn secondary" id="checkMontageStatus" type="button" style="width:100%;margin-top:8px">📍 Посмотреть этап обработки</button>
+      <p class="note">Видео в Cloudflare хранятся максимум 3 дня; исходники освобождаются сразу после обработки. Статус доступен после закрытия и повторного открытия приложения.</p>
       <details style="margin-top:12px">
         <summary style="cursor:pointer;font-weight:650">Первое подключение Cloudflare · инструкция</summary>
         <p class="note">Нужно один раз привязать KV-хранилище под именем <strong>UPLOADS</strong> и опубликовать новый код Worker.</p>
@@ -729,6 +740,102 @@
   });
 
 
+  // Closing the Mini App stops JS polling, NOT GitHub rendering.
+  // On reopening, use the saved upload ID and freshly signed Telegram initData.
+  var refreshingStatus=false;
+  var processingStages={
+    uploading:['Загрузка исходников',0],
+    queued:['Очередь монтажа',1],
+    downloading:['Скачивание на сервер',2],
+    joining:['Склейка видео',3],
+    transcribing:['Распознавание речи',4],
+    review:['Проверка текста',5],
+    planning:['Планирование смысловых вставок',6],
+    rendering:['Монтаж и эффекты',7],
+    publishing:['Экспорт и отправка MP4',8],
+    done:['Готово',9],
+    failed:['Ошибка',9]
+  };
+  function loadLastProject(){
+    try{return JSON.parse(localStorage.getItem('personalEditorLastUpload')||'null')}
+    catch(ignore){return null}
+  }
+  function showStatusCard(){
+    var previous=loadLastProject();
+    var valid=!!(previous && previous.id && previous.url &&
+      /^https:\/\/[a-z0-9.-]+\.workers\.dev$/i.test(previous.url));
+    byId('projectStatusCard').hidden=!valid;
+    return valid?previous:null;
+  }
+  async function refreshProjectStatus(){
+    var project=showStatusCard();
+    if(!project){
+      byId('upload50Status').textContent=byId('upload50Status').textContent;
+      return;
+    }
+    if(refreshingStatus)return;
+    refreshingStatus=true;
+    var stage=byId('montageStage');
+    try{
+      var proof=telegramProof();
+      var res=await fetch(project.url+'/upload/'+project.id+'/status',{
+        headers:{'X-Telegram-Init-Data':proof},cache:'no-store'
+      });
+      var data=await res.json();
+      if(!res.ok){
+        if(res.status===404){
+          stage.textContent='🗑 Этот проект удалён из временного хранилища. Можно загрузить новое видео.';
+          byId('montageRetention').textContent='Старое видео больше не занимает место.';
+          byId('montageStageProgress').value=0;
+          return;
+        }
+        throw new Error(data.error||'Не удалось узнать этап монтажа');
+      }
+      var step=processingStages[data.stage]||processingStages[data.state]||
+        processingStages.queued;
+      var label=data.stage_label||step[0];
+      var index=step[1];
+      stage.textContent=(data.stage==='failed'?'⚠️ ':
+                         data.stage==='done'||data.ready?'✅ ':'🎬 ')+label;
+      byId('montageStageProgress').value=
+        Number.isFinite(data.progress_percent)?data.progress_percent:index*11;
+      byId('montageStageHint').textContent=
+        (data.stage==='uploading'
+         ? 'Загружено '+(data.uploaded_parts||[]).length+
+           ' из '+data.input_parts+' частей.'
+         : (data.stage==='failed'?'Проект остановлен с ошибкой.':
+            data.stage==='done'||data.ready?'Монтаж завершён.':
+            'Этап '+index+' из 9. Это не оценка оставшегося времени.'))+
+        (data.stage==='review'?' Проверь чат Telegram и ответь /ok.':'');
+      var expires=Number(data.expires_at);
+      byId('montageRetention').textContent=expires>Date.now()
+        ? '🗑 Автоудаление из Cloudflare: '+
+          new Date(expires).toLocaleString('ru-RU',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})+
+          '. Готовый MP4 лучше сохранить на iPad заранее.'
+        : '🗑 Временные файлы могут быть уже удалены.';
+      if(data.ready)byId('checkUploadedResult').hidden=false;
+    }catch(err){
+      stage.textContent='⚠️ '+(err.message||err);
+    }finally{refreshingStatus=false}
+  }
+  byId('refreshMontageStatus').addEventListener('click',refreshProjectStatus);
+  byId('checkMontageStatus').addEventListener('click',function(){
+    if(!showStatusCard()){
+      byId('upload50Status').textContent='Сначала загрузи видео в монтаж.';
+      return;
+    }
+    byId('projectStatusCard').scrollIntoView({behavior:'smooth',block:'start'});
+    refreshProjectStatus();
+  });
+  if(showStatusCard())refreshProjectStatus();
+  document.addEventListener('visibilitychange',function(){
+    if(!document.hidden)refreshProjectStatus();
+  });
+  window.addEventListener('focus',refreshProjectStatus);
+  // The timer runs only while the app is OPEN. Telegram notifications work
+  // separately even when the user closes the app.
+  setInterval(function(){if(!document.hidden && showStatusCard())refreshProjectStatus()},20000);
+
   // Прямой многоклиповый проект до 500 MB через Cloudflare KV.
   // Обычный Bot API не скачивает больше 20 MB: здесь он не используется
   // для исходника. Размер частей 4 MB и поочерёдная отправка с iPad.
@@ -840,6 +947,7 @@
         try{localStorage.setItem('personalEditorLastUpload',
           JSON.stringify({id:id,url:url,fingerprint:fingerprint,
              settings:signature,created:Date.now()}))}catch(ignore){}
+        showStatusCard();
       }
       if(!Number.isInteger(partSize) || partSize!==4000000 ||
           parts!==uploadParts.length || !Number.isInteger(parts)){
@@ -888,6 +996,7 @@
         'Открой Telegram-бота, проверь общий текст и ответь /ok. '+
         'Если готовый MP4 больше лимита Telegram, скачай его здесь.';
       progress.value=100;
+      refreshProjectStatus();
     }catch(err){
       status.textContent='⚠️ '+(err.message||err);
     }finally{
