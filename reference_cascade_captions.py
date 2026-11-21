@@ -240,10 +240,12 @@ def build_reference_cascade_ass(
                 # The visual shadow is anchored to each actual word, not to
                 # the center of the complete phrase or independent layout.
                 plate_color=(highlight if is_big else "&H00251D24&")
-                x0=round(x-width/2+drift)
                 x1=round(x-width/2)
-                y0=round(y-height/2+rise)
                 y1=round(y-height/2)
+                # Apply identical integer-pixel movement to the glyph and
+                # oval. Rounding each keyframe separately causes 1px jitter.
+                x0=x1+drift
+                y0=y1+rise
                 halo_move=(
                     rf"\move({x0},{y0},{x1},{y1},0,"
                     f"{min(260,duration_ms)})"
