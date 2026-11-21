@@ -299,12 +299,19 @@ def main() -> None:
     owner = int(os.environ["OWNER_TELEGRAM_ID"])
     upload_id = os.environ["UPLOAD_ID"]
     worker_url = os.environ["UPLOAD_WORKER_URL"].rstrip("/")
+    from montage_progress import publish_progress
+
+    def stage(name: str, message: str = "") -> None:
+        # A failed status update must NEVER abort or delay the final Reels.
+        publish_progress(worker_url,upload_id,token,name,message)
+
     with tempfile.TemporaryDirectory(prefix="private-video-") as tmp:
         root = Path(tmp)
         source = root/"original.mp4"
         reference = root/"reference.mp4"
         out = root/"finished-reels.mp4"
         try:
+            stage("downloading","📥 Скачиваю все исходные видео в монтаж.")
             send_text(token,owner,"📥 Получаю исходные видео (до 500 МБ суммарно) через защищённый Cloudflare.")
             metadata,clips=read_chunked_project(
                 worker_url,upload_id,token,root/"source_clips"
@@ -322,6 +329,7 @@ def main() -> None:
                     "🎨 Приватные наборы проверены: "+str(private_assets.selected_files)+
                     " подходящих MOV/WAV, шаблоны Adobe не используются напрямую.")
             from clip_montage import join_clips
+            stage("joining","🎞️ Склеиваю выбранные фрагменты в порядке загрузки.")
             seconds,audio=join_clips(
                 clips,source,quality=str(config.get("export_quality","high"))
             )
@@ -336,9 +344,12 @@ def main() -> None:
             if mode=="cuts":
                 words=None
             else:
+                stage("transcribing","🎧 Распознаю оригинальную речь и таймкоды.")
                 send_text(token,owner,"🎧 Видео получено. Распознаю речь и готовлю черновик.")
                 words=transcribe_words(source,model_size="small",language="ru")
+                stage("review","📝 Текст готов. Жду твоего /ok или исправлений в Telegram.")
                 words,delay=wait_for_transcript_review(token,owner,words,seconds,delay)
+                stage("planning","🧠 Подбираю смысловые вставки по тексту.")
                 # Explain WHY an illustration appears, never hide arbitrary
                 # decorative insert choices from the author of the Reels.
                 if config.get("insert_style","reference_soft")=="reference_soft":
@@ -372,6 +383,7 @@ def main() -> None:
                             "🧠 По этой речи крупных смысловых вставок не нужно: "
                             "сохраню чистый монтаж и аккуратные субтитры.")
                 send_text(token,owner,"✅ Текст принят. Монтирую с сохранением Full HD.")
+            stage("rendering","🎬 Накладываю субтитры, анимации и эффекты.")
             selected_style=str(config.get("subtitle_style","reference_dynamic"))
             animation="phrase_float" if selected_style.endswith("_phrases") else "word_pop"
             style=selected_style.removesuffix("_phrases")
@@ -453,6 +465,7 @@ def main() -> None:
             })
             if not out.is_file() or out.stat().st_size < 1000:
                 raise RuntimeError("FFmpeg не создал готовый MP4.")
+            stage("publishing","📦 Экспорт MP4 завершён. Отправляю готовое видео.")
             if out.stat().st_size<=48_000_000:
                 send_result(
                     token,owner,out,
@@ -475,8 +488,10 @@ def main() -> None:
                     "перейди к последнему экрану и нажми "
                     "«Проверить готовность / скачать Full HD»."
                 )
+            stage("done","✅ Видео смонтировано и доступно в Telegram или Mini App.")
 
         except Exception as exc:
+            stage("failed","⚠️ Ошибка монтажа: "+str(exc)[:140])
             LOG.exception("Private upload montage failed")
             send_text(
                 token,owner,
