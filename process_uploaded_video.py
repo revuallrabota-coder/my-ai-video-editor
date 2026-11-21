@@ -235,7 +235,7 @@ def main() -> None:
                 animation_style=str(config.get("animation_style","float")),
                 subtitle_sfx=str(config.get("subtitle_sfx","soft")),
                 # Small emoji never enable oversized themed cards.
-                insert_style=str(config.get("insert_style","off")),
+                insert_style=str(config.get("insert_style","reference_soft")),
                 insert_density=str(config.get(
                     "insert_density",
                     "subtle" if style=="reference_dynamic" else "balanced",
