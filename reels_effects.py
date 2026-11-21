@@ -276,8 +276,9 @@ def apply_effects(
     validate_effects(sound, emoji, "off")
     if caption_sound not in _ALLOWED_CAPTION_SFX:
         raise ValueError("Звуки субтитров: off, soft или tick.")
-    if insert_style not in ("off", "retro", "minimal"):
-        raise ValueError("Вставки: off, retro или minimal.")
+    from retro_inserts import CARD_STYLES
+    if insert_style != "off" and insert_style not in CARD_STYLES:
+        raise ValueError("Неизвестный стиль вставок: " + insert_style)
     if insert_density not in ("subtle", "balanced", "dynamic"):
         raise ValueError("Плотность вставок: subtle, balanced или dynamic.")
     if insert_sound not in ("on", "off"):
