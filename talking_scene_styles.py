@@ -204,4 +204,44 @@ def append_scene_ornaments(ass_file: Path,
                 f"Dialogue: 1,{ass_time(start)},{ass_time(end)},"
                 f"TalkDraw,,0,0,0,,{{{stroke}}}{path}{{\\p0}}\n"
             )
+    if name=="cream":
+        # An original stylized mini-interface, not a screenshot of a third-party
+        # app. It appears only if the actual speech mentions an app, bot,
+        # video, upload or subtitles. No misleading random insert cards.
+        shown=0
+        for group in groups:
+            if shown>=2:break
+            matched=next((
+                safe_text(raw).upper() for _,_,raw in group
+                if any(stem in safe_text(raw).lower() for stem in
+                       ("бот","монтаж","видео","прилож","загруз","субтитр"))
+            ),None)
+            if not matched or len(matched)>13:
+                continue
+            start=max(0.,float(group[0][0]))
+            end=min(start+2.3,max(start+1.1,float(group[-1][1])+.55))
+            origin_x,origin_y=504,465
+            bg=(r"\an7\p1\bord1\blur1"
+                +r"\1c&H00F9F7F2&\3c&H00B9B5A5&"
+                +r"\fad(320,280)"
+                +rf"\move({origin_x+15},{origin_y+12},{origin_x},{origin_y},0,360)")
+            events.append(
+                f"Dialogue: 3,{ass_time(start)},{ass_time(end)},"
+                f"TalkDraw,,0,0,0,,{{{bg}}}{oval_path(172,215)}{{\\p0}}\n"
+            )
+            text_tag=(r"\an5\c&H00282317&\b1\fs19"
+                      +rf"\pos({origin_x+86},{origin_y+61})\fad(380,280)")
+            events.append(
+                f"Dialogue: 4,{ass_time(start)},{ass_time(end)},"
+                f"TalkBadge,,0,0,0,,{{{text_tag}}}{matched}\n"
+            )
+            # Simple animated pink action bar in the mockup.
+            btn=(r"\an7\p1\bord0"
+                 +r"\1c&H00712BCD&\fad(430,330)"
+                 +rf"\pos({origin_x+20},{origin_y+140})")
+            events.append(
+                f"Dialogue: 4,{ass_time(start)},{ass_time(end)},"
+                f"TalkDraw,,0,0,0,,{{{btn}}}{oval_path(132,29)}{{\\p0}}\n"
+            )
+            shown+=1
     ass_file.write_text(script+"".join(events),encoding="utf-8")
