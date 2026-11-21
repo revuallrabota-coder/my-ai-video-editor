@@ -47,7 +47,7 @@ class MiniAppApiTests(unittest.TestCase):
         self.assertEqual(defaults["font_profile"], "old_money")
         self.assertEqual(defaults["subtitle_style"], "reference_dynamic")
         self.assertEqual(defaults["caption_variant"], "reference_soft")
-        self.assertEqual(defaults["insert_style"], "off")
+        self.assertEqual(defaults["insert_style"], "reference_soft")
         settings = validate_settings({
             "mode":"reference", "camera_style":"cinematic_pan",
             "subtitle_style":"reference_dynamic", "font_profile":"bubble",
