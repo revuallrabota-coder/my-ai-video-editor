@@ -250,8 +250,10 @@
     <label class="field" for="shadow">Мягкая тень: <span id="shadowValue">1</span></label>
     <input id="shadow" type="range" min="0" max="10" value="1">
     <label class="option"><input id="emoji" type="checkbox" checked> ✨ Маленькие эмодзи возле смысловых фраз</label>
-    <label class="option"><input id="motionInserts" type="checkbox" checked> ⭐ Крупные вставки с графикой и звёздами на полэкрана</label>
-    <p class="note">В режиме «Нежные фразы» в начале автоматически появляется большое анимированное название по твоей речи или по тексту хука. Звёзды мягко движутся, а крупные монтажные вставки возникают на подходящих по смыслу моментах, не постоянно. Галочкой можно отключить большие промежуточные вставки.</p>
+    <label class="option"><input id="motionInserts" type="checkbox" checked> ⭐ Белые анимированные сцены: розовый телевизор, фотоколлажи, звёзды</label>
+    <label class="field" for="motionFrequency">Как часто добавлять большие вставки</label>
+    <select id="motionFrequency"><option value="subtle">Редко, только на главных моментах</option><option value="balanced" selected>Умеренно, как динамичный Reels</option><option value="dynamic">Часто, для активного монтажа</option></select>
+    <p class="note">По твоему видео: крупный заголовок в начале, белая графическая сцена с розовым ретротелевизором, затем фотоколлаж из кадров ТВОЕГО исходника, силуэты и звёзды. Слои плавно выезжают по очереди. Настрой частоту или отключи большие сцены.</p>
     <p class="note">Эмодзи появляются плавно только возле смысловых фраз. Большие иллюстрированные карточки больше не добавляются автоматически.</p>
     <label class="field" for="soundfx">🔊 Звуковые акценты на ключевых словах</label>
     <select id="soundfx">
@@ -393,6 +395,7 @@
       shadow:Number(byId('shadow').value),
       emoji:byId('emoji').checked,
       motionInserts:byId('motionInserts').checked,
+      motionDensity:byId('motionFrequency').value,
       soundEffects:byId('soundfx').value,
       hook:byId('hook').checked,
       hookPosition:byId('hookPosition').value,
@@ -815,7 +818,7 @@
       sound_effects:s.soundEffects,
       emoji_mode:s.emoji?'on':'off',
       insert_style:s.motionInserts?'reference_soft':'off',
-      insert_density:'subtle',
+      insert_density:s.motionDensity,
       insert_sound:'off',
       hook:s.hook?s.hookText:'',
       hook_position:s.hook?s.hookPosition:'off'
