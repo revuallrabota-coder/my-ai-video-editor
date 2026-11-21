@@ -6,6 +6,7 @@ on:
     paths:
       - "reference_editor.py"
       - "index.html"
+      - "test_unified_ui.mjs"
       - "video_filters.py"
       - "test_reels_looks.py"
       - "test_caption_safe_area.py"
@@ -87,6 +88,9 @@ jobs:
 
       - name: "Протестировать многоклиповый проект 500 МБ и 126 частей без роста памяти"
         run: node test_upload_500mb.mjs
+
+      - name: "Проверить упрощённый редактор, фото и все шрифтовые настройки"
+        run: node test_unified_ui.mjs
 
       - name: "Проверить JS экрана iPad с несколькими видео"
         run: node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const i=h.indexOf('<script>');const j=h.indexOf('</script>',i);if(i<0||j<=i)throw Error('Missing app script');new Function(h.slice(i+8,j));"
