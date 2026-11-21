@@ -30,51 +30,19 @@ class MotionCue:
 
 def select_motion_cues(words: Sequence[Word], duration: float,
                        density: str = "subtle") -> list[MotionCue]:
-    """Pick a few speech-led illustrated scenes, avoiding the opening title."""
-    if density not in {"subtle", "balanced", "dynamic"}:
-        raise ValueError("Unknown motion scene density")
-    if duration < 7:
-        return []
-    steps={"subtle":10.5,"balanced":8.8,"dynamic":7.0}
-    gap=steps[density]
-    anchor=4.6
-    result=[]
-    sorted_words=sorted(words,key=lambda w:float(w[0]))
-    while anchor < duration - 1.7 and len(result)<5:
-        candidates=[(float(a),str(w).strip()) for a,b,w in sorted_words
-                    if anchor-0.8<=a<=anchor+2.6 and b>a
-                    and len(re.sub(r"[^\wа-яё]","",w,re.I))>=4]
-        if candidates:
-            from retro_inserts import TOPICS
-            stems=tuple(stem for roots,_,_,_ in TOPICS for stem in roots)
-            relevant=(c for c in candidates if any(
-                stem in re.sub(r"[^\wа-яё]","",c[1].lower())
-                for stem in stems))
-            timestamp,word=next(relevant,candidates[0])
-            label=re.sub(r"[^\wа-яёА-ЯЁ\-]","",word)[:21].upper()
-            start=max(anchor,timestamp)
-        else:
-            future=[(float(a),str(w).strip()) for a,b,w in sorted_words
-                    if a>=anchor and b>a and len(w.strip())>=3]
-            if not future:
-                anchor+=gap
-                continue
-            start,word=future[0]
-            label=re.sub(r"[^\wа-яёА-ЯЁ\-]","",word)[:21].upper()
-        if not label:
-            anchor+=gap
-            continue
-        start=min(start,duration-1.65)
-        finish=min(duration-.02,start+2.65)
-        context=[re.sub(r"[^а-яёА-ЯЁa-zA-Z0-9\-]","",str(w))
-                 for a,b,w in sorted_words if start-1.25<=a<=start+1.3
-                 and b>a]
-        excerpt=" ".join(w for w in context if w).strip()[:44]
-        result.append(MotionCue(start,finish,label,
-                                "television" if len(result)%2==0 else "collage",
-                                excerpt))
-        anchor=max(start,anchor)+gap
-    return result
+    """Choose editorial transitions by meaning, never periodic intervals.
+
+    In particular, merely saying "маникюр" or "видео" does not authorize a
+    full-screen TV or collage. Each stage requires a comparison/shooting topic.
+    """
+    from semantic_editing import plan_for_editorial_scenes
+    cues=[]
+    for event in plan_for_editorial_scenes(words,duration,density):
+        scene="television" if event.kind=="camera" else "collage"
+        context=" ".join(str(w).strip() for a,b,w in words
+                         if event.start-1.25<=a<=event.start+1.3 and b>a)[:44]
+        cues.append(MotionCue(event.start,event.end,event.label,scene,context))
+    return cues
 
 
 def _font(size: int, bold: bool=False):
