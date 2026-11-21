@@ -340,7 +340,7 @@ def main() -> None:
                 raise ValueError("Видео должно быть не длиннее 2 минут.")
             if not audio and mode!="cuts":
                 raise ValueError("В видео отсутствует речь / звуковая дорожка.")
-            delay=float(config.get("subtitle_delay",0.30))
+            delay=float(config.get("subtitle_delay",0.0))
             if mode=="cuts":
                 words=None
             else:
@@ -401,6 +401,7 @@ def main() -> None:
                 background_style=str(config.get("background_style","occasional")),
                 animation_style=str(config.get("animation_style","float")),
                 subtitle_sfx=str(config.get("subtitle_sfx","soft")),
+                pause_removal=str(config.get("pause_removal","tight")),
                 top_title=str(config.get("top_title","")),
                 top_title_mode=str(config.get("top_title_mode","auto")),
                 # Small emoji never enable oversized themed cards.
@@ -422,7 +423,7 @@ def main() -> None:
                     audio_profile=audio_profile,subtitle_style=subtitle_style,
                     hook=str(config.get("hook","")),
                     camera_style=str(config.get("camera_style","cinematic_pan")),
-                    speed=float(config.get("video_speed","1.0")),
+                    speed=float(config.get("video_speed","1.2")),
                     filter_style=str(config.get("video_filter","none")),
                     caption_position=str(config.get("caption_position","middle")),
                     font_profile=str(config.get("font_profile","old_money")),
@@ -438,7 +439,7 @@ def main() -> None:
                 stats=edit_video(
                     source,out,mode,color,audio_profile,subtitle_style,
                     str(config.get("hook","")),
-                    float(config.get("video_speed","1.0")),
+                    float(config.get("video_speed","1.2")),
                     str(config.get("video_filter","none")),
                     str(config.get("caption_position","middle")),
                     str(config.get("font_profile","elegant")),
