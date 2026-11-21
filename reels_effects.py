@@ -58,16 +58,16 @@ def validate_effects(sound: str, emoji: str, hook_position: str) -> None:
 
 
 def pick_cues(
-    words: Sequence[Word], duration: float, *, limit: int = 18,
+    words: Sequence[Word], duration: float, *, limit: int = 10,
 ) -> list[tuple[float, str | None]]:
-    """Эмодзи на смысловых словах, с интервалом не менее 1.35 с."""
+    """Only sparse, meaningful emoji; no generic decorative stickers."""
     if duration <= 0:
         return []
     result: list[tuple[float, str | None]] = []
     last = -10.0
     for start, end, token in sorted(words, key=lambda x: x[0]):
         t = max(0.0, float(start))
-        if t < 0.25 or t > duration - 0.40 or t - last < 1.35:
+        if t < 0.25 or t > duration - 0.40 or t - last < 2.2:
             continue
         cleaned = re.sub(r"[^\wа-яё]", "", token.lower())
         emoji = next((symbol for stem, symbol in EMOJI_WORDS if stem in cleaned), None)
@@ -78,23 +78,6 @@ def pick_cues(
         if len(result) >= limit:
             return result
 
-    # Если нет слов из словаря, добавляем нейтральные ✨ только
-    # на смысловые слова. Никаких случайных и неуместных символов.
-    if words and len(result) < limit:
-        from signature_captions import split_groups, pick_main_word
-        extras: list[tuple[float, str]] = []
-        for group in split_groups(words):
-            chosen = group[pick_main_word(group)]
-            t = float(chosen[0])
-            clean = re.sub(r"[^а-яёa-z0-9]", "", chosen[2].lower())
-            if 0.25 <= t <= duration - 0.40 and len(clean) >= 5:
-                extras.append((t, "✨"))
-        for t, symbol in extras:
-            if any(abs(t - existing) < 1.20 for existing, _ in result):
-                continue
-            result.append((t, symbol))
-            if len(result) >= limit:
-                break
     return sorted(result)
 
 
@@ -299,20 +282,19 @@ def apply_effects(
     caption_cues = (pick_caption_cues(words,duration,style=caption_sound)
                     if caption_sound != "off" else [])
     # Обычные смайлы не перекрывают большую иллюстрированную карточку.
-    from reference_dynamic_captions import phrase_geometry
-    geometry=phrase_geometry(words, caption_position,
-                             small_font_profile, font_profile)
-    # Emoji is one small accent on one whole phrase. Coordinates derive
-    # from that exact phrase's measured text width, NOT the video edge.
+    from reference_dynamic_captions import phrase_emoji_anchors
+    geometry=phrase_emoji_anchors(words, caption_position,
+                                  small_font_profile, font_profile)
+    # Attach emoji to the emphasized phrase line, rather than the screen edge.
     visual=[]
     used_phrases=set()
     if emoji=="on":
         for t,symbol in cues:
             if not symbol or any(abs(t-r.time)<1.15 for r in retro):
                 continue
-            for k,(start,end,width,cx,cy) in enumerate(geometry):
+            for k,(start,end,anchor_x,anchor_y) in enumerate(geometry):
                 if start-0.05<=t<=end+0.02 and k not in used_phrases:
-                    visual.append((start,end,symbol,width,cx,cy))
+                    visual.append((start,end,symbol,anchor_x,anchor_y))
                     used_phrases.add(k)
                     break
     if (sound == "off" and not visual and not caption_cues and not retro):
@@ -330,7 +312,7 @@ def apply_effects(
         if visual:
             # One refined sticker beside the actual PHRASE. It fades and
             # floats together with that phrase, with a 12px breathing gap.
-            for i,(start,clip_end,symbol,text_width,cx,cy) in enumerate(visual[:16]):
+            for i,(start,clip_end,symbol,anchor_x,anchor_y) in enumerate(visual[:10]):
                 path = folder/f"emoji_{i}.png"
                 try:
                     emoji_image(symbol, path)
@@ -339,11 +321,11 @@ def apply_effects(
                     continue
                 args.extend(["-loop","1","-framerate","30","-i",str(path)])
                 clip_end=min(duration,clip_end)
-                sticker_size=max(36,round(52*sx))
-                sticker_x=min(frame_width-sticker_size-round(55*sx),
-                              max(round(72*sx),round((cx+text_width/2+13)*sx)))
-                sticker_y=round((cy-23)*sy)
-                bob=max(4,round(7*sy))
+                sticker_size=max(30,round(43*sx))
+                sticker_x=min(frame_width-sticker_size-round(70*sx),
+                              max(round(72*sx),round(anchor_x*sx)))
+                sticker_y=round(anchor_y*sy-sticker_size/2)
+                bob=max(3,round(5*sy))
                 alpha = (f"[{current_input}:v]"
                          f"scale={sticker_size}:{sticker_size},format=rgba,"
                          f"fade=t=in:st={start:.3f}:d=0.30:alpha=1,"
