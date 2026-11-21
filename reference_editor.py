@@ -340,12 +340,15 @@ def montage_by_reference(
     top_title_mode: str = "auto",
     pause_removal: str = "tight",
     subject_layout: str = "standard",
+    talk_scene: str = "off",
 ) -> dict:
     """Монтаж с точной синхронизацией речи, динамичным кадром и титрами."""
     from reels_effects import apply_effects, validate_effects
     validate_effects(sound_effects, emoji_mode, hook_position)
     from portrait_caption_layer import check_layout, choose_text_side, protect_subject
     subject_layout = check_layout(subject_layout)
+    from talking_scene_styles import validate_talk_scene, render_scene, append_scene_ornaments
+    talk_scene = validate_talk_scene(talk_scene)
     # Без второго файла используем постоянный темп из разобранного
     # 50-секундного пользовательского референса: близкие планы, мягкое
     # движение камеры, без резких ступенек.
@@ -385,12 +388,13 @@ def montage_by_reference(
         # голос. Скорость исходного видео и речи остаётся равной 1.0.
         joined_duration, _ = duration_and_audio(joined)
         words = shift_word_timestamps(words, subtitle_delay, joined_duration)
-        subject_side = choose_text_side(joined) if subject_layout == "beside" else "center"
+        subject_side = choose_text_side(joined) if talk_scene == "off" and subject_layout == "beside" else "center"
         # Render title timings from the joined timeline, then burn those
         # titles while making the actual camera move (one less lossy pass).
         count = write_ass(
             joined, subtitles, color, style=subtitle_style, hook=hook,
-            caption_position=caption_position, font_profile=font_profile,
+            caption_position="studio" if talk_scene!="off" else caption_position,
+            font_profile=font_profile,
             words_override=words,
             caption_animation=caption_animation,
             hook_position=hook_position,
@@ -401,24 +405,41 @@ def montage_by_reference(
             top_title=top_title, top_title_mode=top_title_mode,
             subject_side=subject_side,
         )
-        add_virtual_camera(
-            joined, dynamic, profile.seconds_per_change,
-            camera_style=camera_style, words=words,
-            quality=quality, subtitles_ass=subtitles if count else None,
-            intermediate=(emoji_mode == "on" or subject_layout != "standard"),
-        )
-        if count and subject_layout != "standard":
-            # Camera moves must be identical in the uncaptioned foreground
-            # and captioned image, or the person would leave ghost outlines.
-            clean_camera = folder / "camera_without_captions.mp4"
-            protected = folder / "captions_behind_subject.mp4"
+        if talk_scene != "off":
+            # The title treatment belongs to a separate designed canvas.
+            # Existing camera effects remain inside its arched video window.
+            clean_camera = folder / "talk_camera.mp4"
+            studio_clean = folder / "talk_canvas.mp4"
             add_virtual_camera(
                 joined, clean_camera, profile.seconds_per_change,
                 camera_style=camera_style, words=words, quality=quality,
                 subtitles_ass=None, intermediate=True,
             )
-            protect_subject(clean_camera, dynamic, protected, quality=quality)
-            dynamic = protected
+            render_scene(clean_camera, studio_clean, talk_scene, quality=quality)
+            if count:
+                append_scene_ornaments(subtitles,words,talk_scene)
+                burn_subtitles(studio_clean, subtitles, dynamic, quality=quality)
+            else:
+                studio_clean.replace(dynamic)
+        else:
+            add_virtual_camera(
+                joined, dynamic, profile.seconds_per_change,
+                camera_style=camera_style, words=words,
+                quality=quality, subtitles_ass=subtitles if count else None,
+                intermediate=(emoji_mode == "on" or subject_layout != "standard"),
+            )
+            if count and subject_layout != "standard":
+                # Camera moves must be identical in the uncaptioned foreground
+                # and captioned image, or the person would leave ghost outlines.
+                clean_camera = folder / "camera_without_captions.mp4"
+                protected = folder / "captions_behind_subject.mp4"
+                add_virtual_camera(
+                    joined, clean_camera, profile.seconds_per_change,
+                    camera_style=camera_style, words=words, quality=quality,
+                    subtitles_ass=None, intermediate=True,
+                )
+                protect_subject(clean_camera, dynamic, protected, quality=quality)
+                dynamic = protected
         effect_stats = apply_effects(
             dynamic, output, words,
             sound=sound_effects, emoji=emoji_mode,
