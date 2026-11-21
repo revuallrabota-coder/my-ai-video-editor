@@ -466,28 +466,53 @@ def main() -> None:
             if not out.is_file() or out.stat().st_size < 1000:
                 raise RuntimeError("FFmpeg не создал готовый MP4.")
             stage("publishing","📦 Экспорт MP4 завершён. Отправляю готовое видео.")
-            if out.stat().st_size<=48_000_000:
-                send_result(
-                    token,owner,out,
-                    "🎬 Reels готов! Субтитры привязаны к речи, Full HD "
-                    "и монтаж сохранены в MP4." + effect_report
-                )
+            from telegram_delivery import telegram_copy,send_video_to_telegram
+            # Direct delivery is the PRIMARY outcome, not a secondary
+            # download button hidden behind the Mini App setup wizard.
+            large=out.stat().st_size>48_000_000
+            if large:
+                send_text(token,owner,
+                    "📦 Ролик готов. Делаю отдельную версию до 48 МБ "
+                    "для отправки прямо в Telegram. Исходный мастер не заменяю.")
+            telegram_file=telegram_copy(out,root/"telegram-reels.mp4")
+            caption=(
+                "🎬 Готовый смонтированный Reels! "
+                "Видео воспроизводится прямо в Telegram.\n"
+                "🎞 Убраны паузы; скорость и субтитры синхронизированы."
+                +effect_report
+            )
+            sent=False
+            send_error=None
+            try:
+                send_video_to_telegram(token,owner,telegram_file,caption)
+                sent=True
+            except Exception as exc:
+                send_error=str(exc)
+                LOG.exception("Telegram upload failed; keeping a download backup.")
+            master_saved=False
+            if large and out.stat().st_size<=250_000_000:
+                # Optional *high-quality master* for an iPad backup. The owner
+                # does not need to open the app to receive the playable copy.
+                try:
+                    publish_large_mp4(worker_url,upload_id,token,out)
+                    master_saved=True
+                except Exception:
+                    LOG.exception("Optional Full HD master backup failed.")
+            if sent:
+                send_text(token,owner,
+                    "✅ Готовый Reels отправлен выше прямо в Telegram."+
+                    (" 💾 Мастер-версия без уменьшения размера также доступна "
+                     "в Mini App до автоудаления через 3 дня."
+                     if master_saved else ""))
+            elif master_saved:
+                send_text(token,owner,
+                    "⚠️ Telegram отклонил автоматическую отправку MP4. "
+                    "Сохранила мастер-версию в Mini App; "
+                    "видео не потеряно. Ошибка: "+str(send_error)[:150])
+                raise RuntimeError("Telegram не принял файл, доступна резервная копия.")
             else:
-                send_text(
-                    token,owner,
-                    "🎞 Ролик смонтирован в высоком качестве ("+
-                    str(round(out.stat().st_size/1_000_000,1))+
-                    " МБ). Он больше лимита отправки Telegram, "
-                    "поэтому сохраняю оригинальный MP4 для скачивания "
-                    "через мини-приложение." + effect_report
-                )
-                publish_large_mp4(worker_url,upload_id,token,out)
-                send_text(
-                    token,owner,
-                    "✅ MP4 готов! Открой своё Telegram Mini App, "
-                    "перейди к последнему экрану и нажми "
-                    "«Проверить готовность / скачать Full HD»."
-                )
+                raise RuntimeError("Telegram не принял итоговый файл: "+
+                                   str(send_error)[:150])
             stage("done","✅ Видео смонтировано и доступно в Telegram или Mini App.")
 
         except Exception as exc:
