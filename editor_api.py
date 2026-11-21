@@ -167,6 +167,7 @@ def validate_settings(config: dict) -> dict:
         "subtle","balanced","dynamic"
     },"balanced")
     insert_sound=option("insert_sound",{"on","off"},"off")
+    pause_removal=option("pause_removal",{"off","gentle","balanced","tight"},"tight")
     color = str(config.get("color", "auto"))
     if color != "auto" and not re.fullmatch(r"#[a-fA-F0-9]{6}", color):
         raise HTTPException(400, "Цвет должен быть auto или #RRGGBB")
@@ -199,6 +200,7 @@ def validate_settings(config: dict) -> dict:
         "insert_style":insert_style,
         "insert_density":insert_density,
         "insert_sound":insert_sound,
+        "pause_removal":pause_removal,
         "color": color, "speed": speed,
         "filter_style": option("filter_style", {
             "none","warm","soft","cool","contrast","clean","film","matte","old_money","vintage","street","elegant",
@@ -295,6 +297,7 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 insert_style=s["insert_style"],
                 insert_density=s["insert_density"],
                 insert_sound=s["insert_sound"],
+                pause_removal=s["pause_removal"],
             )
         else:
             from telegram_editor import edit_video
@@ -309,6 +312,7 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 s["background_style"], s["animation_style"], s["subtitle_sfx"],
                 s["insert_style"],s["insert_density"],s["insert_sound"],
                 top_title=s["top_title"],top_title_mode=s["top_title_mode"],
+                pause_removal=s["pause_removal"],
             )
         if not output.is_file() or output.stat().st_size < 100:
             raise RuntimeError("Обработчик не создал готовый MP4.")
