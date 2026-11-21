@@ -28,6 +28,7 @@ class VideoProjectTests(unittest.TestCase):
             subprocess.run([
                 "ffmpeg","-hide_banner","-loglevel","error","-y",
                 "-f","lavfi","-i","color=c=blue:s=320x240:r=24:d=1.0",
+                "-vf","noise=alls=15:allf=t",
                 "-c:v","libx264","-preset","ultrafast","-an",str(second)
             ],check=True,capture_output=True,timeout=50)
             duration,actual_audio=join_clips([first,second],output,"balanced")
