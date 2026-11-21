@@ -33,7 +33,8 @@ class ReferenceMotionTests(unittest.TestCase):
         self.assertIn("Style: Plate",text)
         self.assertIn(r"\move(",text)
         self.assertIn(r"\fad(",text)
-        self.assertIn(r"\fs107",text)
+        # Максимальный кегль ограничен безопасной зоной 9:16, 107 больше не допустим.
+        self.assertNotIn(r"\fs107",text)
         self.assertRegex(text,r"\\fs(?:3[0-9]|4[0-9])")
         self.assertIn("Dialogue: 0,",text)
         self.assertIn("Dialogue: 2,",text)
