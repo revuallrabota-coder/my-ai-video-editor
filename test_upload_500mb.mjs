@@ -81,7 +81,8 @@ const created=await request("/upload/start","POST",{
   files,size:500_000_000,settings:{
     mode:"my_style",subtitle_style:"reference_dynamic",
     caption_variant:"reference_soft",insert_style:"reference_soft",
-    insert_density:"balanced",insert_sound:"off"
+    insert_density:"balanced",insert_sound:"off",
+    top_title:"Разбор маникюра",top_title_mode:"always"
   }
 });
 assert.equal(created.status,201,JSON.stringify(created.data));
@@ -94,6 +95,16 @@ assert.deepEqual(manifest.files.map(f=>[f.size,f.offset,f.parts]),[
   [200_000_000,0,50],[199_000_000,50,50],[101_000_000,100,26]
 ]);
 assert.equal(manifest.settings.insert_style,"reference_soft");
+assert.equal(manifest.settings.top_title,"Разбор маникюра");
+assert.equal(manifest.settings.top_title_mode,"always");
+assert.equal((await request("/upload/start","POST",{
+  filename:"title.mp4",size:8000,
+  settings:{top_title:"x".repeat(71),top_title_mode:"always"}
+})).status,400);
+assert.equal((await request("/upload/start","POST",{
+  filename:"title.mp4",size:8000,
+  settings:{top_title:"Test",top_title_mode:"invisible"}
+})).status,400);
 const prefix="user-video:"+id+":";
 assert.equal((await request("/upload/"+id+"/0","PUT",new ArrayBuffer(4_000_000))).status,200);
 // First and last chunks of middle/end files test boundary arithmetic:
