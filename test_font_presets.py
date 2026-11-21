@@ -15,8 +15,9 @@ class ReferenceFontsTests(unittest.TestCase):
              (0.88,1.23,"сегодня")]
 
     def test_all_reference_fonts_are_selectable(self):
-        self.assertEqual(len(PRESETS),12)
-        for choice in ("bebas","platform","bubble","script","modern","old_money","vintage","street","refined"):
+        self.assertEqual(len(PRESETS),19)
+        for choice in ("bebas","platform","bubble","script","modern","old_money","vintage","street","refined",
+                       "roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed"):
             with self.subTest(choice=choice):
                 spec=choose_font(choice)
                 self.assertGreater(spec.size,50)
@@ -29,7 +30,8 @@ class ReferenceFontsTests(unittest.TestCase):
             choose_font("unknown")
 
     def test_phrases_support_new_typefaces(self):
-        for choice in ("bebas","platform","bubble","script","modern","old_money","vintage","street","refined"):
+        for choice in ("bebas","platform","bubble","script","modern","old_money","vintage","street","refined",
+                       "roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed"):
             text,count=build_signature_ass(
                 self.WORDS,font_profile=choice
             )
@@ -37,7 +39,8 @@ class ReferenceFontsTests(unittest.TestCase):
             self.assertIn("Style: Accent,"+choose_font(choice).name+",",text)
 
     def test_installed_ubuntu_fonts_are_resolved(self):
-        for choice in ("bebas","platform","bubble","script","modern","old_money","vintage","street","refined"):
+        for choice in ("bebas","platform","bubble","script","modern","old_money","vintage","street","refined",
+                       "roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed"):
             spec=choose_font(choice)
             result=subprocess.run(
                 ["fc-match","-f","%{family}",spec.name],
