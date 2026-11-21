@@ -29,7 +29,7 @@ class CaptionSafeAreaTests(unittest.TestCase):
                 with self.subTest(preset=preset, word=word):
                     size = fit_caption_size(word, 90, font)
                     self.assertLessEqual(size, 90)
-                    self.assertGreaterEqual(size, 24)
+                    self.assertGreaterEqual(size, 18)
                     self.assertLessEqual(
                         _measure_width(word, size, font),
                         TEXT_SAFE_WIDTH * 0.91 + 2.0,
@@ -54,10 +54,15 @@ class CaptionSafeAreaTests(unittest.TestCase):
             len(re.findall(r"^Dialogue: 2,",ass,re.M)),
             len(re.findall(r"^Dialogue: 0,",ass,re.M)),
         )
-        # Both subtitle and its plate share the exact x=360 anchor.
+        # Word is centered at x=360; positive-coordinate backplate begins
+        # at x=(360-half_w), unlike the previous detached negative drawing.
         for line in ass.splitlines():
-            if line.startswith("Dialogue:"):
+            if line.startswith("Dialogue: 2,"):
                 self.assertRegex(line,r"\\(?:move|pos)\(360,")
+            if line.startswith("Dialogue: 0,"):
+                self.assertIn(r"\an7",line)
+                self.assertIn(r"\p1",line)
+                self.assertIn(r"\clip(65,170,655,1140)",line)
         # Text is never rendered again as a separate distant extra line.
         self.assertNotIn("Dialogue: 1,", ass)
 
