@@ -234,6 +234,9 @@ def main() -> None:
                 background_style=str(config.get("background_style","occasional")),
                 animation_style=str(config.get("animation_style","float")),
                 subtitle_sfx=str(config.get("subtitle_sfx","soft")),
+                insert_style=str(config.get("insert_style","off")),
+                insert_density=str(config.get("insert_density","balanced")),
+                insert_sound=str(config.get("insert_sound","on")),
             )
             if mode in ("my_style", "reference"):
                 from reference_editor import montage_by_reference
@@ -273,10 +276,12 @@ def main() -> None:
                 "\n✨ Эмодзи: " + str(stats.get("emoji_count", 0))
                 + " · 🔊 акценты: " + str(stats.get("sfx_count", 0))
                 + " · 🎵 звуки титров: " + str(stats.get("caption_sfx_count", 0))
+                + " · 🖼 винтажные вставки: " + str(stats.get("insert_count", 0))
+                + " · 🔔 звуки вставок: " + str(stats.get("insert_sfx_count", 0))
             )
             LOG.info("Reels effects counts %s", {
                 k:stats.get(k,0) for k in
-                ("emoji_count","sfx_count","caption_sfx_count")
+                ("emoji_count","sfx_count","caption_sfx_count","insert_count","insert_sfx_count")
             })
             if not out.is_file() or out.stat().st_size < 1000:
                 raise RuntimeError("FFmpeg не создал готовый MP4.")
