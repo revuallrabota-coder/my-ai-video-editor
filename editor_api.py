@@ -139,11 +139,11 @@ def validate_settings(config: dict) -> dict:
         "signature",
     )
     font = option("font_profile", {
-        "elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined",
+        "elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined","roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed",
     }, "elegant")
     choose_font(font)
     small_font = option("small_font_profile",{
-        "elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined",
+        "elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined","roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed",
     },"modern")
     choose_font(small_font)
     caption_variant=option("caption_variant",{
@@ -158,10 +158,10 @@ def validate_settings(config: dict) -> dict:
     subtitle_sfx=option("subtitle_sfx",{
         "off","soft","tick"
     },"soft")
-    retro_default = ("retro" if caption_variant in
-                     ("old_money","vintage","elegant") else "minimal")
+    retro_default=caption_variant
     insert_style=option("insert_style",{
-        "off","retro","minimal"
+        "off","retro","old_money","vintage","elegant","street",
+        "editorial","minimal","neon","pop","luxe"
     },retro_default if str(config.get("emoji_mode","on"))=="on" else "off")
     insert_density=option("insert_density",{
         "subtle","balanced","dynamic"
