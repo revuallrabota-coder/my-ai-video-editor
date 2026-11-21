@@ -89,7 +89,7 @@ def _row_positions(words: Sequence[tuple[int,str]], cy: int,
 
 def _caption_slots(group: Sequence[Word], index: int, caption_position: str,
                    small: FontSpec, big: FontSpec,
-                   animation_style: str="float") -> tuple[dict[int,tuple[int,int,int,bool]],int]:
+                   animation_style: str="float", subject_side: str="center") -> tuple[dict[int,tuple[int,int,int,bool]],int]:
     main=_pick_editorial_keyword(group)
     cx,cy,*_=phrase_motion(index,caption_position,animation_style)
     main_word=safe_text(group[main][2]).upper()
@@ -126,6 +126,16 @@ def _caption_slots(group: Sequence[Word], index: int, caption_position: str,
         else:
             latter=_row_positions(after,cy+42,cx+13,small,helper_size)
         result.update({i:(x,y,helper_size,False) for i,(x,y) in latter.items()})
+    if subject_side in ("left", "right"):
+        # Narrow caption column next to the person: maintain the very same
+        # word-by-word fade, soft travel and linked halo coordinates.
+        target_x = 176 if subject_side == "left" else 544
+        factor = .49
+        result = {
+            i: (round(target_x + (x - cx) * factor), y,
+                max(15, round(size * factor)), is_big)
+            for i, (x, y, size, is_big) in result.items()
+        }
     return result,main
 
 
@@ -138,7 +148,10 @@ def build_reference_cascade_ass(
     animation_style: str="float",
     intro_animated: bool=False,
     intro_title: str="",
+    subject_side: str="center",
 ) -> tuple[str,int]:
+    if subject_side not in ("center", "left", "right"):
+        raise ValueError("Неизвестная сторона расположения текста.")
     if caption_position not in ("top","middle","bottom"):
         raise ValueError("Недопустимое положение субтитров.")
     if caption_variant not in COLOR_PALETTES:
@@ -179,7 +192,8 @@ def build_reference_cascade_ass(
     for group_index,group in enumerate(groups):
         if not group:continue
         slots,main=_caption_slots(
-            group,group_index,caption_position,small,big,animation_style
+            group,group_index,caption_position,small,big,animation_style,
+            subject_side=subject_side
         )
         group_start=max(0.0,float(group[0][0]))
         end=max(group[-1][1]+.20,group_start+.68)
