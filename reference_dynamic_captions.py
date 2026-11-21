@@ -19,7 +19,7 @@ from word_captions import word_events
 
 Word = tuple[float, float, str]
 PLAY_WIDTH, PLAY_HEIGHT = 720, 1280
-TEXT_SAFE_WIDTH = 508
+TEXT_SAFE_WIDTH = 500
 CENTER_X = PLAY_WIDTH // 2
 
 COLOR_PALETTES = {
@@ -53,14 +53,13 @@ def _font_file(family: str) -> str | None:
 
 
 def _estimated_width(text: str, size: int, font: FontSpec) -> float:
-    """Conservative fallback if Pillow/fontconfig is not installed."""
-    capital = sum(c.isupper() for c in text if c.isalpha())
-    latin = sum(c.isascii() and c.isalpha() for c in text)
-    others = sum(c.isalpha() for c in text) - capital
-    spaces = text.count(" ")
-    punctuation = max(0, len(text) - capital - others - spaces)
-    return size * (0.75 * capital + 0.57 * others + 0.60 * latin * 0.0
-                   + 0.30 * spaces + 0.36 * punctuation) * font.scale_x / 100
+    """Conservative fallback including Cyrillic width."""
+    units = 0.0
+    for char in text:
+        units += (0.35 if char.isspace() else
+                  0.86 if char.isalpha() and char.isupper() else
+                  0.70 if char.isalpha() else 0.50)
+    return units*size*font.scale_x/100
 
 
 def _measure_width(text: str, size: int, font: FontSpec) -> float:
@@ -69,71 +68,52 @@ def _measure_width(text: str, size: int, font: FontSpec) -> float:
         path = _font_file(font.name)
         if path:
             rendered = ImageFont.truetype(path, size=size)
-            return rendered.getlength(text) * font.scale_x / 100
+            # libass may choose the bold/italic face, wider than fc-match.
+            return rendered.getlength(text)*font.scale_x/100*1.15
     except (ImportError, OSError, ValueError):
         pass
-    return _estimated_width(text, size, font)
+    return _estimated_width(text,size,font)
 
 
-def fit_caption_size(
-    text: str,
-    requested: int,
-    font: FontSpec,
-    *,
-    max_width: int = TEXT_SAFE_WIDTH,
-) -> int:
-    """Choose actual ASS font size to keep any word/phrase inside safe margins."""
-    if not text.strip():
-        return 30
-    candidate = min(90, max(28, int(requested)))
-    # Conservative correction for slight libass/Pillow font measurement differences.
-    budget = max_width * 0.91
-    for size in range(candidate, 23, -1):
-        if _measure_width(text, size, font) <= budget:
+def fit_caption_size(text: str, requested: int, font: FontSpec,
+                     *, max_width: int = TEXT_SAFE_WIDTH) -> int:
+    """Shrink overlong Cyrillic words to fit a central Reels safe area."""
+    target=max_width*0.88
+    for size in range(min(82,max(18,int(requested))),17,-1):
+        if _measure_width(text,size,font)<=target:
             return size
-    return 24
+    return 18
 
 
-def _rounded_plate(half_width: int, half_height: int, radius: int = 20) -> str:
-    """Closed libass vector shape, centered on the exact subtitle position."""
-    w, h = max(45, half_width), max(23, half_height)
-    r = min(radius, w // 2, h // 2)
-    return (
-        f"m {-w+r} {-h} l {w-r} {-h} "
-        f"b {w} {-h} {w} {-h+r//2} {w} {-h+r} "
-        f"l {w} {h-r} b {w} {h-r//2} {w} {h} {w-r} {h} "
-        f"l {-w+r} {h} b {-w} {h} {-w} {h-r//2} {-w} {h-r} "
-        f"l {-w} {-h+r} b {-w} {-h+r//2} {-w} {-h} {-w+r} {-h}"
-    )
+def _rounded_plate(half_width: int, half_height: int, radius: int=15) -> str:
+    """ASS positive-coordinate polygon anchored at its TOP-LEFT corner."""
+    w,h=max(72,2*half_width),max(42,2*half_height)
+    r=min(radius,w//2,h//2)
+    return (f"m {r} 0 l {w-r} 0 "
+            f"b {w} 0 {w} {r//2} {w} {r} "
+            f"l {w} {h-r} b {w} {h-r//2} {w} {h} {w-r} {h} "
+            f"l {r} {h} b 0 {h} 0 {h-r//2} 0 {h-r} "
+            f"l 0 {r} b 0 {r//2} 0 0 {r} 0")
 
 
-def _wrap_two_lines(text: str, font: FontSpec, requested: int) -> tuple[str, int, float, int]:
-    """Wrap only long small phrases. Do not break a single Russian word."""
-    size = fit_caption_size(text, requested, font)
-    if len(text.split()) < 2 or size >= 28:
-        return text, size, _measure_width(text, size, font), 1
-    tokens = text.split()
-    candidates = [
-        (" ".join(tokens[:i]), " ".join(tokens[i:]))
-        for i in range(1, len(tokens))
-    ]
-    left, right = min(
-        candidates,
-        key=lambda pair: max(
-            _measure_width(pair[0], requested, font),
-            _measure_width(pair[1], requested, font)
-        ),
-    )
-    size = min(
-        fit_caption_size(left, requested, font),
-        fit_caption_size(right, requested, font),
-    )
-    if size < 28:
-        return text, 24, _measure_width(text, 24, font), 1
-    return left + r"\N" + right, size, max(
-        _measure_width(left, size, font),
-        _measure_width(right, size, font),
-    ), 2
+def _wrap_two_lines(text: str, font: FontSpec, requested: int) -> tuple[str,int,float,int]:
+    """Wrap too-long phrases while maintaining a readable font size."""
+    size=fit_caption_size(text,requested,font)
+    tokens=text.split()
+    if len(tokens)<2 or size>=max(26,requested*.78):
+        return text,size,_measure_width(text,size,font),1
+    candidates=[(" ".join(tokens[:i])," ".join(tokens[i:]))
+                for i in range(1,len(tokens))]
+    left,right=min(candidates,key=lambda pair:max(
+        _measure_width(pair[0],requested,font),
+        _measure_width(pair[1],requested,font)))
+    size2=min(fit_caption_size(left,requested,font),
+              fit_caption_size(right,requested,font))
+    if size2<=20 and size>20:
+        return text,size,_measure_width(text,size,font),1
+    return (left+r"\N"+right,size2,
+            max(_measure_width(left,size2,font),
+                _measure_width(right,size2,font)),2)
 
 
 def build_reference_dynamic_ass(
@@ -227,14 +207,14 @@ def build_reference_dynamic_ass(
             continue
         shown = clean.upper() if strong else clean
         # Short accent = punchy but not huge. Even a 16-letter word is fitted.
-        desired = (74, 65, 70, 61)[index % 4] if strong else (37, 34, 39)[index % 3]
+        desired = (66, 61, 64, 59)[index % 4] if strong else (34, 31, 35)[index % 3]
         face = big_font if strong else small_font
         shown, size, measured, line_count = _wrap_two_lines(shown, face, desired)
-        # Guard against font substitutions with wider real glyph metrics.
-        if measured > TEXT_SAFE_WIDTH * 0.91:
-            size = fit_caption_size(shown.replace(r"\N", " "), size, face)
-            measured = min(measured, TEXT_SAFE_WIDTH * 0.91)
-        y = ybase + (-9, 0, 9)[index % 3]
+        # Recompute based on actual glyph size. Never trust the text length.
+        if measured > TEXT_SAFE_WIDTH*0.88:
+            size=fit_caption_size(shown.replace(r"\N"," "),size,face)
+            measured=min(measured,TEXT_SAFE_WIDTH*0.88)
+        y=ybase+(-4,0,4)[index%3]
         lifetime = max(100, int((end - begin)*1000))
         rise = min(235, max(60, int(lifetime*0.48)))
         fade = min(130, max(25, int(lifetime*0.22)))
@@ -253,13 +233,18 @@ def build_reference_dynamic_ass(
             )
         else:
             movement = rf"\pos({CENTER_X},{y})"
-        scale = 94 if strong else 97
-        fade_tag = rf"\fad({fade},{fade_out})"
-        text_tag = (
-            r"{\an5" + movement + fade_tag
-            + rf"\fscx{scale}\fscy{scale}"
-            + rf"\t(0,{rise},0.65,\fscx100\fscy100)"
-            + rf"\fs{size}\q2\blur0.35" + "}"
+        # A condensed or expanded Cyrillic font must retain its intended
+        # width. Previously tweening all presets to 100% caused clipping.
+        sx,sy=face.scale_x,face.scale_y
+        initial_x=round(sx*(0.965 if strong else 0.98))
+        initial_y=round(sy*(0.965 if strong else 0.98))
+        fade_tag=rf"\fad({fade},{fade_out})"
+        text_tag=(
+            r"{\an5"+movement+fade_tag
+            +rf"\fscx{initial_x}\fscy{initial_y}"
+            +rf"\t(0,{rise},0.65,\fscx{sx}\fscy{sy})"
+            +rf"\fs{size}\q2\blur0.35"
+            +r"\clip(65,170,655,1140)"+"}"
         )
         # Put backing behind the ACTUAL event at the SAME x/y and begin/end.
         # 6–12 px padding, with max width capped inside Reels safe margins.
@@ -269,13 +254,21 @@ def build_reference_dynamic_ass(
             or background_style == "occasional" and (index % 3 == 0)
         )
         if plate:
-            half_w = min(268, int(math.ceil(measured / 2)) + 18)
-            half_h = int(size * (0.73 if line_count == 1 else 1.12)) + 9
-            shape = (
-                r"{\an5" + movement + fade_tag
-                + r"\p1\1c&H181616&\1a&H84&}"
-                + _rounded_plate(half_w, half_h)
-            )
+            half_w=min(246,max(44,int(math.ceil(measured/2))+15))
+            half_h=int(size*(0.69 if line_count==1 else 1.12))+8
+            left,top=CENTER_X-half_w,y-half_h
+            if animation_style=="float":
+                plate_move=rf"\move({left},{top+delta},{left},{top},0,{rise})"
+            elif animation_style=="slide":
+                plate_move=rf"\move({left+delta},{top},{left},{top},0,{rise})"
+            else:
+                plate_move=rf"\pos({left},{top})"
+            # \an7 + positive draw coordinates anchor background precisely:
+            # unlike \an5 with negative path bounds it cannot drift sideways.
+            shape=(r"{\an7"+plate_move+fade_tag
+                   +r"\p1\1c&H181616&\1a&H87&\bord0\shad0"
+                   +r"\clip(65,170,655,1140)}"
+                   +_rounded_plate(half_w,half_h)+r"{\p0}")
             lines.append(
                 f"Dialogue: 0,{ass_time(begin)},{ass_time(end)},Plate,,0,0,0,,{shape}\n"
             )
