@@ -504,6 +504,10 @@
       el.hidden=!previewUrl;
       if(previewUrl){el.src=previewUrl;el.load()}
       else{el.pause();el.removeAttribute('src');el.load()}
+      if(id==='captionVideo'&&!byId('previewPhotoImage').hidden){
+        el.hidden=true;
+        el.pause();
+      }
     });
   }
   function appendClips(files,replacePrevious){
@@ -552,86 +556,127 @@
       document.querySelectorAll('.mode').forEach(function(label){label.classList.toggle('selected',label.querySelector('input').checked)});
     });
   });
+  // The preview uses real CSS font families on iPad. The runner uses
+  // installed Cyrillic counterparts; font availability can differ slightly.
+  var visibleFonts={
+    old_money:{family:'Georgia, "Times New Roman", serif',italic:false,weight:'800',spacing:'-.4px',stretch:'none'},
+    vintage:{family:'Georgia, "Times New Roman", serif',italic:true,weight:'700',spacing:'0px',stretch:'none'},
+    refined:{family:'Lato, "Helvetica Neue", sans-serif',italic:false,weight:'500',spacing:'0px',stretch:'none'},
+    bold:{family:'Roboto, Arial, sans-serif',italic:false,weight:'900',spacing:'-.5px',stretch:'none'},
+    modern:{family:'Lato, Arial, sans-serif',italic:false,weight:'700',spacing:'0px',stretch:'none'},
+    clean:{family:'Arial, "Helvetica Neue", sans-serif',italic:false,weight:'400',spacing:'0px',stretch:'none'},
+    bubble:{family:'Comfortaa, "Arial Rounded MT Bold", sans-serif',italic:false,weight:'700',spacing:'-.3px',stretch:'none'},
+    bebas:{family:'Impact, "Arial Narrow", sans-serif',italic:false,weight:'900',spacing:'-1px',stretch:'scaleX(.82) scaleY(1.08)'}
+  };
+  function applySampleFont(node,preset){
+    var item=visibleFonts[preset]||visibleFonts.refined;
+    node.style.fontFamily=item.family;
+    node.style.fontWeight=item.weight;
+    node.style.fontStyle=item.italic?'italic':'normal';
+    node.style.letterSpacing=item.spacing;
+    node.style.fontStretch='normal';
+    node.style.webkitTextStroke=preset==='bubble'?'.45px #28202f':'0px transparent';
+    return item;
+  }
+  function replaySample(){
+    var element=byId('sample');
+    element.classList.remove('reveal');
+    // Restart CSS keyframes when font/style changes, not just the color.
+    void element.offsetWidth;
+    element.classList.add('reveal');
+  }
   function updateSample(){
-    var big=byId('sampleBig'); big.style.color=byId('color').value;
-    var styles={
-      elegant:'Georgia, serif',
-      clean:'Arial, sans-serif',
-      bold:'Arial Black, Arial, sans-serif',
-      bebas:'Impact, "Arial Narrow", sans-serif',
-      platform:'Arial Black, Arial, sans-serif',
-      bubble:'"Arial Rounded MT Bold", Trebuchet MS, sans-serif',
-      script:'Georgia, "Times New Roman", serif',
-      modern:'Arial, sans-serif',
-      old_money:'Georgia, "Times New Roman", serif',
-      vintage:'Georgia, "Times New Roman", serif',
-      street:'Impact, "Arial Narrow", sans-serif',
-      refined:'"Helvetica Neue", Arial, sans-serif',
-      roboto:'Roboto, Arial, sans-serif',
-      open_sans:'"Open Sans", Arial, sans-serif',
-      noto_sans:'"Noto Sans", Arial, sans-serif',
-      ubuntu:'Ubuntu, Arial, sans-serif',
-      carlito:'Carlito, Arial, sans-serif',
-      lato_black:'Lato, Arial Black, sans-serif',
-      modern_condensed:'"Arial Narrow", "Helvetica Neue", sans-serif'
-    };
-    big.style.fontFamily=styles[byId('fontBig').value]||'Arial,sans-serif';
-    big.style.fontWeight=byId('fontBig').value==='clean'?'500':'900';
-    var chosenFont=byId('fontBig').value;
-    big.style.fontFamily=styles[chosenFont]||'Georgia, serif';
-    big.style.fontWeight=chosenFont==='clean'?'600':'900';
-    big.style.fontStyle=(chosenFont==='elegant'||chosenFont==='script')?'italic':'normal';
-    big.style.letterSpacing=chosenFont==='bebas'?'-0.9px':chosenFont==='platform'?'1.8px':'0px';
-    big.style.transform=chosenFont==='bebas'?'scaleX(.8) scaleY(1.08)':chosenFont==='platform'?'scaleX(1.12)':'none';
-    big.style.webkitTextStroke=chosenFont==='bubble'?'3px #201926':byId('outline').value+'px #211832';
-    if(byId('subtitleStyle').value.startsWith('contrast')||byId('subtitleStyle').value==='reference_dynamic'){
-      big.style.color=byId('color').value.toLowerCase()==='#ebc0c8'?'#f0443e':byId('color').value;
-    }else{
-      big.style.color=byId('color').value;
-    }
-    var tiny=byId('sample').querySelector('.small');
-    tiny.style.fontFamily=styles[byId('fontSmall').value]||'Arial,sans-serif';
-    tiny.style.fontStyle=(['vintage','old_money','elegant','script'].includes(byId('fontSmall').value))?'italic':'normal';
-    tiny.style.fontWeight=(byId('fontSmall').value==='refined'||byId('fontSmall').value==='clean')?'500':'700';
+    var presetBig=byId('fontBig').value, presetSmall=byId('fontSmall').value;
+    var big=byId('sampleBig'), before=byId('sampleBefore'),after=byId('sampleAfter');
+    var bigFont=applySampleFont(big,presetBig);
+    applySampleFont(before,presetSmall);
+    applySampleFont(after,presetSmall);
+    big.textContent=(byId('previewKeyword').value||'ОШИБКУ').trim().toUpperCase();
+    big.style.color=byId('color').value;
+    // Scale and font size are visibly different for each chosen Cyrillic
+    // font family; the live preview never silently displays one fixed font.
+    big.style.fontSize=(presetBig==='bebas'?'clamp(28px,8vw,46px)':
+      presetBig==='bubble'?'clamp(20px,6.1vw,34px)':
+      'clamp(24px,7.0vw,39px)');
+    big.style.transform=bigFont.stretch;
     var palette={
-      reference_soft:'#FFF6F8',editorial:'#FFFFFF',old_money:'#FFF3E1',vintage:'#F4DFC7',
-      street:'#F5F5F0',elegant:'#FFFFFF',luxe:'#FFF4E5',
-      minimal:'#EFEFEF',neon:'#F3F7E7',pop:'#FFF3F9'
+      reference_soft:'#FFF6F8',editorial:'#FFFFFF',old_money:'#FFF3E1',
+      minimal:'#F9F9F8',elegant:'#FFFFFF'
     };
-    tiny.style.color=palette[byId('captionVariant').value]||'#FFFFFF';
-    var selectedTitle=byId('topTitleText').value.trim();
-    var titleMode=byId('topTitleMode').value;
-    var titlePreview=byId('topTitlePreview');
-    titlePreview.hidden=titleMode==='off'||(!selectedTitle&&titleMode!=='auto');
-    titlePreview.textContent=selectedTitle.toUpperCase()||
-      (titleMode==='auto'?'ЗАГОЛОВОК ИЗ РЕЧИ':'');
+    var helper=palette[byId('captionVariant').value]||'#FFFFFF';
+    before.style.color=helper;
+    after.style.color=helper;
+    var title=byId('topTitleText').value.trim();
+    var mode=byId('topTitleMode').value;
+    var titleNode=byId('topTitlePreview');
+    titleNode.hidden=mode==='off'||(!title&&mode!=='auto');
+    titleNode.textContent=title.toUpperCase()||
+      (mode==='auto'?'НАЗВАНИЕ ИЗ РЕЧИ':'');
+    titleNode.style.fontFamily=bigFont.family;
+    titleNode.style.fontStyle=bigFont.italic?'italic':'normal';
+    titleNode.style.fontWeight=bigFont.weight;
     var backing=byId('captionBackground').value;
-    var container=byId('sample');
-    container.style.background=backing==='off'?'transparent':
-      'rgba(18,13,20,'+(backing==='always'?'.52':backing==='frequent'?'.38':'.20')+')';
-    container.style.borderRadius=backing==='off'?'0':'999px';
-    container.style.padding=backing==='off'?'0':'10px 22px';
-    var animate=byId('captionAnimation').value;
-    container.style.transition='transform .5s ease-out, background .4s ease-out';
-    container.style.boxShadow=backing==='off'?'none':'0 1px 18px 6px #18101960';
-    container.style.transform=animate==='slide'?'translateX(calc(-50% + 4px))':
-      animate==='pop'?'translateX(-50%) scale(1.03)':
-      'translateX(-50%) translateY(-4px)';
-    var positions={top:'32%',middle:'62%',bottom:'78%'};
-    byId('sample').style.top=positions[byId('position').value]||'60%';
-    if(chosenFont!=='bubble')big.style.webkitTextStroke=byId('outline').value+'px #211832';
-    big.style.textShadow='0 1px '+(Number(byId('shadow').value)+1)+'px #0005';
-    big.textContent=byId('hookText').value.trim() || 'СУБТИТРЫ';
+    var sample=byId('sample');
+    // Tight blur directly behind the highlighted word instead of one
+    // square plate across all three lines.
+    sample.style.background='transparent';
+    sample.style.boxShadow='none';
+    sample.style.padding='0';
+    sample.style.borderRadius='0';
+    big.style.textShadow=backing==='off'?'0 1px 2px #1116':
+      '0 1px 2px #1117,0 0 '+(backing==='always'?15:backing==='frequent'?11:7)+
+      'px '+(backing==='always'?'#3b29319a':'#3b29316f');
+    before.style.textShadow='0 1px 5px #160d1b9c';
+    after.style.textShadow='0 1px 5px #160d1b9c';
+    sample.style.transition='top .26s ease-out, left .26s ease-out, transform .3s ease-out';
+    var spots={top:'33%',middle:'56%',bottom:'73%'};
+    sample.style.top=spots[byId('position').value]||'56%';
+    sample.style.left='50%';
+    sample.style.transform='translateX(-50%)';
+    // The animated reference alternates between gentle left and right
+    // word placement rather than a single linear movement.
+    sample.style.alignItems=byId('captionAnimation').value==='slide'?'flex-start':
+      byId('captionAnimation').value==='pop'?'flex-end':'center';
     byId('outlineValue').textContent=byId('outline').value;
     byId('shadowValue').textContent=byId('shadow').value;
+    replaySample();
   }
+  var previewImageUrl=null;
+  function showPreviewPhoto(file){
+    if(previewImageUrl){URL.revokeObjectURL(previewImageUrl);previewImageUrl=null;}
+    var image=byId('previewPhotoImage');
+    var video=byId('captionVideo');
+    if(file){
+      if(!file.type.startsWith('image/'))throw new Error('Выбери фотографию.');
+      previewImageUrl=URL.createObjectURL(file);
+      image.src=previewImageUrl;
+      image.hidden=false;
+      video.hidden=true;
+      video.pause();
+    }else{
+      image.hidden=true;
+      image.removeAttribute('src');
+      video.hidden=!previewUrl;
+      if(previewUrl){video.src=previewUrl;video.load();}
+    }
+    updateSample();
+  }
+  byId('previewPhoto').addEventListener('change',function(){
+    try{showPreviewPhoto(this.files[0]||null)}
+    catch(error){alert(error.message);}
+  });
+  byId('clearPreviewPhoto').addEventListener('click',function(){
+    byId('previewPhoto').value='';
+    showPreviewPhoto(null);
+  });
+  byId('replayPreview').addEventListener('click',replaySample);
+  // Presets modify *only* visual typography: no audio, camera, pause, or
+  // semantic editing setting changes when a style is selected.
   var reelPresets={
-    reference_soft:{variant:'reference_soft',big:'old_money',small:'refined',filter:'none',color:'#E8A4B5',backing:'occasional',animation:'float'},
-    editorial:{variant:'editorial',big:'bold',small:'modern',filter:'none',color:'#F0443E',backing:'occasional',animation:'float'},
-    old_money:{variant:'old_money',big:'old_money',small:'refined',filter:'old_money',color:'#CEB68A',backing:'occasional',animation:'float'},
-    vintage:{variant:'vintage',big:'vintage',small:'script',filter:'vintage',color:'#D79B6D',backing:'frequent',animation:'slide'},
-    street:{variant:'street',big:'street',small:'clean',filter:'street',color:'#DEEF5A',backing:'frequent',animation:'pop'},
-    elegant:{variant:'elegant',big:'refined',small:'elegant',filter:'elegant',color:'#F0DBDC',backing:'occasional',animation:'float'}
+    reference_soft:{variant:'reference_soft',big:'old_money',small:'refined',color:'#E8A4B5'},
+    old_money:{variant:'old_money',big:'vintage',small:'old_money',color:'#CEB68A'},
+    editorial:{variant:'editorial',big:'bold',small:'modern',color:'#F0443E'},
+    minimal:{variant:'minimal',big:'refined',small:'clean',color:'#FFFFFF'}
   };
   byId('reelsPreset').addEventListener('change',function(){
     var cfg=reelPresets[this.value];
@@ -639,10 +684,7 @@
       byId('captionVariant').value=cfg.variant;
       byId('fontBig').value=cfg.big;
       byId('fontSmall').value=cfg.small;
-      byId('filter').value=cfg.filter;
       byId('color').value=cfg.color;
-      byId('captionBackground').value=cfg.backing;
-      byId('captionAnimation').value=cfg.animation;
       // All four curated looks are designed for mixed-size captions.
       byId('subtitleStyle').value='reference_dynamic';
     }
@@ -650,12 +692,12 @@
   });
   ['color','fontBig','fontSmall','captionVariant','captionBackground',
    'captionAnimation','position','outline','shadow','hookText','subtitleStyle','filter',
-   'topTitleText','topTitleMode'
+   'topTitleText','topTitleMode','previewKeyword'
   ].forEach(function(id){
     byId(id).addEventListener('input',function(){
       // Пользователь изменил готовый набор: его выбор не перезаписываем.
       if(['color','fontBig','fontSmall','captionVariant','captionBackground',
-          'captionAnimation','filter'].includes(id))byId('reelsPreset').value='custom';
+          'captionAnimation'].includes(id))byId('reelsPreset').value='custom';
       updateSample();
     });
   });
