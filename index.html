@@ -88,7 +88,7 @@
     <p class="note" id="montageStageHint">Полоса показывает этап работы, а не точное оставшееся время.</p>
     <p class="note" id="montageRetention"></p>
     <button type="button" class="btn secondary" id="refreshMontageStatus" style="width:100%;margin:8px 0">🔄 Проверить этап монтажа</button>
-    <p class="note">Можно закрыть приложение: обработка продолжится в GitHub Actions. Уведомления о важных этапах придут в чат Telegram.</p>
+    <p class="note">После завершения загрузки (100%) можно закрыть приложение: обработка продолжится в GitHub Actions. Закрытие во время передачи файлов останавливает загрузку, которую потом можно возобновить. Этапы придут в Telegram.</p>
   </section>
   <div class="progress" id="progress"></div>
 
@@ -769,10 +769,7 @@
   }
   async function refreshProjectStatus(){
     var project=showStatusCard();
-    if(!project){
-      byId('upload50Status').textContent=byId('upload50Status').textContent;
-      return;
-    }
+    if(!project)return;
     if(refreshingStatus)return;
     refreshingStatus=true;
     var stage=byId('montageStage');
@@ -790,6 +787,11 @@
           return;
         }
         throw new Error(data.error||'Не удалось узнать этап монтажа');
+      }
+      if(data.retention_days!==3 || !data.stage){
+        stage.textContent='⚠️ Cloudflare Worker ещё использует старую версию. Обнови cloudflare_launcher.js и нажми Deploy.';
+        byId('montageRetention').textContent='Срок хранения 3 дня и этапы монтажа заработают после обновления Worker.';
+        return;
       }
       var step=processingStages[data.stage]||processingStages[data.state]||
         processingStages.queued;
@@ -813,7 +815,7 @@
           new Date(expires).toLocaleString('ru-RU',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})+
           '. Готовый MP4 лучше сохранить на iPad заранее.'
         : '🗑 Временные файлы могут быть уже удалены.';
-      if(data.ready)byId('checkUploadedResult').hidden=false;
+      byId('checkUploadedResult').hidden=!data.ready;
     }catch(err){
       stage.textContent='⚠️ '+(err.message||err);
     }finally{refreshingStatus=false}
@@ -953,7 +955,7 @@
           parts!==uploadParts.length || !Number.isInteger(parts)){
         throw new Error('Сервер вернул неправильное число частей проекта.');
       }
-      byId('checkUploadedResult').hidden=false;
+      byId('checkUploadedResult').hidden=true;
       progress.value=Math.round(completed.size*100/parts);
       for(var i=0;i<parts;i++){
         if(completed.has(i))continue;
