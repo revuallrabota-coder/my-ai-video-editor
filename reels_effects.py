@@ -122,6 +122,7 @@ def add_hook_to_ass(
     if not text or position == "off" or duration < 0.6:
         return content
     from font_presets import choose_font
+    from reference_dynamic_captions import _oval_phrase_shadow
     font = choose_font(font_profile)
     accent = ass_color(color if color != "auto" else "#EBC0C8")
     new_styles = (
@@ -145,11 +146,13 @@ def add_hook_to_ass(
     for start, end in windows:
         fadein = min(240, int((end-start)*230))
         fadeout = min(270, int((end-start)*230))
-        # Плашка позади хука; текстовой слой имеет более высокий порядок.
+        # Same fully rounded capsule as speech subtitles, never a box.
+        oval_width=min(612,max(212,round(len(text)*27+66)))
+        oval=_oval_phrase_shadow(oval_width,126)
         shape = (
-            r"{\an5\pos(360,202)\p1\1c&H272025&\1a&H68&"
+            r"{\an5\pos(360,202)\p1\blur6\1c&H272025&\1a&H8E&"
             r"\fad("+str(fadein)+","+str(fadeout)+")}"
-            "m -319 -73 l 319 -73 l 319 73 l -319 73"
+            +oval+r"{\p0}"
         )
         label = (
             r"{\an5\pos(360,202)\fad("+str(fadein)+","+str(fadeout)+")"
