@@ -244,8 +244,14 @@ def make_retro_sound_track(
     cues: Sequence[RetroCue],
     duration: float,
     rate: int = 48000,
+    style: str = "retro",
 ) -> None:
-    """Оригинальные paper/swish/shutter/coin/chime, без чужих сэмплов."""
+    """Оригинальные звуки в характере выбранного оформления."""
+    if style not in CARD_STYLES:
+        raise ValueError("Неподдерживаемый стиль звука вставок.")
+    gain = (0.072 if style in ("old_money","elegant","luxe") else
+            0.115 if style in ("street","neon","pop") else
+            0.090)
     import wave
     from array import array
     n_total=max(1,int(duration*rate))
@@ -276,7 +282,7 @@ def make_retro_sound_track(
                 wave_value=.7*math.sin(2*math.pi*700*t)+.3*math.sin(2*math.pi*1050*t)
             else: # sparkle
                 wave_value=.65*math.sin(2*math.pi*(820+720*t)*t)+.35*math.sin(2*math.pi*1340*t)
-            sample=int(32767*0.10*envelope*wave_value)
+            sample=int(32767*gain*envelope*wave_value)
             pos=start+i
             samples[pos]=max(-32760,min(32760,samples[pos]+sample))
     with wave.open(str(target),"wb") as wf:
