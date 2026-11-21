@@ -161,12 +161,12 @@ def validate_settings(config: dict) -> dict:
     retro_default=caption_variant
     insert_style=option("insert_style",{
         "off","retro","old_money","vintage","elegant","street",
-        "editorial","minimal","neon","pop","luxe"
-    },"off")
+        "editorial","minimal","neon","pop","luxe","reference_soft"
+    },"reference_soft")
     insert_density=option("insert_density",{
         "subtle","balanced","dynamic"
     },"subtle")
-    insert_sound=option("insert_sound",{"on","off"},"on")
+    insert_sound=option("insert_sound",{"on","off"},"off")
     color = str(config.get("color", "auto"))
     if color != "auto" and not re.fullmatch(r"#[a-fA-F0-9]{6}", color):
         raise HTTPException(400, "Цвет должен быть auto или #RRGGBB")
