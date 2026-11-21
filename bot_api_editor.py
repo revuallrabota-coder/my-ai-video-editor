@@ -139,6 +139,12 @@ def render_result(
                 sound_effects=sound_effects, emoji_mode=emoji_mode,
                 hook_position=hook_position, quality=quality,
                 subtitle_delay=subtitle_delay,
+                small_font_profile="refined",
+                caption_variant="reference_soft",
+                background_style="occasional",
+                animation_style="float",
+                insert_style=("reference_soft" if subtitle_style=="reference_dynamic" else "off"),
+                insert_density="subtle",insert_sound="off",
             )
             caption = (
                 "🎬 Монтаж готов! "
