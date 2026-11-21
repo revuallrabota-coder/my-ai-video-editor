@@ -75,7 +75,7 @@ jobs:
         run: node test_upload_500mb.mjs
 
       - name: "Проверить JS экрана iPad с несколькими видео"
-        run: node -e "const fs=require('fs');const html=fs.readFileSync('index.html','utf8');const match=html.match(/<script>([\\s\\S]*?)<\\/script>/);if(!match)throw Error('Script not found');new Function(match[1]);"
+        run: node -e "const fs=require('fs');const h=fs.readFileSync('index.html','utf8');const i=h.indexOf('<script>');const j=h.indexOf('</script>',i);if(i<0||j<=i)throw Error('Missing app script');new Function(h.slice(i+8,j));"
 
       - name: "Проверить склейку исходников, тишину и порядок кадров через FFmpeg"
         run: python -m unittest -v test_clip_montage.py
