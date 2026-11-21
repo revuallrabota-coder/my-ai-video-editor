@@ -247,6 +247,7 @@ def apply_effects(
     insert_sound: str = "on",
     font_profile: str = "bold",
     small_font_profile: str = "modern",
+    animation_style: str = "float",
 ) -> dict:
     """Тематические винтажные cutaway, эмодзи, звук, без изменения речи."""
     from telegram_editor import duration_and_audio, media_info, execute
@@ -284,7 +285,8 @@ def apply_effects(
     # Обычные смайлы не перекрывают большую иллюстрированную карточку.
     from reference_dynamic_captions import phrase_emoji_anchors
     geometry=phrase_emoji_anchors(words, caption_position,
-                                  small_font_profile, font_profile)
+                                  small_font_profile, font_profile,
+                                  animation_style)
     # Attach emoji to the emphasized phrase line, rather than the screen edge.
     visual=[]
     used_phrases=set()
@@ -292,9 +294,9 @@ def apply_effects(
         for t,symbol in cues:
             if not symbol or any(abs(t-r.time)<1.15 for r in retro):
                 continue
-            for k,(start,end,anchor_x,anchor_y) in enumerate(geometry):
+            for k,(start,end,x0,y0,x1,y1) in enumerate(geometry):
                 if start-0.05<=t<=end+0.02 and k not in used_phrases:
-                    visual.append((start,end,symbol,anchor_x,anchor_y))
+                    visual.append((start,end,symbol,x0,y0,x1,y1))
                     used_phrases.add(k)
                     break
     if (sound == "off" and not visual and not caption_cues and not retro):
@@ -312,7 +314,7 @@ def apply_effects(
         if visual:
             # One refined sticker beside the actual PHRASE. It fades and
             # floats together with that phrase, with a 12px breathing gap.
-            for i,(start,clip_end,symbol,anchor_x,anchor_y) in enumerate(visual[:10]):
+            for i,(start,clip_end,symbol,x0,y0,x1,y1) in enumerate(visual[:10]):
                 path = folder/f"emoji_{i}.png"
                 try:
                     emoji_image(symbol, path)
@@ -322,10 +324,10 @@ def apply_effects(
                 args.extend(["-loop","1","-framerate","30","-i",str(path)])
                 clip_end=min(duration,clip_end)
                 sticker_size=max(30,round(43*sx))
-                sticker_x=min(frame_width-sticker_size-round(70*sx),
-                              max(round(72*sx),round(anchor_x*sx)))
-                sticker_y=round(anchor_y*sy-sticker_size/2)
-                bob=max(3,round(5*sy))
+                moving_seconds=max(0.25,clip_end-start)
+                position=f"max(0,min(1,(t-{start:.3f})/{moving_seconds:.3f}))"
+                sticker_x=f"{x0*sx:.2f}+{(x1-x0)*sx:.2f}*{position}"
+                sticker_y=f"{y0*sy-sticker_size/2:.2f}+{(y1-y0)*sy:.2f}*{position}"
                 alpha = (f"[{current_input}:v]"
                          f"scale={sticker_size}:{sticker_size},format=rgba,"
                          f"fade=t=in:st={start:.3f}:d=0.30:alpha=1,"
@@ -335,7 +337,7 @@ def apply_effects(
                 dest = f"[stage{i}]"
                 filters.append(
                     f"{prev}[emoji{i}]overlay=x='{sticker_x}':"
-                    f"y='{sticker_y+bob}-{bob}*min(1,max(0,(t-{start:.3f})/0.42))':"
+                    f"y='{sticker_y}':"
                     f"enable='between(t,{start:.3f},{clip_end:.3f})'"
                     f":shortest=1{dest}"
                 )
@@ -354,9 +356,12 @@ def apply_effects(
                 continue
             args.extend(["-loop","1","-framerate","30","-i",str(card)])
             start=insert.time
-            finish=min(duration,start+1.35)
-            insert_width=max(220,round(286*sx))
-            insert_height=max(172,round(228*sy))
+            finish=min(duration,start+(1.80 if insert_style=="reference_soft" else 1.35))
+            # Reference cutaways take approximately half the picture, not
+            # the tiny cards used by legacy vintage styles.
+            large=insert_style=="reference_soft"
+            insert_width=max(220,round((625 if large else 286)*sx))
+            insert_height=max(172,round((497 if large else 228)*sy))
             filters.append(
                 f"[{current_input}:v]"
                 f"scale={insert_width}:{insert_height},format=rgba,"
@@ -367,7 +372,7 @@ def apply_effects(
             dest=f"[cardstage{i}]"
             filters.append(
                 f"{prev}[insert{i}]overlay=x='(main_w-overlay_w)/2':"
-                f"y='main_h*0.16+26*max(0,1-(t-{start:.3f})*5)':"
+                f"y='main_h*0.16+26*max(0,1-(t-{start:.3f})*3)':"
                 f"enable='between(t,{start:.3f},{finish:.3f})':shortest=1{dest}"
             )
             prev=dest
