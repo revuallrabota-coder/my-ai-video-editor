@@ -248,6 +248,7 @@ def apply_effects(
     font_profile: str = "bold",
     small_font_profile: str = "modern",
     animation_style: str = "float",
+    private_assets = None,
 ) -> dict:
     """Тематические винтажные cutaway, эмодзи, звук, без изменения речи."""
     from telegram_editor import duration_and_audio, media_info, execute
@@ -278,11 +279,21 @@ def apply_effects(
     sy=frame_height/1280
     from retro_inserts import choose_retro_cues, make_retro_card, make_retro_sound_track
     from reference_motion_scenes import select_motion_cues, make_motion_assets
+    from semantic_editing import choose_semantic_cues
+    semantic_cues=(choose_semantic_cues(words,duration,insert_density)
+                   if insert_style=="reference_soft" else [])
     motion_cues=(select_motion_cues(words,duration,insert_density)
                  if insert_style=="reference_soft" else [])
     retro=(choose_retro_cues(words,duration,density=insert_density)
            if insert_style not in ("off","reference_soft") else [])
-    cues = pick_cues(words, duration)
+    semantic_emojis={
+        "error":"❌","inspect":"🔎","success":"✅","compare":"↔️",
+        "time":"⏱️","speech":"💬","camera":"🎥",
+        "phone":"📱","next":"➡️",
+    }
+    # No stickers merely for saying a generic "маникюр" or "видео".
+    cues=([(c.start,semantic_emojis.get(c.kind)) for c in semantic_cues]
+          if insert_style=="reference_soft" else pick_cues(words,duration))
     caption_cues = (pick_caption_cues(words,duration,style=caption_sound)
                     if caption_sound != "off" else [])
     # Обычные смайлы не перекрывают большую иллюстрированную карточку.
@@ -304,7 +315,9 @@ def apply_effects(
                     used_phrases.add(k)
                     break
     if (sound == "off" and not visual and not caption_cues
-            and not retro and not motion_cues):
+            and not retro and not motion_cues
+            and not (private_assets and any(
+                c.kind in private_assets.icons for c in semantic_cues))):
         source.replace(target)
         return {"emoji_count": 0, "sfx_count": 0, "caption_sfx_count": 0,
                 "insert_count": 0, "insert_sfx_count": 0}
@@ -421,6 +434,45 @@ def apply_effects(
                 current_input+=1
             scene_count+=1
 
+        # Private animated icon MOV, matched to the actual spoken topic.
+        private_icon_count=0
+        if private_assets is not None and insert_style=="reference_soft":
+            for cue in semantic_cues:
+                if private_icon_count>=6:
+                    break
+                if any(cue.start < mc.end+0.2 and cue.end>mc.start-0.2
+                       for mc in motion_cues):
+                    continue
+                media=private_assets.icons.get(cue.kind)
+                if media is None or not media.is_file():
+                    continue
+                start,end=cue.start,cue.end
+                if end-start<0.50:
+                    continue
+                args.extend(["-stream_loop","-1","-t",
+                             f"{end-start+0.20:.3f}","-i",str(media)])
+                size=max(96,round(225*sx))
+                label=f"[privateicon{private_icon_count}]"
+                filters.append(
+                    f"[{current_input}:v]fps=30,scale={size}:{size},"
+                    f"format=rgba,trim=duration={end-start+0.15:.3f},"
+                    f"setpts=PTS-STARTPTS+{start:.3f}/TB,"
+                    f"fade=t=in:st={start:.3f}:d=0.16:alpha=1,"
+                    f"fade=t=out:st={max(start+0.2,end-0.2):.3f}:"
+                    f"d=0.18:alpha=1{label}"
+                )
+                stage=f"[privateiconstage{private_icon_count}]"
+                x=f"(main_w-overlay_w)*{0.72 if cue.kind in ('error','inspect') else 0.12}"
+                y=f"main_h*{0.24 if cue.kind in ('error','inspect') else 0.34}"
+                filters.append(
+                    f"{prev}{label}overlay=x='{x}':y='{y}':"
+                    f"enable='between(t,{start:.3f},{end:.3f})':"
+                    f"shortest=0:eof_action=pass:repeatlast=0{stage}"
+                )
+                prev=stage
+                current_input+=1
+                private_icon_count+=1
+
         sfx_count = 0
         caption_sfx_count = 0
         insert_sfx_count = 0
@@ -449,6 +501,28 @@ def apply_effects(
             track_inputs.append(f"[{current_input}:a:0]")
             current_input+=1
             insert_sfx_count=insert_count
+        # Dramatic trailer accents only when explicitly enabled and
+        # meaningful; low-volume against the unchanged original speech.
+        if (insert_sound=="on" and has_audio and private_assets is not None
+                and insert_style=="reference_soft"):
+            for cue in semantic_cues:
+                if cue.kind not in ("error","compare"):
+                    continue
+                wav=private_assets.sounds.get(cue.kind)
+                if wav is None or not wav.is_file():
+                    continue
+                args.extend(["-i",str(wav)])
+                label=f"[private_sfx{insert_sfx_count}]"
+                milliseconds=int(cue.start*1000)
+                filters.append(
+                    f"[{current_input}:a:0]atrim=0:0.42,"
+                    f"asetpts=PTS-STARTPTS,volume=0.045,"
+                    f"adelay={milliseconds}:all=1{label}"
+                )
+                track_inputs.append(label)
+                current_input+=1
+                insert_sfx_count+=1
+                if insert_sfx_count>=3:break
         if len(track_inputs)>1:
             filters.append(
                 "".join(track_inputs)
@@ -457,7 +531,7 @@ def apply_effects(
             )
             sound_output = "[mixed]"
 
-        if emoji_count or insert_count or scene_count:
+        if emoji_count or insert_count or scene_count or private_icon_count:
             args.extend(["-filter_complex",";".join(filters),"-map",prev,
                          "-c:v","libx264","-preset",export.preset,"-crf",str(export.crf)])
         elif sfx_count or caption_sfx_count or insert_sfx_count:
@@ -475,5 +549,7 @@ def apply_effects(
         execute(args)
         return {"emoji_count":emoji_count, "sfx_count":sfx_count,
                 "caption_sfx_count":caption_sfx_count,
-                "insert_count":insert_count+scene_count,
-                "insert_sfx_count":insert_sfx_count}
+                "insert_count":insert_count+scene_count+private_icon_count,
+                "insert_sfx_count":insert_sfx_count,
+                "semantic_cue_count":len(semantic_cues),
+                "private_asset_count":private_icon_count}
