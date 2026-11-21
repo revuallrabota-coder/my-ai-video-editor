@@ -373,9 +373,12 @@ def apply_effects(
             args.extend(["-loop","1","-framerate","30","-i",str(card)])
             start=insert.time
             finish=min(duration,start+1.35)
+            insert_width=max(220,round(286*sx))
+            insert_height=max(172,round(228*sy))
             filters.append(
-                f"[{current_input}:v]format=rgba,"
-                f"fade=t=in:st={start:.3f}:d=0.19:alpha=1,"
+                f"[{current_input}:v]"
+                f"scale={insert_width}:{insert_height},format=rgba,"
+                f"fade=t=in:st={start:.3f}:d=0.26:alpha=1,"
                 f"fade=t=out:st={max(start+0.25,finish-0.22):.3f}:d=0.22:"
                 f"alpha=1[insert{i}]"
             )
