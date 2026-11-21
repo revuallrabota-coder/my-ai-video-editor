@@ -88,6 +88,7 @@
     <p class="note" id="montageStageHint">Полоса показывает этап работы, а не точное оставшееся время.</p>
     <p class="note" id="montageRetention"></p>
     <button type="button" class="btn secondary" id="refreshMontageStatus" style="width:100%;margin:8px 0">🔄 Проверить этап монтажа</button>
+    <button type="button" class="btn primary" id="downloadMasterQuick" style="width:100%;margin:8px 0" hidden>⬇️ Скачать Full HD без перехода по шагам</button>
     <p class="note">После завершения загрузки (100%) можно закрыть приложение: обработка продолжится в GitHub Actions. Закрытие во время передачи файлов останавливает загрузку, которую потом можно возобновить. Этапы придут в Telegram.</p>
   </section>
   <div class="progress" id="progress"></div>
@@ -832,11 +833,16 @@
           '. Готовый MP4 лучше сохранить на iPad заранее.'
         : '🗑 Временные файлы могут быть уже удалены.';
       byId('checkUploadedResult').hidden=!data.ready;
+      byId('downloadMasterQuick').hidden=!data.ready;
     }catch(err){
       stage.textContent='⚠️ '+(err.message||err);
     }finally{refreshingStatus=false}
   }
   byId('refreshMontageStatus').addEventListener('click',refreshProjectStatus);
+  byId('downloadMasterQuick').addEventListener('click',function(){
+    byId('checkUploadedResult').click();
+    byId('upload50Status').scrollIntoView({behavior:'smooth',block:'nearest'});
+  });
   byId('checkMontageStatus').addEventListener('click',function(){
     if(!showStatusCard()){
       byId('upload50Status').textContent='Сначала загрузи видео в монтаж.';
