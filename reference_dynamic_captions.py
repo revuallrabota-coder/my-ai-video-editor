@@ -531,4 +531,22 @@ def build_reference_dynamic_ass(
             "&H801E1820,&H960A1018,0,0,0,0,100,100,0,0,1,0.4,0.4,5,70,70,10,1\n"
             "\n[Events]\n")
         events.extend(_hero_events(words,intro_title,accent_color,small_color))
+        # Little stars occasionally follow the words as animated scene accents.
+        star_shape="m 0 -18 l 4 -4 20 0 4 4 0 20 -4 4 -20 0 -4 -4"
+        for j,group in enumerate(phrases):
+            if j%5!=3:
+                continue
+            a,b=_phrase_lifetime(phrases,j)
+            if b-a<0.30:
+                continue
+            cx,cy,_,_,_,_=phrase_motion(j,caption_position,animation_style)
+            x=105 if j%2 else 604
+            sy=max(325,min(1020,cy-85))
+            ms=round((b-a)*1000)
+            events.append(
+                f"Dialogue: 4,{ass_time(a)},{ass_time(b)},HeroStar,,0,0,0,,"
+                "{"+rf"\an5\move({x},{sy+8},{x+8},{sy-7},0,{ms})"
+                +r"\fad(190,200)\fscx70\fscy70"
+                +rf"\t(0,{ms},\frz24\fscx105\fscy105)\p1"
+                +"}"+star_shape+r"{\p0}"+"\n")
     return header+"".join(events),len(events)
