@@ -1,4 +1,4 @@
-"""GitHub Actions: download private 50 MB chunks from Cloudflare KV, edit, send MP4.
+"""GitHub Actions: download private 300 MB chunks from Cloudflare KV, edit, send MP4.
 
 Cloudflare Worker verifies Telegram initData on upload and GitHub's bot
 secret on downloads. Never print raw file, worker tokens, or full URLs.
@@ -23,7 +23,7 @@ from speech_review import (
 from telegram_editor import duration_and_audio, transcribe_words
 
 LOG = logging.getLogger("private_upload_montage")
-MAX_BYTES = 50_000_000
+MAX_BYTES = 300_000_000  # 300MB, 75 x 4MB KV fragments
 
 
 def read_chunked_video(
@@ -59,7 +59,7 @@ def read_chunked_video(
         not isinstance(size, int) or size < 4096 or size > MAX_BYTES
         or not isinstance(chunk_size, int) or chunk_size != 4_000_000
         or not isinstance(parts, int) or parts != (size + chunk_size-1)//chunk_size
-        or not 1 <= parts <= 13
+        or not 1 <= parts <= 75
     ):
         raise ValueError("Недостоверные размеры файла из Cloudflare.")
     downloaded = 0
@@ -147,7 +147,7 @@ def wait_for_transcript_review(
     offset = recent[-1]["update_id"]+1 if recent else None
     send_text(
         token,chat_id,
-        "📝 Черновик субтитров для видео до 50 МБ:\n\n"
+        "📝 Черновик субтитров для видео до 300 МБ:\n\n"
         + transcript[:3500]
         + "\n\n⏱ Сдвиг титров: +"+str(round(delay,2))+" сек.\n"
         "Ответь /ok или /fix ошибка=правильно, /text ПОЛНЫЙ ТЕКСТ.\n"
@@ -200,7 +200,7 @@ def main() -> None:
         reference = root/"reference.mp4"
         out = root/"finished-reels.mp4"
         try:
-            send_text(token,owner,"📥 Получаю исходник до 50 МБ через защищённый Cloudflare.")
+            send_text(token,owner,"📥 Получаю исходник до 300 МБ через защищённый Cloudflare.")
             metadata=read_chunked_video(worker_url,upload_id,token,source)
             config=metadata.get("settings") or {}
             mode=config.get("mode","my_style")
@@ -319,7 +319,7 @@ def main() -> None:
             LOG.exception("Private upload montage failed")
             send_text(
                 token,owner,
-                "⚠️ Монтаж 50 МБ завершился с ошибкой: "
+                "⚠️ Монтаж 300 МБ завершился с ошибкой: "
                 + str(exc)[:220]
                 + "\nПроверь журнал GitHub Actions → upload-video-50mb."
             )
