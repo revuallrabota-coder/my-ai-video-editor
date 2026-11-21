@@ -404,6 +404,7 @@ def montage_by_reference(
             insert_style=insert_style, insert_density=insert_density,
             insert_sound=insert_sound,
             font_profile=font_profile, small_font_profile=small_font_profile,
+            animation_style=animation_style,
         )
     return {
         "before": round(source_duration, 1),
