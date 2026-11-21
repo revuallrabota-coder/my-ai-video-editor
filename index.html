@@ -124,7 +124,8 @@
     <p>Выбери готовый стиль или настрой крупные и мелкие надписи отдельно. Предпросмотр показывает приблизительный вид.</p>
     <label class="field" for="reelsPreset">Готовый стиль Reels</label>
     <select id="reelsPreset">
-      <option value="editorial" selected>🎬 Editorial — как в референсе</option>
+      <option value="reference_soft" selected>🌸 Нежный референс — пудровый розовый</option>
+      <option value="editorial">🎬 Editorial — красный + белый</option>
       <option value="old_money">🤎 Old Money — сдержанная роскошь</option>
       <option value="vintage">🎞️ Vintage — плёночная эстетика</option>
       <option value="street">🖤 Street — уличная типографика</option>
@@ -162,7 +163,8 @@
     <p class="note">Новый режим «Нежные фразы» выводит сразу короткое предложение, выделяя одно смысловое слово более крупным и цветным. Вся фраза плавно всплывает и мягко исчезает. Тень очень лёгкая, а полупрозрачный фон появляется только иногда и всегда вместе с надписью. Маленький эмодзи располагается рядом с фразой, не перекрывая текст. Для прежней анимации каждого слова отдельно доступны Signature, Contrast и Classic. Предпросмотр показывает только приблизительный стиль.</p>
     <label class="field" for="captionVariant">Вариант цвета и оформления надписей</label>
     <select id="captionVariant">
-      <option value="editorial" selected>Editorial — красный + белый</option>
+      <option value="reference_soft" selected>Reference Soft — нежно-розовый + молочный</option>
+      <option value="editorial">Editorial — красный + белый</option>
       <option value="old_money">Old Money — песочный + кремовый</option>
       <option value="vintage">Vintage — терракотовый + бежевый</option>
       <option value="street">Street — лаймовый + молочный</option>
@@ -173,19 +175,19 @@
       <option value="pop">Pop — розовый</option>
     </select>
     <label class="field" for="color">Цвет крупного слова — можно изменить</label>
-    <input type="color" id="color" value="#f0443e">
+    <input type="color" id="color" value="#e8a4b5">
     <div class="split">
       <div><label class="field" for="fontBig">Крупный шрифт</label>
         <select id="fontBig">
           <option value="elegant">Элегантный курсив</option>
           <option value="clean">Минималистичный</option>
-          <option value="bold" selected>Плотный акцент</option>
+          <option value="bold">Плотный акцент</option>
           <option value="bebas">Bebas-стиль — высокий узкий</option>
           <option value="platform">Platform-стиль — широкий жирный</option>
           <option value="bubble">Bubble — округлый стикер с обводкой</option>
           <option value="script">Script — декоративный курсив</option>
           <option value="modern">Modern — строгий современный</option>
-          <option value="old_money">Old Money — классическая антиква</option>
+          <option value="old_money" selected>Old Money — классическая антиква</option>
           <option value="vintage">Vintage — ретро курсив</option>
           <option value="street">Street — плотный графичный</option>
           <option value="refined">Elegant — утончённый современный</option>
@@ -199,7 +201,7 @@
 </select></div>
       <div><label class="field" for="fontSmall">Мелкий шрифт</label>
         <select id="fontSmall">
-          <option value="modern" selected>Modern — тонкий современный</option>
+          <option value="modern">Modern — тонкий современный</option>
           <option value="clean">Clean — простой и читаемый</option>
           <option value="elegant">Elegant — журнальная классика</option>
           <option value="bold">Bold — плотный</option>
@@ -210,7 +212,7 @@
           <option value="old_money">Old Money — тонкая антиква</option>
           <option value="vintage">Vintage — ретро подпись</option>
           <option value="street">Street — графичный</option>
-          <option value="refined">Elegant — изящный</option>
+          <option value="refined" selected>Elegant — изящный</option>
                   <option value="roboto">Roboto — современный чёткий кириллический</option>
           <option value="open_sans">Open Sans — мягкий чистый</option>
           <option value="noto_sans">Noto Sans — универсальный русский</option>
@@ -245,10 +247,10 @@
     <select id="position"><option value="middle" selected>Средняя часть кадра</option><option value="top">Верхняя часть кадра</option><option value="bottom">Нижняя часть кадра</option></select>
     <label class="field" for="outline">Обводка: <span id="outlineValue">0</span></label>
     <input id="outline" type="range" min="0" max="8" value="0">
-    <label class="field" for="shadow">Мягкая тень: <span id="shadowValue">2</span></label>
-    <input id="shadow" type="range" min="0" max="10" value="2">
-    <label class="option"><input id="emoji" type="checkbox" checked> ✨ Эмодзи + тематические вставки под выбранный стиль</label>
-    <p class="note">Для Old Money, Vintage, Elegant, Street, Editorial, Minimal, Neon, Pop и Luxe автоматически выбираются свои карточки и звуковые акценты. Они появляются на ключевых словах. Галочка отключает и стикеры, и вставки.</p>
+    <label class="field" for="shadow">Мягкая тень: <span id="shadowValue">1</span></label>
+    <input id="shadow" type="range" min="0" max="10" value="1">
+    <label class="option"><input id="emoji" type="checkbox" checked> ✨ Маленькие эмодзи возле смысловых фраз</label>
+    <p class="note">Эмодзи появляются плавно только возле смысловых фраз. Большие иллюстрированные карточки больше не добавляются автоматически.</p>
     <label class="field" for="soundfx">🔊 Звуковые акценты на ключевых словах</label>
     <select id="soundfx">
       <option value="soft" selected>Тихие мягкие акценты</option>
@@ -505,7 +507,7 @@
     tiny.style.fontStyle=(['vintage','old_money','elegant','script'].includes(byId('fontSmall').value))?'italic':'normal';
     tiny.style.fontWeight=(byId('fontSmall').value==='refined'||byId('fontSmall').value==='clean')?'500':'700';
     var palette={
-      editorial:'#FFFFFF',old_money:'#FFF3E1',vintage:'#F4DFC7',
+      reference_soft:'#FFF6F8',editorial:'#FFFFFF',old_money:'#FFF3E1',vintage:'#F4DFC7',
       street:'#F5F5F0',elegant:'#FFFFFF',luxe:'#FFF4E5',
       minimal:'#EFEFEF',neon:'#F3F7E7',pop:'#FFF3F9'
     };
@@ -523,12 +525,13 @@
     var positions={top:'32%',middle:'62%',bottom:'78%'};
     byId('sample').style.top=positions[byId('position').value]||'60%';
     if(chosenFont!=='bubble')big.style.webkitTextStroke=byId('outline').value+'px #211832';
-    big.style.textShadow='0 2px '+(Number(byId('shadow').value)+2)+'px #000a';
+    big.style.textShadow='0 1px '+(Number(byId('shadow').value)+1)+'px #0005';
     big.textContent=byId('hookText').value.trim() || 'СУБТИТРЫ';
     byId('outlineValue').textContent=byId('outline').value;
     byId('shadowValue').textContent=byId('shadow').value;
   }
   var reelPresets={
+    reference_soft:{variant:'reference_soft',big:'old_money',small:'refined',filter:'none',color:'#E8A4B5',backing:'occasional',animation:'float'},
     editorial:{variant:'editorial',big:'bold',small:'modern',filter:'none',color:'#F0443E',backing:'occasional',animation:'float'},
     old_money:{variant:'old_money',big:'old_money',small:'refined',filter:'old_money',color:'#CEB68A',backing:'occasional',animation:'float'},
     vintage:{variant:'vintage',big:'vintage',small:'script',filter:'vintage',color:'#D79B6D',backing:'frequent',animation:'slide'},
@@ -808,6 +811,9 @@
       subtitle_delay:s.subtitleDelay,
       sound_effects:s.soundEffects,
       emoji_mode:s.emoji?'on':'off',
+      insert_style:'off',
+      insert_density:'subtle',
+      insert_sound:'off',
       hook:s.hook?s.hookText:'',
       hook_position:s.hook?s.hookPosition:'off'
     };
