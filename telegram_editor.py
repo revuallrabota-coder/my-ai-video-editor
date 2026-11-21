@@ -383,6 +383,7 @@ def write_ass(
     animation_style: str = "float",
     top_title: str = "",
     top_title_mode: str = "auto",
+    subject_side: str = "center",
 ) -> int:
     words = words_override if words_override is not None else transcribe_words(video_path)
     from reels_effects import add_hook_to_ass
@@ -420,6 +421,7 @@ def write_ass(
             animation_style=animation_style,
             intro_animated=(top_title_mode=="auto"),
             intro_title=hook if hook_position in ("start","both") else "",
+            subject_side=subject_side,
         )
         # The giant intro already displays the starting hook; avoid duplication.
         return save_subtitles(
@@ -546,10 +548,13 @@ def edit_video(
     top_title: str = "",
     top_title_mode: str = "auto",
     pause_removal: str = "tight",
+    subject_layout: str = "standard",
 ) -> dict:
     from reels_effects import apply_effects, validate_effects
     from speech_review import map_words_to_ranges, shift_word_timestamps
     validate_effects(sound_effects, emoji_mode, hook_position)
+    from portrait_caption_layer import check_layout
+    subject_layout = check_layout(subject_layout)
 
     duration, has_audio = duration_and_audio(original)
     ranges = ([Segment(0.0, duration)] if mode == "captions"
@@ -574,6 +579,8 @@ def edit_video(
         words = shift_word_timestamps(words, subtitle_delay, work_duration)
         subtitle_events = 0
         if mode != "cuts" and has_audio:
+            from portrait_caption_layer import choose_text_side
+            subject_side = choose_text_side(work) if subject_layout == "beside" else "center"
             ass = folder / "captions.ass"
             subtitle_events = write_ass(
                 work, ass, color, style=subtitle_style, hook=hook,
@@ -585,9 +592,15 @@ def edit_video(
                 background_style=background_style,
                 animation_style=animation_style,
                 top_title=top_title, top_title_mode=top_title_mode,
+                subject_side=subject_side,
             )
             if subtitle_events:
                 burn_subtitles(work, ass, staged, quality=quality)
+                if subject_layout != "standard":
+                    from portrait_caption_layer import protect_subject
+                    masked = folder / "foreground_protected.mp4"
+                    protect_subject(work, staged, masked, quality=quality)
+                    staged = masked
             else:
                 work.replace(staged)
         else:
