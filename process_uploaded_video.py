@@ -245,7 +245,10 @@ def main() -> None:
                     if str(config.get("emoji_mode","on"))=="on" else "off",
                 )),
                 insert_density=str(config.get("insert_density","balanced")),
-                insert_sound=str(config.get("insert_sound","on")),
+                insert_sound=str(config.get(
+                    "insert_sound",
+                    "off" if str(config.get("sound_effects","soft"))=="off" else "on",
+                )),
             )
             if mode in ("my_style", "reference"):
                 from reference_editor import montage_by_reference
