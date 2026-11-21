@@ -323,14 +323,15 @@ def write_ass(
     words = words_override if words_override is not None else transcribe_words(video_path)
     from reels_effects import add_hook_to_ass
 
-    def save_subtitles(content: str) -> int:
+    def save_subtitles(content: str, *, placement: str | None = None) -> int:
         seconds, _ = duration_and_audio(video_path)
         accent_color = (
             "#F0443E" if style == "contrast" and color == "auto" else
             "#FFFFFF" if style == "classic" and color == "auto" else color
         )
         complete = add_hook_to_ass(
-            content, hook, position=hook_position, duration=seconds,
+            content, hook, position=hook_position if placement is None else placement,
+            duration=seconds,
             color=accent_color, font_profile=font_profile,
         )
         output_ass.write_text(complete, encoding="utf-8")
@@ -346,8 +347,12 @@ def write_ass(
             caption_variant=caption_variant,
             background_style=background_style,
             animation_style=animation_style,
+            intro_animated=True,
+            intro_title=hook if hook_position in ("start","both") else "",
         )
-        return save_subtitles(content)
+        # The giant intro already displays the starting hook; avoid duplication.
+        return save_subtitles(content, placement=(
+            "end" if hook_position in ("end","both") else "off"))
 
     if caption_animation == "word_pop":
         from word_captions import build_word_pop_ass
@@ -517,6 +522,7 @@ def edit_video(
             insert_style=insert_style, insert_density=insert_density,
             insert_sound=insert_sound,
             font_profile=font_profile, small_font_profile=small_font_profile,
+            animation_style=animation_style,
         )
     return {
         "before": round(duration, 1),
