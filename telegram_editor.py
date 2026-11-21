@@ -112,6 +112,68 @@ def ranges_to_keep(silences: list[Segment], duration: float) -> list[Segment]:
     return kept
 
 
+def get_speech_keep_ranges(
+    words: Sequence[tuple[float,float,str]],
+    duration: float, mode: str = "tight",
+) -> list[Segment]:
+    """Remove actual between-word pauses, even with noisy room sound.
+
+    Word boundaries from Whisper are more reliable for talking-head reels
+    than a fixed dB threshold on a noisy nail-salon recording. Leave short
+    natural breaths, protect both sides of every word, and avoid jumpy 0.1s
+    fragments. The original speech is NEVER deleted or time-stretched here;
+    playback speed is handled separately by atempo.
+    """
+    if mode not in ("off","gentle","balanced","tight"):
+        raise ValueError("Неверная настройка удаления пауз.")
+    duration=float(duration)
+    if duration<=0:
+        raise ValueError("Некорректная длительность.")
+    if mode=="off" or not words:
+        return [Segment(0.0,duration)]
+    threshold,pad={
+        "gentle":(.85,.24),
+        "balanced":(.52,.16),
+        "tight":(.32,.11),
+    }[mode]
+    ordered=sorted(
+        (max(0.,float(a)),min(duration,float(b))) for a,b,t in words
+        if b>a and str(t).strip() and a<duration
+    )
+    if not ordered:
+        return [Segment(0.0,duration)]
+    # Merge overlapping speech windows so we never cut inside a word.
+    merged=[]
+    for a,b in ordered:
+        if merged and a<=merged[-1][1]:
+            merged[-1]=(merged[-1][0],max(merged[-1][1],b))
+        else:
+            merged.append((a,b))
+    removals=[]
+    if merged[0][0]>threshold:
+        removals.append((0.0,max(0.,merged[0][0]-pad)))
+    for (_,last_end),(next_start,_) in zip(merged,merged[1:]):
+        gap=next_start-last_end
+        if gap>=threshold and gap>2*pad+.08:
+            removals.append((last_end+pad,next_start-pad))
+    if duration-merged[-1][1]>threshold:
+        removals.append((min(duration,merged[-1][1]+pad),duration))
+    kept=[]
+    cursor=0.0
+    for left,right in removals:
+        if left>cursor+0.12:
+            kept.append(Segment(cursor,left))
+        cursor=max(cursor,right)
+    if duration>cursor+0.12:
+        kept.append(Segment(cursor,duration))
+    if not kept:
+        return [Segment(0.0,duration)]
+    saved=sum(x.end-x.start for x in kept)
+    if saved<duration*.28 or len(kept)>85:
+        return [Segment(0.0,duration)]
+    return kept
+
+
 def get_keep_ranges(path: Path, duration: float, has_audio: bool) -> list[Segment]:
     if not has_audio:
         return [Segment(0.0, duration)]
@@ -471,7 +533,7 @@ def edit_video(
     emoji_mode: str = "off",
     hook_position: str = "start",
     quality: str = "high",
-    subtitle_delay: float = 0.30,
+    subtitle_delay: float = 0.0,
     small_font_profile: str = "modern",
     caption_variant: str = "editorial",
     background_style: str = "occasional",
@@ -483,6 +545,7 @@ def edit_video(
     private_assets = None,
     top_title: str = "",
     top_title_mode: str = "auto",
+    pause_removal: str = "tight",
 ) -> dict:
     from reels_effects import apply_effects, validate_effects
     from speech_review import map_words_to_ranges, shift_word_timestamps
@@ -490,7 +553,9 @@ def edit_video(
 
     duration, has_audio = duration_and_audio(original)
     ranges = ([Segment(0.0, duration)] if mode == "captions"
-              else get_keep_ranges(original, duration, has_audio))
+              else get_speech_keep_ranges(words_override,duration,pause_removal)
+              if words_override is not None
+              else get_keep_ranges(original,duration,has_audio))
     with tempfile.TemporaryDirectory(prefix="editor_") as directory:
         folder=Path(directory)
         work = folder / "joined.mp4"
