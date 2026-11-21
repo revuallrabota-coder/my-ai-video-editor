@@ -321,7 +321,7 @@
     <div id="summary"></div>
     <div class="alert" style="margin:16px 0">
       <strong>🎬 Монтаж Reels · до 500 МБ</strong>
-      <p class="note">Исходник загрузится из приложения частями. После этого бот пришлёт черновик речи на проверку, затем готовый MP4 без дополнительного сжатия в Telegram.</p>
+      <p class="note">Исходные ролики загрузятся частями. Бот пришлёт текст речи на проверку, а готовый Reels отправит прямо в Telegram. Большой исходный MP4 сохранится отдельно без лишнего сжатия, если поддерживает хранилище.</p>
       <label class="field" for="launcherBase">Адрес Cloudflare (настраивается один раз)</label>
       <input id="launcherBase" type="url" inputmode="url" autocomplete="off" placeholder="https://твой-worker.workers.dev" style="width:100%;max-width:100%">
       <button class="btn primary" id="upload50Button" type="button" style="width:100%;margin-top:12px">🎬 Смонтировать Reels</button>
@@ -339,6 +339,10 @@
     <!-- Скрытые элементы прежних прототипов сохраняют совместимость JS,
          но не мешают пользователю десятком дублирующих кнопок. -->
     <div id="legacyControls" hidden aria-hidden="true">
+      <!-- Hidden for compatibility only; the new previewPhoto input is the
+           supported photo control and never uploads user images. -->
+      <input id="photos" type="file" accept="image/*" multiple>
+      <div id="photoInfo"></div>
       <button id="launchWithoutCard" type="button">Старый запуск GitHub Actions</button>
       <p id="launchStatus"></p>
       <input id="apiBase" type="url" autocomplete="off">
