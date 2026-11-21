@@ -165,7 +165,7 @@ def validate_settings(config: dict) -> dict:
     },"reference_soft")
     insert_density=option("insert_density",{
         "subtle","balanced","dynamic"
-    },"subtle")
+    },"balanced")
     insert_sound=option("insert_sound",{"on","off"},"off")
     color = str(config.get("color", "auto"))
     if color != "auto" and not re.fullmatch(r"#[a-fA-F0-9]{6}", color):
