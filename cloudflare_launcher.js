@@ -15,7 +15,8 @@ const GITHUB_API =
 
 const GITHUB_UPLOAD_API =
   "https://api.github.com/repos/revuallrabota-coder/my-ai-video-editor/actions/workflows/upload-video-50mb.yml/dispatches";
-const MAX_UPLOAD_BYTES = 300_000_000; // 300 MB, decimal (75 x 4MB KV parts)
+const MAX_UPLOAD_BYTES = 500_000_000; // Entire project, across all videos
+const MAX_UPLOAD_FILES = 12; // Avoid exhausting free KV quotas
 const UPLOAD_PART_BYTES = 4_000_000;
 const UPLOAD_TTL = 3 * 60 * 60; // 3h automatic deletion if runner fails
 
@@ -233,9 +234,16 @@ async function githubDispatch(endpoint, token, inputs) {
   }
 }
 
-// Check KV keys + tiny per-chunk metadata. Never load 300 MB of chunks into a
+// Check KV keys + tiny per-chunk metadata. Never load 500 MB of chunks into a
 // single Worker invocation (Workers have a much smaller memory limit).
-async function storedChunkIndexes(env, uploadId, category, parts, totalBytes) {
+function uploadPartBytes(meta, index) {
+  const file=(meta.files||[]).find(f=>index>=f.offset && index<f.offset+f.parts);
+  if (!file) return -1;
+  const localIndex=index-file.offset;
+  return Math.min(UPLOAD_PART_BYTES,file.size-localIndex*UPLOAD_PART_BYTES);
+}
+
+async function storedChunkIndexes(env, uploadId, category, parts, totalBytes, files=null) {
   const prefix=uploadKey(uploadId,category);
   const stored=new Set();
   let cursor;
@@ -247,7 +255,9 @@ async function storedChunkIndexes(env, uploadId, category, parts, totalBytes) {
       const suffix=item.name.slice(prefix.length);
       if (!/^(0|[1-9][0-9]*)$/.test(suffix)) continue;
       const index=Number(suffix);
-      const expected=Math.min(UPLOAD_PART_BYTES,totalBytes-index*UPLOAD_PART_BYTES);
+      const expected=files
+        ? uploadPartBytes({files},index)
+        : Math.min(UPLOAD_PART_BYTES,totalBytes-index*UPLOAD_PART_BYTES);
       if (Number.isSafeInteger(index) && index>=0 && index<parts &&
           item.metadata?.bytes===expected) stored.add(index);
     }
@@ -258,7 +268,7 @@ async function storedChunkIndexes(env, uploadId, category, parts, totalBytes) {
 
 async function workerUploadRoute(request, env, path) {
   if (!env.UPLOADS) {
-    return json({error:"Для видео 300 МБ подключи KV namespace к Worker под именем UPLOADS."},503);
+    return json({error:"Для проекта до 500 МБ подключи KV namespace к Worker под именем UPLOADS."},503);
   }
   const internal = path.startsWith("/internal/upload/");
   if (internal) {
@@ -277,7 +287,7 @@ async function workerUploadRoute(request, env, path) {
     if (request.method === "GET" && operation === "manifest") {
       return json({
         id, size:meta.size, parts:meta.parts, original_name:meta.original_name,
-        settings:meta.settings, chunk_size:UPLOAD_PART_BYTES
+        files:meta.files,settings:meta.settings, chunk_size:UPLOAD_PART_BYTES
       });
     }
     const cm = operation.match(/^chunk\/(\d+)$/);
@@ -360,12 +370,13 @@ async function workerUploadRoute(request, env, path) {
     if (!meta) return json({error:"Файл уже удалён или время хранения истекло."},404);
     const o=meta.output;
     const uploaded=meta.state==="uploading"
-      ? await storedChunkIndexes(env,clientStatus[1],"",meta.parts,meta.size)
+      ? await storedChunkIndexes(env,clientStatus[1],"",meta.parts,meta.size,meta.files)
       : new Set();
     return json({
       ready:meta.state==="done" && o?.state==="ready",
       size:o?.size ?? 0,parts:o?.parts ?? 0,
       input_size:meta.size,input_parts:meta.parts,
+      input_files:(meta.files||[]).map(f=>({name:f.name,size:f.size})),
       uploaded_parts:[...uploaded].sort((a,b)=>a-b),
       state:meta.state
     });
@@ -393,22 +404,43 @@ async function workerUploadRoute(request, env, path) {
     let payload;
     try { payload = await request.json(); }
     catch { return json({error:"Неверный запрос на загрузку"},400); }
-    const size=Number(payload.size);
-    if (!Number.isSafeInteger(size) || size < 4096 || size > MAX_UPLOAD_BYTES) {
-      return json({error:"Максимум 300 МБ для одного видео."},413);
+    // The user may attach up to 12 source clips. Their combined bytes are
+    // limited, not each file separately. Preserve upload/concat order.
+    const rawFiles=Array.isArray(payload.files) ? payload.files :
+      [{name:payload.filename,size:payload.size}];
+    if (rawFiles.length<1 || rawFiles.length>MAX_UPLOAD_FILES) {
+      return json({error:"В одном проекте можно выбрать от 1 до 12 видео."},413);
     }
-    const original=String(payload.filename ?? "");
-    if (!/\.(mp4|mov|m4v|webm|mkv)$/i.test(original)) {
-      return json({error:"Поддерживается видео MP4, MOV, M4V, WEBM или MKV."},400);
+    let total=0,offset=0;
+    const files=[];
+    for (const raw of rawFiles) {
+      const size=Number(raw?.size);
+      const name=String(raw?.name ?? "");
+      if (!Number.isSafeInteger(size) || size<4096 || size>MAX_UPLOAD_BYTES) {
+        return json({error:"Некорректный размер видео (от 4 КБ до 500 МБ)."},413);
+      }
+      if (!/\.(mp4|mov|m4v|webm|mkv)$/i.test(name)) {
+        return json({error:"Поддерживаются видео MP4, MOV, M4V, WEBM или MKV."},400);
+      }
+      const parts=Math.ceil(size/UPLOAD_PART_BYTES);
+      files.push({name:name.slice(-120),size,parts,offset});
+      total+=size;
+      offset+=parts;
     }
+    if (total>MAX_UPLOAD_BYTES ||
+        (payload.size!==undefined && Number(payload.size)!==total)) {
+      return json({error:"Общий размер всех видео не должен превышать 500 МБ."},413);
+    }
+    const original=files[0].name;
+    const size=total;
     let settings;
     try {settings=verifiedWorkerSettings(payload.settings ?? {});}
     catch(err){return json({error:String(err.message ?? err)},400);}
     const id=crypto.randomUUID();
-    const parts=Math.ceil(size/UPLOAD_PART_BYTES);
+    const parts=offset; // Sum of per-file chunks, not ceil(total/4MB).
     await env.UPLOADS.put(
       uploadKey(id,"meta"),
-      JSON.stringify({id,size,parts,original_name:original.slice(-120),
+      JSON.stringify({id,size,parts,files,original_name:original,
         settings,state:"uploading",created:Date.now()}),
       {expirationTtl:UPLOAD_TTL}
     );
@@ -425,7 +457,8 @@ async function workerUploadRoute(request, env, path) {
     if (!Number.isSafeInteger(index) || index < 0 || index >= meta.parts) {
       return json({error:"Неверный номер части."},400);
     }
-    const expected=Math.min(UPLOAD_PART_BYTES,meta.size-index*UPLOAD_PART_BYTES);
+    const expected=uploadPartBytes(meta,index);
+    if (expected<1) return json({error:"Неверная схема частей."},400);
     const length=Number(request.headers.get("Content-Length") ?? 0);
     if (length && length !== expected) {
       return json({error:"Часть файла неверного размера."},400);
@@ -448,7 +481,7 @@ async function workerUploadRoute(request, env, path) {
     }
     // Confirm all parts have reached KV before launching GitHub.
     // KV is eventually consistent; retry in app when replicas lag.
-    const uploaded=await storedChunkIndexes(env,id,"",meta.parts,meta.size);
+    const uploaded=await storedChunkIndexes(env,id,"",meta.parts,meta.size,meta.files);
     if (uploaded.size!==meta.parts) {
       const missing=Array.from({length:meta.parts},(_,i)=>i)
         .find(i=>!uploaded.has(i));
@@ -471,7 +504,7 @@ async function workerUploadRoute(request, env, path) {
     );
     return json({
       started:true,
-      message:"Видео до 300 МБ передано. GitHub скачает его частями и смонтирует Reels; большой итоговый MP4 скачай из приложения."
+      message:"Все исходники проекта до 500 МБ переданы. GitHub соединит видео в нужном порядке и смонтирует один Reels."
     },202);
   }
   return json({error:"Неизвестный маршрут загрузки"},404);
@@ -485,7 +518,8 @@ export default {
       return json({ status: "online", mode: "github-actions-launcher",
         uploads_50mb_configured: Boolean(env.UPLOADS),
          uploads_300mb_configured: Boolean(env.UPLOADS),
-         max_upload_mb: 300 });
+         uploads_500mb_configured: Boolean(env.UPLOADS),
+         max_upload_mb: 500,max_files:MAX_UPLOAD_FILES });
     }
     if (path.startsWith("/internal/upload/")) {
       return workerUploadRoute(request, env, path);
