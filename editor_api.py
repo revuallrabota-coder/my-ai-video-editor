@@ -147,7 +147,7 @@ def validate_settings(config: dict) -> dict:
     },"refined")
     choose_font(small_font)
     caption_variant=option("caption_variant",{
-        "reference_soft","editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant"
+        "reference_soft","editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant","contour_talk","cream_talk"
     },"reference_soft")
     background_style=option("background_style",{
         "off","occasional","frequent","always"
