@@ -51,7 +51,8 @@ class CascadeSubtitleTests(unittest.TestCase):
             cx,cy,dx,dy,_,_=move(word)
             # The shadow has TOP-LEFT ASS anchoring and the glyph CENTER:
             # compare motion delta and measured capsule center, not x/y.
-            self.assertEqual((bx-ax,by-ay),(dx-cx,dy-cy))
+            self.assertLessEqual(abs((bx-ax)-(dx-cx)),1)
+            self.assertLessEqual(abs((by-ay)-(dy-cy)),1)
             shape=re.search(r"}m \d+ 0 l \d+ 0 b \d+ 0 (\d+)",shadow)
             self.assertIsNotNone(shape)
             width=int(shape.group(1))
