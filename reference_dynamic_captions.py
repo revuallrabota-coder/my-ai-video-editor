@@ -151,10 +151,15 @@ def phrase_groups(words: Sequence[Word]) -> list[list[Word]]:
     if len(groups)>1 and len(groups[-1])==1:
         previous=groups[-2]
         tail=groups[-1][0]
-        if (len(previous)<=3 and tail[0]-previous[-1][1]<=0.44
-                and sum(len(x[2])+1 for x in previous)+len(tail[2])<=44):
-            previous.append(tail)
-            groups.pop()
+        gap=tail[0]-previous[-1][1]
+        if gap<=0.44 and not re.search(r"[.!?…]$",previous[-1][2]):
+            if len(previous)>=4:
+                # 5+1 words feels like an abrupt single flash. Redistribute
+                # to 4+2 instead, preserving the spoken word order.
+                groups[-1].insert(0,previous.pop())
+            elif sum(len(x[2])+1 for x in previous)+len(tail[2])<=44:
+                previous.append(tail)
+                groups.pop()
     return groups
 
 
