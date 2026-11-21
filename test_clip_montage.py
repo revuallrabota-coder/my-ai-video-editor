@@ -46,7 +46,7 @@ class VideoProjectTests(unittest.TestCase):
                 result=subprocess.run([
                     "ffmpeg","-hide_banner","-loglevel","error",
                     "-ss",str(t),"-i",str(output),
-                    "-frames:v","1","-vf","crop=1:1:360:640",
+                    "-frames:v","1","-vf","crop=2:2:360:640",
                     "-f","rawvideo","-pix_fmt","rgb24","-"
                 ],check=True,capture_output=True,timeout=40)
                 return tuple(result.stdout[:3])
