@@ -26,11 +26,11 @@ const CHOICES = {
   camera_style: ["cinematic_pan", "editorial", "soft_punch", "enhanced", "gentle", "off"],
   video_filter: ["none","warm","soft","cool","contrast","clean","film","matte","old_money","vintage","street","elegant"],
   caption_position: ["top", "middle", "bottom"],
-  font_profile: ["elegant", "clean", "bold", "bebas", "platform", "bubble", "script", "modern", "old_money","vintage","street","refined"],
+  font_profile: ["elegant", "clean", "bold", "bebas", "platform", "bubble", "script", "modern", "old_money","vintage","street","refined","roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed"],
   audio_profile: ["off", "balanced", "strong"],
   video_speed: ["1.0", "1.1", "1.2"],
   caption_variant: ["editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant"],
-  small_font_profile: ["elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined"],
+  small_font_profile: ["elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined","roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed"],
   background_style: ["off","occasional","frequent","always"],
   animation_style: ["float","pop","slide"],
   subtitle_sfx: ["off","soft","tick"]
