@@ -136,19 +136,19 @@ def validate_settings(config: dict) -> dict:
         "subtitle_style",
         {"reference_dynamic","signature","contrast","classic",
          "signature_phrases","contrast_phrases","classic_phrases"},
-        "signature",
+        "reference_dynamic",
     )
     font = option("font_profile", {
         "elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined","roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed",
-    }, "elegant")
+    }, "old_money")
     choose_font(font)
     small_font = option("small_font_profile",{
         "elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined","roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed",
-    },"modern")
+    },"refined")
     choose_font(small_font)
     caption_variant=option("caption_variant",{
-        "editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant"
-    },"editorial")
+        "reference_soft","editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant"
+    },"reference_soft")
     background_style=option("background_style",{
         "off","occasional","frequent","always"
     },"occasional")
@@ -162,10 +162,10 @@ def validate_settings(config: dict) -> dict:
     insert_style=option("insert_style",{
         "off","retro","old_money","vintage","elegant","street",
         "editorial","minimal","neon","pop","luxe"
-    },retro_default if str(config.get("emoji_mode","on"))=="on" else "off")
+    },"off")
     insert_density=option("insert_density",{
         "subtle","balanced","dynamic"
-    },"balanced")
+    },"subtle")
     insert_sound=option("insert_sound",{"on","off"},"on")
     color = str(config.get("color", "auto"))
     if color != "auto" and not re.fullmatch(r"#[a-fA-F0-9]{6}", color):
