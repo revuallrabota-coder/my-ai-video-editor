@@ -690,7 +690,7 @@
   });
 
 
-  // Прямой безопасный входной файл до 300 MB через Cloudflare KV.
+  // Прямой многоклиповый проект до 500 MB через Cloudflare KV.
   // Обычный Bot API не скачивает больше 20 MB: здесь он не используется
   // для исходника. Размер частей 4 MB и поочерёдная отправка с iPad.
   byId('upload50Button').addEventListener('click',async function(){
@@ -704,18 +704,21 @@
         throw new Error('Сначала укажи адрес своего Cloudflare Worker ниже, без /health.');
       }
       var auth=telegramProof();
-      var videos=videoInput.files;
-      if(videos.length!==1)throw new Error('Исходник не выбран. Нажми «Назад» и на первом экране «Выбрать видео». В поле «Видео-референс» загружать исходник не нужно.');
+      var videos=selectedClips.slice();
+      if(videos.length<1 || videos.length>12)
+        throw new Error('Выбери от 1 до 12 видео на первом экране.');
       if(ratio!=='9:16')throw new Error('Для Reels выбери вертикальный формат 9:16.');
       if(byId('fontFile').files.length)throw new Error('Свой файл шрифта пока нельзя передать: выбери встроенный.');
       var settings=buildRenderSettings();
-      if(settings.mode==='reference')throw new Error('Для загрузки до 300 МБ выбери «Мой стиль» (без второго видео-референса).');
-      var file=videos[0];
-      if(file.size>300000000){
-        throw new Error('Исходник «'+file.name+'» весит '+fmtBytes(file.size)+'. Максимум 300 МБ.');
-      }
-      if(file.size<4096){
-        throw new Error('Файл «'+file.name+'» пустой или меньше 4 КБ. Выбери настоящий видеофайл в разделе «Выбрать видео».');
+      if(settings.mode==='reference')throw new Error('Для проекта до 500 МБ выбери «Мой стиль» (без второго видео-референса).');
+      var totalSize=videos.reduce(function(sum,file){return sum+file.size},0);
+      if(totalSize>500000000)throw new Error(
+        'Общий размер проекта '+fmtBytes(totalSize)+'. Максимум 500 МБ на все видео вместе.');
+      for(var f=0;f<videos.length;f++){
+        if(videos[f].size<4096)throw new Error(
+          'Видео №'+(f+1)+' пустое или слишком маленькое.');
+        if(!/\.(mp4|mov|m4v|webm|mkv)$/i.test(videos[f].name))
+          throw new Error('Видео №'+(f+1)+': поддерживаются MP4, MOV, M4V, WEBM, MKV.');
       }
       if(settings.mode!=='cuts' && settings.speed!==1){
         status.textContent='ℹ️ Для синхронизации текста лучше скорость 1.0.';
@@ -736,49 +739,64 @@
         if(!response.ok)throw new Error(data.error||('Cloudflare ответил HTTP '+response.status));
         return data;
       }
-      status.textContent='Подготавливаю загрузку видео до 300 МБ…';
-      // Resume an interrupted upload only for the same selected video/settings.
-      // Local storage holds metadata, never video bytes.
+      status.textContent='Подготавливаю проект: '+videos.length+' видео, '+fmtBytes(totalSize)+'…';
+      // Each file starts a fresh 4MB-chunk sequence. Flat chunk IDs
+      // preserve the user's exact clip order without bundling 500MB in RAM.
+      var uploadParts=[];
+      videos.forEach(function(file,clipIndex){
+        for(var j=0;j<Math.ceil(file.size/4000000);j++){
+          uploadParts.push({
+            clipIndex:clipIndex,start:j*4000000,
+            end:Math.min(file.size,(j+1)*4000000)
+          });
+        }
+      });
+      var fingerprint=JSON.stringify(videos.map(function(file){
+        return [file.name,file.size,file.lastModified];
+      }));
       var old=null,signature=JSON.stringify(settings);
       try{old=JSON.parse(localStorage.getItem('personalEditorLastUpload')||'null')}catch(ignore){}
       var id=null,partSize=4000000,parts=0,completed=new Set();
-      if(old && old.url===url && old.filename===file.name &&
-          old.size===file.size && old.settings===signature &&
-          Date.now()-old.created<2.5*60*60*1000){
+      if(old && old.url===url && old.fingerprint===fingerprint &&
+          old.settings===signature && Date.now()-old.created<2.5*60*60*1000){
         try{
           var resumed=await request('/upload/'+old.id+'/status','GET');
-          if(resumed.input_size===file.size && resumed.state==='uploading'){
+          if(resumed.input_size===totalSize && resumed.state==='uploading' &&
+             resumed.input_parts===uploadParts.length){
             id=old.id;
             parts=resumed.input_parts;
             (resumed.uploaded_parts||[]).forEach(function(i){completed.add(i)});
-            status.textContent='↩️ Продолжаю загрузку: уже получено '+completed.size+' частей.';
+            status.textContent='↩️ Восстанавливаю загрузку: '+completed.size+
+              ' частей уже в облаке.';
           }else if(resumed.state==='queued' || resumed.state==='done'){
-            status.textContent='✅ Этот файл уже загружен. Монтаж запущен.';
+            status.textContent='✅ Этот видеопроект уже передан на монтаж.';
             return;
           }
-        }catch(ignore){ /* expired session: start a fresh transfer */ }
+        }catch(ignore){ /* create a new session when the old one expired */ }
       }
       if(!id){
-        var start=await request('/upload/start','POST',
-          JSON.stringify({filename:file.name,size:file.size,settings:settings}),false);
+        var start=await request('/upload/start','POST',JSON.stringify({
+          files:videos.map(function(file){return {name:file.name,size:file.size}}),
+          size:totalSize,settings:settings
+        }),false);
         id=start.upload_id;
         partSize=start.chunk_size;
         parts=start.parts;
         try{localStorage.setItem('personalEditorLastUpload',
-          JSON.stringify({id:id,url:url,filename:file.name,size:file.size,
+          JSON.stringify({id:id,url:url,fingerprint:fingerprint,
              settings:signature,created:Date.now()}))}catch(ignore){}
       }
       if(!Number.isInteger(partSize) || partSize!==4000000 ||
-          parts!==Math.ceil(file.size/partSize) || !Number.isInteger(parts)){
-        throw new Error('Сервер вернул неверный размер частей загрузки.');
+          parts!==uploadParts.length || !Number.isInteger(parts)){
+        throw new Error('Сервер вернул неправильное число частей проекта.');
       }
       byId('checkUploadedResult').hidden=false;
       progress.value=Math.round(completed.size*100/parts);
       for(var i=0;i<parts;i++){
         if(completed.has(i))continue;
-        var a=i*partSize,b=Math.min(file.size,(i+1)*partSize);
-        // Blob.slice keeps only one 4MB chunk in the iPad webview.
-        var chunk=file.slice(a,b);
+        var piece=uploadParts[i];
+        var file=videos[piece.clipIndex];
+        var chunk=file.slice(piece.start,piece.end);
         for(var tries=0;tries<4;tries++){
           try{
             await request('/upload/'+id+'/'+i,'PUT',chunk,true);
@@ -791,7 +809,9 @@
         }
         completed.add(i);
         progress.value=Math.round(completed.size*100/parts);
-        status.textContent='📤 Загружено '+progress.value+'% · '+completed.size+' из '+parts+' частей';
+        status.textContent='📤 '+progress.value+'% · Видео '+
+          (piece.clipIndex+1)+'/'+videos.length+
+          ' · часть '+completed.size+'/'+parts;
       }
       status.textContent='Проверяю целостность файла и запускаю GitHub Actions…';
       var response;
@@ -805,10 +825,10 @@
           await new Promise(function(resolve){setTimeout(resolve,Math.min(12000,2000*(retries+1)))});
         }
       }
-      status.textContent='✅ Видео '+Math.round(file.size/1000000)+
-        ' МБ передано без сжатия. GitHub Actions начинает монтаж. '+
-        'Теперь открой чат Telegram-бота, проверь текст и ответь /ok. '+
-        'Готовый MP4 бот пришлёт документом, чтобы не снижать качество.';
+      status.textContent='✅ Загружено '+videos.length+' видео ('+
+        Math.round(totalSize/1000000)+' МБ). GitHub объединит их в один Reels. '+
+        'Открой Telegram-бота, проверь общий текст и ответь /ok. '+
+        'Если готовый MP4 больше лимита Telegram, скачай его здесь.';
       progress.value=100;
     }catch(err){
       status.textContent='⚠️ '+(err.message||err);
