@@ -84,7 +84,7 @@ jobs:
       - name: "Реально проверить через FFmpeg, что длинные слова и подложки не обрезаются"
         run: python -m unittest -v test_caption_safe_area.py
 
-      - name: "Проверить 12 шрифтов и кириллицу"
+      - name: "Проверить 19 шрифтов с русской кириллицей"
         run: python -m unittest -v test_font_presets.py
 
       - name: "Проверить анимацию одного слова и рендер"
