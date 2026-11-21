@@ -50,6 +50,7 @@ const CHOICES = {
   caption_variant: ["reference_soft","editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant"],
   small_font_profile: ["elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined","roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed"],
   background_style: ["off","occasional","frequent","always"],
+  subject_layout: ["standard","behind","beside"],
   top_title_mode: ["auto","off","intro","always"],
   animation_style: ["float","pop","slide"],
   subtitle_sfx: ["off","soft","tick"],
@@ -187,6 +188,7 @@ function verifiedWorkerSettings(config) {
   const captionVariant = field(config.caption_variant,"caption_variant","editorial");
   const smallFont = field(config.small_font_profile,"small_font_profile","modern");
   const backgroundStyle = field(config.background_style,"background_style","occasional");
+  const subjectLayout = field(config.subject_layout,"subject_layout","standard");
   // The user-written title is independent from the hook and subtitle words.
   const topTitle=String(config.top_title??"").trim();
   if (topTitle.length>70 || /[\\{}\r\n]/.test(topTitle)) {
@@ -219,6 +221,7 @@ function verifiedWorkerSettings(config) {
     small_font_profile: smallFont,
     caption_variant: captionVariant,
     background_style: backgroundStyle,
+    subject_layout: subjectLayout,
     top_title: topTitle,
     top_title_mode: topTitleMode,
     animation_style: animationStyle,
