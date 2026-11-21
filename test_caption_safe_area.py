@@ -36,35 +36,29 @@ class CaptionSafeAreaTests(unittest.TestCase):
                     )
 
     def test_no_random_horizontal_scattering_or_duplicate_context(self):
+        from reference_dynamic_captions import phrase_groups
         words = [
             (0.1,0.42,"Я"),(0.44,0.74,"так"),
             (0.76,1.25,"параллельна"),
             (1.6,1.9,"работа"),(1.94,2.4,"мастера"),
         ]
         ass, count = build_reference_dynamic_ass(
-            words,
-            background_style="always",
-            font_profile="old_money",
-            small_font_profile="refined",
+            words, background_style="always",
+            font_profile="old_money",small_font_profile="refined",
         )
-        self.assertGreater(count, 1)
-        self.assertNotIn(r"\fs107", ass)
-        self.assertEqual(count, len(re.findall(r"^Dialogue:",ass,re.M)))
-        self.assertEqual(
-            len(re.findall(r"^Dialogue: 2,",ass,re.M)),
-            len(re.findall(r"^Dialogue: 0,",ass,re.M)),
-        )
-        # Word is centered at x=360; positive-coordinate backplate begins
-        # at x=(360-half_w), unlike the previous detached negative drawing.
+        self.assertLess(count,len(words))
+        self.assertEqual(count,len(phrase_groups(words)))
+        self.assertEqual(count,len(re.findall(r"^Dialogue:",ass,re.M)))
+        # Every phrase including its translucent backplate is ONE event.
+        self.assertEqual(ass.count("Dialogue: 2,"),count)
+        self.assertNotIn("Dialogue: 0,",ass)
+        self.assertNotIn("Dialogue: 1,",ass)
+        self.assertIn("Style: PhrasePlate,",ass)
+        self.assertIn("ПАРАЛЛЕЛЬНА",ass)
+        self.assertIn(r"\clip(72,175,648,1105)",ass)
         for line in ass.splitlines():
             if line.startswith("Dialogue: 2,"):
-                self.assertRegex(line,r"\\(?:move|pos)\(360,")
-            if line.startswith("Dialogue: 0,"):
-                self.assertIn(r"\an7",line)
-                self.assertIn(r"\p1",line)
-                self.assertIn(r"\clip(65,170,655,1140)",line)
-        # Text is never rendered again as a separate distant extra line.
-        self.assertNotIn("Dialogue: 1,", ass)
+                self.assertIn(r"\move(360,",line)
 
     def test_ffmpeg_renders_long_emphasis_inside_9_by_16(self):
         from PIL import Image, ImageChops
