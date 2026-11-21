@@ -25,6 +25,26 @@ from signature_captions import ass_color, ass_time, pick_main_word, safe_text
 Word=tuple[float,float,str]
 
 
+def oval_path(w: int, h: int) -> str:
+    """Capsule in positive coordinates for ASS top-left anchor (\\an7).
+
+    Negative vector coordinates combined with \\an5 can be laid out by libass
+    relative to the glyph bounding box, creating the detached shadow the user
+    observed. A top-left origin matches the exact measured word rectangle.
+    """
+    w=max(64,round(w));h=max(36,round(h))
+    r=h/2;k=.55228475
+    n=lambda x:round(x)
+    return (
+        f"m {n(r)} 0 l {n(w-r)} 0 "
+        f"b {n(w-r+k*r)} 0 {w} {n(r-k*r)} {w} {n(r)} "
+        f"b {w} {n(h-r+k*r)} {n(w-r+k*r)} {h} {n(w-r)} {h} "
+        f"l {n(r)} {h} "
+        f"b {n(r-k*r)} {h} 0 {n(h-r+k*r)} 0 {n(h-r)} "
+        f"b 0 {n(r-k*r)} {n(r-k*r)} 0 {n(r)} 0"
+    )
+
+
 def _row_positions(words: Sequence[tuple[int,str]], cy: int,
                    center_x: int, font: FontSpec, size: int) -> dict[int,tuple[int,int]]:
     """Distribute a small helper row with fixed spacing, always in safe area."""
@@ -178,12 +198,22 @@ def build_reference_cascade_ass(
             if has_halo:
                 width=min(515,max(65,round(measured+15)))
                 height=max(38,round(size*1.10+11))
-                halo=_oval_phrase_shadow(width,height)
-                # 0xAE = subtle, blurred shadow; no opaque dark banner.
-                # Pink large-word accents follow the reference's soft glow.
+                halo=oval_path(width,height)
+                # The visual shadow is anchored to each actual word, not to
+                # the center of the complete phrase or independent layout.
                 plate_color=(highlight if is_big else "&H00251D24&")
+                x0=round(x-width/2+drift)
+                x1=round(x-width/2)
+                y0=round(y-height/2+rise)
+                y1=round(y-height/2)
+                halo_move=(
+                    rf"\move({x0},{y0},{x1},{y1},0,"
+                    f"{min(260,duration_ms)})"
+                )
                 shadow_prefix=(
-                    "{"+common+r"\blur5.3"
+                    "{"+r"\an7"+halo_move
+                    +rf"\fad({fadein},{fadeout})"+alpha
+                    +r"\blur5.3"
                     +rf"\1c{plate_color}\1a&HAD&\p1"+"}"
                 )
                 events.append(
