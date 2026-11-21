@@ -98,19 +98,27 @@ class SemanticMontageTests(unittest.TestCase):
                 "-vf","format=argb,drawbox=x=18:y=18:w=60:h=60:color=red@1:t=fill",
                 "-c:v","qtrle",str(icon)
             ],check=True,capture_output=True,timeout=60)
+            sound=root/"sample.wav"
+            subprocess.run([
+                "ffmpeg","-hide_banner","-loglevel","error","-y",
+                "-f","lavfi","-i","sine=frequency=180:duration=1",
+                "-c:a","pcm_s16le",str(sound)
+            ],check=True,capture_output=True,timeout=30)
             from private_effect_assets import PrivateAssets
-            assets=PrivateAssets(icons={"error":icon})
+            assets=PrivateAssets(icons={"error":icon},
+                                 sounds={"error":sound})
             # A strong explicit error cue, well after the opening title.
             words=[(2.7,3.1,"вот"),(3.15,3.6,"ошибка"),
                    (3.7,4.15,"покрытия")]
             result=apply_effects(
                 source,done,words,emoji="off",sound="off",
                 caption_sound="off",insert_style="reference_soft",
-                insert_density="subtle",insert_sound="off",
+                insert_density="subtle",insert_sound="on",
                 quality="balanced",private_assets=assets
             )
             self.assertEqual(result["private_asset_count"],1)
             self.assertEqual(result["semantic_cue_count"],1)
+            self.assertEqual(result["insert_sfx_count"],1)
             self.assertEqual(result["insert_count"],1)
             seconds,audio=duration_and_audio(done)
             self.assertTrue(audio)
