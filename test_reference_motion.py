@@ -25,12 +25,12 @@ class ReferenceMotionTests(unittest.TestCase):
         )
         self.assertGreater(count,0)
         self.assertLess(count, len(self.WORDS)*3)
-        # One phrase with inline emphasis, single event (including its plate).
+        # One text event per phrase; any oval shadow has its own synced layer.
         self.assertIn("Сейчас",text)
         self.assertIn("расскажу",text)
         self.assertIn("Style: Phrase,",text)
         self.assertIn("Style: PhrasePlate,",text)
-        self.assertEqual(text.count("Dialogue: 2,"),count)
+        self.assertEqual(text.count("Dialogue: 2,")+text.count("Dialogue: 1,"),count)
         self.assertNotIn("Dialogue: 0,",text)
         self.assertIn(r"\move(",text)
         self.assertIn(r"\fad(",text)
