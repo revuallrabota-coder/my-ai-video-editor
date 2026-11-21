@@ -25,18 +25,17 @@ class ReferenceMotionTests(unittest.TestCase):
         )
         self.assertGreater(count,0)
         self.assertLess(count, len(self.WORDS)*3)
-        # Малые слова теперь собираются в читабельные микро-фразы,
-        # поэтому один титр может содержать 2–3 последовательных слова.
-        self.assertIn("Сейчас расскажу",text)
-        self.assertIn("Style: Main",text)
-        self.assertIn("Style: Tiny",text)
-        self.assertIn("Style: Plate",text)
+        # One phrase with inline emphasis, single event (including its plate).
+        self.assertIn("Сейчас",text)
+        self.assertIn("расскажу",text)
+        self.assertIn("Style: Phrase,",text)
+        self.assertIn("Style: PhrasePlate,",text)
+        self.assertEqual(text.count("Dialogue: 2,"),count)
+        self.assertNotIn("Dialogue: 0,",text)
         self.assertIn(r"\move(",text)
         self.assertIn(r"\fad(",text)
         # Максимальный кегль ограничен безопасной зоной 9:16, 107 больше не допустим.
         self.assertNotIn(r"\fs107",text)
-        self.assertRegex(text,r"\\fs(?:3[0-9]|4[0-9])")
-        self.assertIn("Dialogue: 0,",text)
         self.assertIn("Dialogue: 2,",text)
         self.assertIn("&H003E44F0&",text)  # red #F0443E in ASS BGR
         self.assertNotIn("Cheat Code",text)
