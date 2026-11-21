@@ -32,9 +32,9 @@ def publish_progress(
     url=f"{worker_url.rstrip('/')}/internal/upload/{upload_id}/progress"
     headers={"Authorization":"Bearer "+bot_token}
     payload={"stage":stage,"message":str(message)[:180]}
-    for attempt in range(3):
+    for attempt in range(2):
         try:
-            response=requests.post(url,json=payload,headers=headers,timeout=20)
+            response=requests.post(url,json=payload,headers=headers,timeout=6)
             if response.ok:
                 return True
             if response.status_code not in (409,429,500,502,503,504):
@@ -43,7 +43,7 @@ def publish_progress(
                 return False
         except requests.RequestException:
             pass
-        if attempt<2:
-            time.sleep(1.5*(attempt+1))
+        if attempt<1:
+            time.sleep(1.0)
     LOG.warning("Cloudflare progress update for stage %s unavailable",stage)
     return False
