@@ -372,7 +372,7 @@ def apply_effects(
             dest=f"[cardstage{i}]"
             filters.append(
                 f"{prev}[insert{i}]overlay=x='(main_w-overlay_w)/2':"
-                f"y='main_h*0.16+26*max(0,1-(t-{start:.3f})*3)':"
+                f"y='main_h*{0.07 if large else 0.16}+26*max(0,1-(t-{start:.3f})*3)':"
                 f"enable='between(t,{start:.3f},{finish:.3f})':shortest=1{dest}"
             )
             prev=dest
