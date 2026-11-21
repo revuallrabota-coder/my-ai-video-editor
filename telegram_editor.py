@@ -516,6 +516,7 @@ def edit_video(
             caption_sound=subtitle_sfx,
             insert_style=insert_style, insert_density=insert_density,
             insert_sound=insert_sound,
+            font_profile=font_profile, small_font_profile=small_font_profile,
         )
     return {
         "before": round(duration, 1),
