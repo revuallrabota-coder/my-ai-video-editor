@@ -20,7 +20,7 @@ from reference_dynamic_captions import (
     _measure_width, fit_caption_size, _oval_phrase_shadow,
     phrase_groups, phrase_motion, COLOR_PALETTES
 )
-from signature_captions import ass_color, ass_time, pick_main_word, safe_text
+from signature_captions import ass_color, ass_time, pick_main_word, safe_text, STOP_WORDS
 
 Word=tuple[float,float,str]
 
@@ -45,6 +45,33 @@ def oval_path(w: int, h: int) -> str:
     )
 
 
+EDITORIAL_KEYWORDS=(
+    "ошиб","маникюр","покры","кутикул","результ","важн",
+    "секунд","врем","вручную","монтир","монтаж","выреза",
+    "добавля","субтитр","картин","неправильн","проблем",
+    "сравн","причин","исправ","френч","акцент","съёмк",
+    "скорост","качеств","клиент",
+)
+
+
+def _pick_editorial_keyword(group: Sequence[Word]) -> int:
+    """Emphasize meaningful spoken concepts, not filler or merely length."""
+    original=pick_main_word(group)
+    scored=[]
+    for i,(_,_,raw) in enumerate(group):
+        word=re.sub(r"[^\wа-яёА-ЯЁ-]","",str(raw)).lower()
+        weight=min(12,len(word))*.75
+        if word in STOP_WORDS or len(word)<=2:
+            weight-=7
+        if any(stem in word for stem in EDITORIAL_KEYWORDS):
+            weight+=5.5
+        weight+=.20*i
+        scored.append((weight,i))
+    best=max(scored)[1]
+    # If all words are stop words, preserve legacy emphasis choice.
+    return best if scored[best][0]>0 else original
+
+
 def _row_positions(words: Sequence[tuple[int,str]], cy: int,
                    center_x: int, font: FontSpec, size: int) -> dict[int,tuple[int,int]]:
     """Distribute a small helper row with fixed spacing, always in safe area."""
@@ -62,7 +89,7 @@ def _row_positions(words: Sequence[tuple[int,str]], cy: int,
 
 def _caption_slots(group: Sequence[Word], index: int, caption_position: str,
                    small: FontSpec, big: FontSpec) -> tuple[dict[int,tuple[int,int,int,bool]],int]:
-    main=pick_main_word(group)
+    main=_pick_editorial_keyword(group)
     cx,cy,*_=phrase_motion(index,caption_position,"float")
     main_word=safe_text(group[main][2]).upper()
     accent_size=fit_caption_size(main_word,53,big,max_width=485)
