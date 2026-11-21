@@ -190,11 +190,11 @@ def main() -> None:
     except ValueError:
         raise RuntimeError("OWNER_TELEGRAM_ID должен быть числом.") from None
 
-    mode = os.environ.get("MONTAGE_MODE", "auto")
+    mode = os.environ.get("MONTAGE_MODE", "my_style")
     color = os.environ.get("SUBTITLE_COLOR", "auto")
     audio_profile = os.environ.get("AUDIO_PROFILE", "balanced")
     audio_filterchain(audio_profile)  # early validation
-    selected_subtitle_style = os.environ.get("SUBTITLE_STYLE", "signature")
+    selected_subtitle_style = os.environ.get("SUBTITLE_STYLE", "reference_dynamic")
     # GitHub Actions ограничивает число отдельных полей формы.
     # Одна настройка выбирает и палитру, и способ появления текста.
     caption_animation = (
@@ -225,7 +225,7 @@ def main() -> None:
     get_export_profile(quality)
     filter_style = os.environ.get("VIDEO_FILTER", "none")
     caption_position = os.environ.get("CAPTION_POSITION", "middle")
-    font_profile = os.environ.get("FONT_PROFILE", "elegant")
+    font_profile = os.environ.get("FONT_PROFILE", "old_money")
     if caption_position not in ("top", "middle", "bottom"):
         raise ValueError("Недопустимое положение субтитров.")
     from font_presets import choose_font
