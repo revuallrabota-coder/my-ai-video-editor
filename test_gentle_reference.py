@@ -28,7 +28,7 @@ class GentleReferenceTests(unittest.TestCase):
             background_style="always",animation_style="float",
         )
         self.assertGreaterEqual(count,2)
-        self.assertLess(count,len(self.WORDS)//2+1)
+        self.assertLess(count,len(self.WORDS)+2)
         lines=[row for row in ass.splitlines() if row.startswith("Dialogue:")]
         self.assertEqual(len(lines),count)
         self.assertNotIn("Dialogue: 0,",ass)
@@ -37,14 +37,16 @@ class GentleReferenceTests(unittest.TestCase):
             self.assertIn(r"\fad(",line)
             self.assertIn(r"\move(",line)
             self.assertIn(r"\clip(72,175,648,1105)",line)
-            self.assertIn("PhrasePlate,",line)
+            self.assertTrue("PhrasePlate,," in line or "OvalShadow,," in line)
         # Never silently drop a spoken word, even with long phrases.
         shown=re.sub(r"\{[^}]*\}","", "\n".join(lines))
         shown=shown.replace(r"\N"," ").lower()
         for _,_,word in self.WORDS:
             self.assertIn(word.lower(),shown)
         self.assertIn(r"\fnLiberation Serif",ass)
-        self.assertNotIn(r"\p1",ass)
+        self.assertIn(r"\p1",ass)
+        self.assertIn("Style: OvalShadow,",ass)
+        self.assertEqual(ass.count("Dialogue: 1,"),len(phrase_groups(self.WORDS)))
 
     def test_grouping_does_not_leave_a_single_word_flicker(self):
         words=[
@@ -89,7 +91,7 @@ class GentleReferenceTests(unittest.TestCase):
         self.assertTrue(any(m.group(1)!=m.group(3) for m in motions))
 
     def test_true_ffmpeg_plate_stays_with_floating_phrase(self):
-        # Matte and text are ONE libass dialogue event. Verify actual pixels.
+        # Two ASS layers with EXACT shared timing/position render one moving oval.
         with tempfile.TemporaryDirectory(prefix="gentle_caption_") as td:
             root=Path(td)
             ass_file=root/"subtitle.ass"
