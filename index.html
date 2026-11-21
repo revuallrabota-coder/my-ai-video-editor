@@ -250,6 +250,8 @@
     <label class="field" for="shadow">Мягкая тень: <span id="shadowValue">1</span></label>
     <input id="shadow" type="range" min="0" max="10" value="1">
     <label class="option"><input id="emoji" type="checkbox" checked> ✨ Маленькие эмодзи возле смысловых фраз</label>
+    <label class="option"><input id="motionInserts" type="checkbox" checked> ⭐ Крупные вставки с графикой и звёздами на полэкрана</label>
+    <p class="note">В режиме «Нежные фразы» в начале автоматически появляется большое анимированное название по твоей речи или по тексту хука. Звёзды мягко движутся, а крупные монтажные вставки возникают на подходящих по смыслу моментах, не постоянно. Галочкой можно отключить большие промежуточные вставки.</p>
     <p class="note">Эмодзи появляются плавно только возле смысловых фраз. Большие иллюстрированные карточки больше не добавляются автоматически.</p>
     <label class="field" for="soundfx">🔊 Звуковые акценты на ключевых словах</label>
     <select id="soundfx">
@@ -390,6 +392,7 @@
       outline:Number(byId('outline').value),
       shadow:Number(byId('shadow').value),
       emoji:byId('emoji').checked,
+      motionInserts:byId('motionInserts').checked,
       soundEffects:byId('soundfx').value,
       hook:byId('hook').checked,
       hookPosition:byId('hookPosition').value,
@@ -811,7 +814,7 @@
       subtitle_delay:s.subtitleDelay,
       sound_effects:s.soundEffects,
       emoji_mode:s.emoji?'on':'off',
-      insert_style:'off',
+      insert_style:s.motionInserts?'reference_soft':'off',
       insert_density:'subtle',
       insert_sound:'off',
       hook:s.hook?s.hookText:'',
