@@ -41,16 +41,17 @@ class ReelsLooksTests(unittest.TestCase):
                     background_style="always",animation_style="slide",
                 )
                 self.assertGreater(n,0)
-                self.assertIn("Style: Main,"+choose_font(big).name,ass)
-                self.assertIn("Style: Tiny,"+choose_font(small).name,ass)
-                self.assertIn("Dialogue: 0,",ass)
+                self.assertIn("Style: Phrase,"+choose_font(small).name,ass)
+                self.assertIn(r"\fn"+choose_font(big).name,ass)
+                self.assertIn("Dialogue: 2,",ass)
+                self.assertNotIn("Dialogue: 0,",ass)
                 self.assertIn(r"\move(",ass)
         ass,n=build_reference_dynamic_ass(
             self.WORDS,background_style="off",animation_style="pop"
         )
         self.assertGreater(n,0)
         self.assertNotIn("Dialogue: 0,",ass)
-        self.assertIn(r"\pos(",ass)
+        self.assertIn(r"\move(",ass)
 
     def test_caption_sfx_are_sparse_not_every_word(self):
         words=[(i*.24,i*.24+.17,"обучение") for i in range(25)]
