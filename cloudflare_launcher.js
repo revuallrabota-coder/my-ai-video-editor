@@ -17,6 +17,8 @@ const GITHUB_UPLOAD_API =
   "https://api.github.com/repos/revuallrabota-coder/my-ai-video-editor/actions/workflows/upload-video-50mb.yml/dispatches";
 const MAX_UPLOAD_BYTES = 500_000_000; // Entire project, across all videos
 const MAX_UPLOAD_FILES = 12; // Avoid exhausting free KV quotas
+const MAX_ASSET_FILES = 4; // User-owned optional media packs, not published
+const MAX_ASSET_BYTES = 100_000_000; // Separate from 500MB video cap
 const UPLOAD_PART_BYTES = 4_000_000;
 const UPLOAD_TTL = 3 * 60 * 60; // 3h automatic deletion if runner fails
 
@@ -237,7 +239,8 @@ async function githubDispatch(endpoint, token, inputs) {
 // Check KV keys + tiny per-chunk metadata. Never load 500 MB of chunks into a
 // single Worker invocation (Workers have a much smaller memory limit).
 function uploadPartBytes(meta, index) {
-  const file=(meta.files||[]).find(f=>index>=f.offset && index<f.offset+f.parts);
+  const file=[...(meta.files||[]),...(meta.assets||[])]
+    .find(f=>index>=f.offset && index<f.offset+f.parts);
   if (!file) return -1;
   const localIndex=index-file.offset;
   return Math.min(UPLOAD_PART_BYTES,file.size-localIndex*UPLOAD_PART_BYTES);
@@ -287,7 +290,8 @@ async function workerUploadRoute(request, env, path) {
     if (request.method === "GET" && operation === "manifest") {
       return json({
         id, size:meta.size, parts:meta.parts, original_name:meta.original_name,
-        files:meta.files,settings:meta.settings, chunk_size:UPLOAD_PART_BYTES
+        files:meta.files,assets:meta.assets??[],asset_size:meta.asset_size??0,
+        settings:meta.settings, chunk_size:UPLOAD_PART_BYTES
       });
     }
     const cm = operation.match(/^chunk\/(\d+)$/);
@@ -376,13 +380,15 @@ async function workerUploadRoute(request, env, path) {
     if (!meta) return json({error:"Файл уже удалён или время хранения истекло."},404);
     const o=meta.output;
     const uploaded=meta.state==="uploading"
-      ? await storedChunkIndexes(env,clientStatus[1],"",meta.parts,meta.size,meta.files)
+      ? await storedChunkIndexes(env,clientStatus[1],"",meta.parts,meta.size,
+          [...(meta.files||[]),...(meta.assets||[])])
       : new Set();
     return json({
       ready:meta.state==="done" && o?.state==="ready",
       size:o?.size ?? 0,parts:o?.parts ?? 0,
       input_size:meta.size,input_parts:meta.parts,
       input_files:(meta.files||[]).map(f=>({name:f.name,size:f.size})),
+      input_assets:(meta.assets||[]).map(f=>({name:f.name,size:f.size})),
       uploaded_parts:[...uploaded].sort((a,b)=>a-b),
       state:meta.state
     });
@@ -437,6 +443,29 @@ async function workerUploadRoute(request, env, path) {
         (payload.size!==undefined && Number(payload.size)!==total)) {
       return json({error:"Общий размер всех видео не должен превышать 500 МБ."},413);
     }
+    // Optional archives are transferred privately and never enter GitHub
+    // source code. Their bytes do not count toward the video 500MB quota.
+    const rawAssets=payload.assets??[];
+    if (!Array.isArray(rawAssets) || rawAssets.length>MAX_ASSET_FILES) {
+      return json({error:"Максимум четыре приватных пакета эффектов."},413);
+    }
+    const assets=[];
+    let assetSize=0;
+    for (const raw of rawAssets) {
+      const size=Number(raw?.size);
+      const name=String(raw?.name??"");
+      if (!Number.isSafeInteger(size) || size<100 || size>MAX_ASSET_BYTES
+          || !/\.zip$/i.test(name)) {
+        return json({error:"Для эффектов поддерживаются только ZIP-пакеты до 100 МБ."},413);
+      }
+      assetSize+=size;
+      const parts=Math.ceil(size/UPLOAD_PART_BYTES);
+      assets.push({name:name.slice(-120),size,parts,offset});
+      offset+=parts;
+    }
+    if (assetSize>MAX_ASSET_BYTES || total+assetSize>600_000_000) {
+      return json({error:"Все ZIP-пакеты вместе не должны превышать 100 МБ."},413);
+    }
     const original=files[0].name;
     const size=total;
     let settings;
@@ -446,8 +475,8 @@ async function workerUploadRoute(request, env, path) {
     const parts=offset; // Sum of per-file chunks, not ceil(total/4MB).
     await env.UPLOADS.put(
       uploadKey(id,"meta"),
-      JSON.stringify({id,size,parts,files,original_name:original,
-        settings,state:"uploading",created:Date.now()}),
+      JSON.stringify({id,size,parts,files,assets,asset_size:assetSize,
+        original_name:original,settings,state:"uploading",created:Date.now()}),
       {expirationTtl:UPLOAD_TTL}
     );
     return json({upload_id:id,chunk_size:UPLOAD_PART_BYTES,parts},201);
@@ -487,7 +516,8 @@ async function workerUploadRoute(request, env, path) {
     }
     // Confirm all parts have reached KV before launching GitHub.
     // KV is eventually consistent; retry in app when replicas lag.
-    const uploaded=await storedChunkIndexes(env,id,"",meta.parts,meta.size,meta.files);
+    const uploaded=await storedChunkIndexes(env,id,"",meta.parts,meta.size,
+      [...(meta.files||[]),...(meta.assets||[])]);
     if (uploaded.size!==meta.parts) {
       const missing=Array.from({length:meta.parts},(_,i)=>i)
         .find(i=>!uploaded.has(i));
@@ -510,7 +540,7 @@ async function workerUploadRoute(request, env, path) {
     );
     return json({
       started:true,
-      message:"Все исходники проекта до 500 МБ переданы. GitHub соединит видео в нужном порядке и смонтирует один Reels."
+      message:"Видео и приватные ZIP-пакеты переданы. GitHub соединит клипы и выберет эффекты только по смыслу речи."
     },202);
   }
   return json({error:"Неизвестный маршрут загрузки"},404);
