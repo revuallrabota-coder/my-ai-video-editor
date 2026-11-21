@@ -27,6 +27,8 @@ class RetroCue:
 # Важные темы из разных ниш: маникюр, бьюти, обучение, маркетинг, медицина.
 # Слова из реального транскрипта, а не придуманная постановка.
 TOPICS: tuple[tuple[tuple[str, ...],str,str,str], ...] = (
+    (("монтаж","монтир","субтитр","титр","нарез","выреза"), "МОНТАЖ", "🎬", "shutter"),
+    (("бот","нейросет","искусственн","ии"), "AI МОНТАЖ", "✨", "sparkle"),
     (("маникюр","ногт","покрыти","френч","кутикул"), "МАНИКЮР", "💅", "sparkle"),
     (("зуб","стомат","эмал","кариес","дент","щетк","паст"), "ЗАБОТА", "🦷", "sparkle"),
     (("ошиб","проблем","неправ","кошмар","страшн"), "ВНИМАНИЕ!", "❗", "stamp"),
@@ -128,6 +130,7 @@ def _emoji_patch(symbol: str, size: int = 140):
 
 
 CARD_STYLES = {
+    "reference_soft": ((250,232,238,235),(91,55,75,255),(226,160,182,255),"soft_motion"),
     # bg, ink, border, visual shape
     "retro":     ((235,220,186,251),(77,55,45,255),(145,84,65,255),"archive"),
     "vintage":   ((232,209,167,251),(84,51,39,255),(162,88,55,255),"archive"),
@@ -142,6 +145,56 @@ CARD_STYLES = {
 }
 
 
+def _motion_star(brush, x: int, y: int, radius: int, color) -> None:
+    pts=[]
+    for j in range(8):
+        angle=j*math.pi/4-math.pi/2
+        r=radius if j%2==0 else radius*.22
+        pts.append((x+math.cos(angle)*r,y+math.sin(angle)*r))
+    brush.polygon(pts,fill=color)
+
+
+def _make_soft_motion_card(target: Path, label: str) -> None:
+    """Original semi-transparent editor/timeline cutaway, never a screenshot."""
+    from PIL import Image, ImageDraw, ImageFont, ImageFilter
+    w,h=480,382
+    bg=Image.new("RGBA",(w,h),(0,0,0,0))
+    shadow=Image.new("RGBA",(w,h),(0,0,0,0))
+    sd=ImageDraw.Draw(shadow)
+    sd.rounded_rectangle((26,22,464,367),radius=34,fill=(15,8,26,115))
+    bg.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(13)))
+    im=Image.new("RGBA",(w,h),(0,0,0,0))
+    d=ImageDraw.Draw(im)
+    d.rounded_rectangle((19,15,461,359),radius=31,
+                        fill=(244,220,232,239),outline=(255,251,252,248),width=4)
+    # A miniature ORIGINAL video-editing interface rather than fake media proof.
+    d.rounded_rectangle((48,55,432,239),radius=17,fill=(46,33,46,247))
+    d.rounded_rectangle((60,69,420,139),radius=8,fill=(93,72,88,255))
+    for idx in range(6):
+        xx=66+idx*58
+        tint=((202+idx*3,152+idx*6,167+idx*3,255))
+        d.rounded_rectangle((xx,79,xx+49,129),radius=5,fill=tint)
+        d.polygon([(xx+20,90),(xx+20,116),(xx+35,103)],fill=(255,248,250,230))
+    d.line((70,164,410,164),fill=(244,211,221,190),width=2)
+    for idx in range(4):
+        xx=70+idx*86
+        d.rounded_rectangle((xx,173,xx+78,199),radius=5,
+                            fill=(221,148,177,255) if idx==1 else (149,112,143,255))
+    d.line((200,154,200,221),fill=(255,249,253,255),width=3)
+    _motion_star(d,85,264,13,(255,255,255,250))
+    _motion_star(d,411,267,18,(218,147,179,255))
+    title=str(label).strip().upper()[:22] or "ВАЖНО"
+    font=_serif(42)
+    while font.size>24 and d.textbbox((0,0),title,font=font)[2]>340:
+        font=_serif(font.size-2)
+    d.text((240,292),title,font=font,fill=(99,57,83,255),anchor="mm")
+    d.text((240,332),"MOTION  •  EDIT  •  REELS",font=_serif(17,False),
+           fill=(165,109,137,245),anchor="mm")
+    bg.alpha_composite(im)
+    target.parent.mkdir(parents=True,exist_ok=True)
+    bg.save(target)
+
+
 def make_retro_card(
     target: Path, label: str, symbol: str, style: str = "retro",
 ) -> None:
@@ -149,6 +202,9 @@ def make_retro_card(
     if style not in CARD_STYLES:
         raise ValueError("Неизвестный стиль вставки: " + str(style))
     from PIL import Image, ImageDraw, ImageFilter
+    if style=="reference_soft":
+        _make_soft_motion_card(target,label)
+        return
 
     paper,ink,accent,shape=CARD_STYLES[style]
     w,h=480,382
