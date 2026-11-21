@@ -338,6 +338,7 @@ def montage_by_reference(
     private_assets = None,
     top_title: str = "",
     top_title_mode: str = "auto",
+    pause_removal: str = "tight",
 ) -> dict:
     """Монтаж с точной синхронизацией речи, динамичным кадром и титрами."""
     from reels_effects import apply_effects, validate_effects
@@ -353,11 +354,12 @@ def montage_by_reference(
     source_duration, source_has_audio = duration_and_audio(original)
     if not source_has_audio:
         raise ValueError("Для разговорного монтажа нужен исходный ролик с речью.")
-    # Главное исправление: в фирменном и референсном режимах не режем
-    # паузы перед словами. Исходная речь и видеоряд остаются на одной
-    # временной шкале. Динамика достигается движением камеры и титрами.
-    from telegram_editor import Segment
-    kept = [Segment(0.0, source_duration)]
+    # Remove awkward gaps BEFORE camera, text and time remapping; the
+    # word timestamps are mapped through the same edit decision.
+    from telegram_editor import get_speech_keep_ranges,get_keep_ranges
+    kept = (get_speech_keep_ranges(words_override,source_duration,pause_removal)
+            if words_override is not None
+            else get_keep_ranges(original,source_duration,source_has_audio))
     with tempfile.TemporaryDirectory(prefix="reference_render_") as tmp:
         folder = Path(tmp)
         joined = folder / "joined.mp4"
