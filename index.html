@@ -85,14 +85,20 @@
 
   <section class="card page active" data-page="0">
     <h2>Загрузить видео</h2>
-    <p>Выбери одно исходное видео с iPad или телефона, до 300 МБ. Референс ниже необязателен и не заменяет исходник.</p>
+    <p>Выбери несколько видео с iPad. **До 500 МБ суммарно** и до 2 минут общей продолжительности. Соединим их по порядку и смонтируем один Reels.</p>
     <label class="upload">
       <div class="emoji">📎</div>
-      <strong>Выбрать видео</strong>
+      <strong>Выбрать несколько видео</strong>
       <small>Открывается файловый менеджер устройства</small>
-      <input type="file" id="videos" accept="video/*">
+      <input type="file" id="videos" accept="video/*" multiple>
     </label>
     <div class="mini" id="videoInfo">Видео пока не выбрано.</div>
+    <label class="upload" style="padding:10px 12px;margin:10px 0;border-width:1px">
+      <strong style="font-size:14px">＋ Добавить ещё видео к проекту</strong>
+      <input type="file" id="addVideos" accept="video/*" multiple>
+    </label>
+    <div id="clipsList" aria-live="polite"></div>
+    <p class="note">Кнопками ↑ и ↓ настрой порядок сцен. В монтаже сохраняется именно этот порядок. До 12 видео в одном проекте.</p>
     <video id="firstVideo" controls playsinline hidden></video>
     <h3>Видео-референс (необязательно)</h3>
     <p class="note">Если выберешь режим «По референсу», этот пример отправится на подключённый сервер вместе с исходником. В других режимах референс используется только для предпросмотра.</p>
@@ -112,7 +118,7 @@
     <label class="option mode"><input type="radio" name="mode" value="Монтаж + субтитры"> ✂️ Монтаж + субтитры<small>Убрать долгие паузы и добавить подписи. Без смыслового анализа дублей.</small></label>
     <label class="option mode"><input type="radio" name="mode" value="Монтаж без субтитров"> 🎞️ Монтаж без субтитров<small>Только нарезка и движения камеры.</small></label>
     <label class="option mode"><input type="radio" name="mode" value="Только субтитры"> 💬 Только субтитры<small>Не резать видео, добавить оформление речи.</small></label>
-    <label class="option selected mode"><input type="radio" name="mode" value="Мой стиль" checked> 💗 Мой стиль — один исходник<small>По сохранённому референсу: мягкие зумы, розовые всплывающие субтитры и чистый голос. Выбери my_style в GitHub Actions, отправь одно видео.</small></label>
+    <label class="option selected mode"><input type="radio" name="mode" value="Мой стиль" checked> 💗 Мой стиль — несколько видео<small>Склеиваем выбранные клипы в один Reels, затем добавляем анимации, мягкие зумы и субтитры по общей речи.</small></label>
     <label class="option mode"><input type="radio" name="mode" value="По референсу"> 🎬 Монтаж по референсу<small>Первый этап: ритм смен кадров из видео-примера, зумы и субтитры. Для запуска выбери reference в GitHub Actions и отправь два видео в чат.</small></label>
     <h3>Свои фото в ролик</h3>
     <input type="file" id="photos" accept="image/*" multiple>
@@ -276,7 +282,7 @@
     </select>
     <label class="field" for="hookText">Текст хука (свой текст)</label>
     <input id="hookText" type="text" maxlength="58" placeholder="Например: Найди ошибку за 3 секунды!">
-    <p class="note">Шрифты, эмодзи, плавные анимации, звук и подложки передаются в новый режим загрузки до 300 МБ. Для старого режима через чат доступны не все настройки.</p>
+    <p class="note">Шрифты, эмодзи, плавные анимации, звук и подложки передаются в новый режим загрузки до 500 МБ. Для старого режима через чат доступны не все настройки.</p>
   </section>
 
   <section class="card page" data-page="3">
@@ -323,18 +329,18 @@
     <p>Проверь выбранные параметры и запускай монтаж одной кнопкой. Стили и фильтры применяются к видео в обработчике GitHub Actions.</p>
     <div id="summary"></div>
     <div class="alert" style="margin:16px 0">
-      <strong>🎬 Монтаж Reels · до 300 МБ</strong>
+      <strong>🎬 Монтаж Reels · до 500 МБ</strong>
       <p class="note">Исходник загрузится из приложения частями. После этого бот пришлёт черновик речи на проверку, затем готовый MP4 без дополнительного сжатия в Telegram.</p>
       <label class="field" for="launcherBase">Адрес Cloudflare (настраивается один раз)</label>
       <input id="launcherBase" type="url" inputmode="url" autocomplete="off" placeholder="https://твой-worker.workers.dev" style="width:100%;max-width:100%">
       <button class="btn primary" id="upload50Button" type="button" style="width:100%;margin-top:12px">🎬 Смонтировать Reels</button>
       <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
-      <p class="mini" id="upload50Status" role="status" aria-live="polite">Поддержка до 300 МБ требует подключённого Cloudflare KV. Видео сохраняем в Full HD.</p>
+      <p class="mini" id="upload50Status" role="status" aria-live="polite">Поддержка до 500 МБ требует подключённого Cloudflare KV. Видео сохраняем в Full HD.</p>
       <button class="btn secondary" id="checkUploadedResult" type="button" style="width:100%;margin-top:8px" hidden>⬇️ Скачать готовое Full HD</button>
       <details style="margin-top:12px">
         <summary style="cursor:pointer;font-weight:650">Первое подключение Cloudflare · инструкция</summary>
         <p class="note">Нужно один раз привязать KV-хранилище под именем <strong>UPLOADS</strong> и опубликовать новый код Worker.</p>
-        <p class="note"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/CLOUDFLARE_300MB.md" target="_blank" rel="noopener noreferrer">Как включить загрузку до 300 МБ на iPad</a></p>
+        <p class="note"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/CLOUDFLARE_500MB.md" target="_blank" rel="noopener noreferrer">Как включить загрузку до 500 МБ на iPad</a></p>
       </details>
     </div>
     <!-- Скрытые элементы прежних прототипов сохраняют совместимость JS,
@@ -370,12 +376,13 @@
   var names=['Видео','Монтаж','Подписи','Эффекты','Итог'];
   var byId=function(id){return document.getElementById(id)};
   var videoInput=byId('videos');
+  var selectedClips=[]; // Ordered, editable collection; each File stays on device.
   var photoInput=byId('photos');
   function fmtBytes(n){return n>=1073741824?(n/1073741824).toFixed(2)+' ГБ':(n/1048576).toFixed(1)+' МБ'}
   function selectedText(id){return byId(id).options[byId(id).selectedIndex].text}
   function getSettings(){
     return {
-      videoFiles:Array.from(videoInput.files).map(function(f){return {name:f.name,sizeBytes:f.size}}),
+      videoFiles:selectedClips.map(function(f){return {name:f.name,sizeBytes:f.size}}),
       referenceVideo:byId('referenceVideo').files[0] ? byId('referenceVideo').files[0].name : null,
       photos:Array.from(photoInput.files).map(function(f){return f.name}),
       ratio:ratio,
@@ -429,23 +436,71 @@
     byId('next').hidden=current===4;
     if(current===4){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Исходник',s.videoFiles.length?(s.videoFiles[0].name+' · '+fmtBytes(s.videoFiles[0].sizeBytes)):'не выбран'],['Референс',s.referenceVideo||'нет'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Референс',s.referenceVideo||'нет'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
-  videoInput.addEventListener('change',function(){
-    var files=Array.from(videoInput.files);
-    var source=files[0];
-    byId('videoInfo').textContent=source?
-      ('Исходник: '+source.name+' · '+fmtBytes(source.size)+(source.size>300000000?' ⚠️ Больше 300 МБ, выбери меньший файл.':'')):
-      'Исходное видео пока не выбрано. Нажми «Выбрать видео» выше.';
+  function renderSelectedClips(){
+    var list=byId('clipsList');
+    list.replaceChildren();
+    var total=selectedClips.reduce(function(sum,f){return sum+f.size},0);
+    var warning=total>500000000||selectedClips.length>12;
+    byId('videoInfo').textContent=selectedClips.length
+      ? ('🎬 '+selectedClips.length+' видео · '+fmtBytes(total)+
+         ' из 500 МБ'+(warning?' ⚠️ Превышен лимит!':''))
+      : 'Видео пока не выбраны. Добавь исходники выше.';
+    selectedClips.forEach(function(file,index){
+      var item=document.createElement('div');
+      item.style.cssText='display:flex;align-items:center;gap:6px;'+
+        'padding:10px 4px;border-bottom:1px solid #e7d7df';
+      var name=document.createElement('span');
+      name.style.cssText='flex:1;min-width:0;overflow-wrap:anywhere;font-size:13px';
+      name.textContent=(index+1)+'. '+file.name+' · '+fmtBytes(file.size);
+      item.appendChild(name);
+      [['↑',-1],['↓',1],['×',0]].forEach(function(spec){
+        var btn=document.createElement('button');
+        btn.type='button';
+        btn.className='btn secondary';
+        btn.style.cssText='width:32px;min-width:32px;padding:4px 1px;font-size:17px';
+        btn.textContent=spec[0];
+        btn.title=spec[1]===0?'Удалить видео':'Изменить порядок';
+        btn.disabled=spec[1]!==0&&(index+spec[1]<0||
+                                   index+spec[1]>=selectedClips.length);
+        btn.addEventListener('click',function(){
+          if(spec[1]===0)selectedClips.splice(index,1);
+          else {
+            var target=index+spec[1];
+            var clip=selectedClips[index];
+            selectedClips[index]=selectedClips[target];
+            selectedClips[target]=clip;
+          }
+          renderSelectedClips();
+        });
+        item.appendChild(btn);
+      });
+      list.appendChild(item);
+    });
     if(previewUrl)URL.revokeObjectURL(previewUrl);
-    previewUrl=files.length?URL.createObjectURL(files[0]):null;
+    previewUrl=selectedClips.length?URL.createObjectURL(selectedClips[0]):null;
     ['firstVideo','captionVideo'].forEach(function(id){
       var el=byId(id);
       el.hidden=!previewUrl;
-      if(previewUrl){el.src=previewUrl;el.load()}else{el.removeAttribute('src')}
+      if(previewUrl){el.src=previewUrl;el.load()}
+      else{el.pause();el.removeAttribute('src');el.load()}
     });
+  }
+  function appendClips(files,replacePrevious){
+    if(replacePrevious)selectedClips=[];
+    selectedClips.push.apply(selectedClips,Array.from(files));
+    renderSelectedClips();
+  }
+  videoInput.addEventListener('change',function(){
+    appendClips(videoInput.files,true);
+  });
+  byId('addVideos').addEventListener('change',function(){
+    appendClips(byId('addVideos').files,false);
+    // Allows selecting the same file again after removing it.
+    byId('addVideos').value='';
   });
   var referenceUrl=null;
   byId('referenceVideo').addEventListener('change',function(){
@@ -570,7 +625,7 @@
     });
   });
   function go(dir){
-    if(dir>0 && current===0 && !videoInput.files.length){alert('Сначала выбери хотя бы одно видео.');return}
+    if(dir>0 && current===0 && !selectedClips.length){alert('Сначала выбери хотя бы одно видео.');return}
     if(dir>0 && current===1 && photoInput.files.length>30){alert('Можно выбрать не больше 30 фото.');return}
     current=Math.max(0,Math.min(4,current+dir));draw();
   }
