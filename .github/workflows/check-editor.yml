@@ -55,7 +55,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: "Шрифт для крупного розового курсива"
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-liberation fonts-dejavu-core fonts-noto-color-emoji fonts-lato fonts-comfortaa
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-liberation fonts-dejavu-core fonts-noto-color-emoji fonts-lato fonts-comfortaa fonts-roboto fonts-open-sans fonts-noto-core fonts-ubuntu fonts-crosextra-carlito
       - name: "Зависимости для проверки"
         run: python -m pip install "telethon>=1.40,<2" "requests>=2.31,<3" "Pillow>=10,<13" -r requirements-api.txt
       - name: "Проверить синтаксис Python"
