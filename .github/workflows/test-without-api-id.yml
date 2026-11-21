@@ -124,7 +124,7 @@ jobs:
       - name: "Установить FFmpeg"
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core fonts-liberation fonts-noto-color-emoji fonts-lato fonts-comfortaa fonts-lobstertwo
+          sudo apt-get install -y ffmpeg fonts-dejavu-core fonts-liberation fonts-noto-color-emoji fonts-lato fonts-comfortaa fonts-roboto fonts-open-sans fonts-noto-core fonts-ubuntu fonts-crosextra-carlito fonts-lobstertwo
 
       - name: "Установить зависимости"
         run: |
