@@ -27,6 +27,11 @@ EMOJI_WORDS = (
     ("совет", "💡"), ("идея", "💡"),
     ("маникюр", "💅"), ("ногт", "💅"),
     ("красив", "✨"), ("идеальн", "✨"),
+    ("работ", "🛠️"), ("мастер", "💅"), ("студ", "🎬"),
+    ("салон", "✨"), ("параллел", "🔄"), ("задач", "📋"),
+    ("съем", "🎥"), ("съём", "🎥"),
+    ("камер", "🎥"), ("видео", "🎞️"), ("фот", "📸"),
+    ("интерес", "👀"), ("вопрос", "❓"), ("покаж", "👀"),
     ("секунд", "⏱"), ("врем", "⏱"),
     ("провер", "✅"), ("правильн", "✅"),
     ("ужас", "😱"), ("кошмар", "😱"),
@@ -52,15 +57,17 @@ def validate_effects(sound: str, emoji: str, hook_position: str) -> None:
         raise ValueError("Хук: start, end, both или off.")
 
 
-def pick_cues(words: Sequence[Word], duration: float, *, limit: int = 10) -> list[tuple[float, str | None]]:
-    """Подобранные моменты акцента с расстоянием >= 2.8 с между событиями."""
+def pick_cues(
+    words: Sequence[Word], duration: float, *, limit: int = 18,
+) -> list[tuple[float, str | None]]:
+    """Эмодзи на смысловых словах, с интервалом не менее 1.35 с."""
     if duration <= 0:
         return []
     result: list[tuple[float, str | None]] = []
     last = -10.0
     for start, end, token in sorted(words, key=lambda x: x[0]):
         t = max(0.0, float(start))
-        if t < 0.3 or t > duration - 0.45 or t - last < 2.8:
+        if t < 0.25 or t > duration - 0.40 or t - last < 1.35:
             continue
         cleaned = re.sub(r"[^\wа-яё]", "", token.lower())
         emoji = next((symbol for stem, symbol in EMOJI_WORDS if stem in cleaned), None)
@@ -69,31 +76,38 @@ def pick_cues(words: Sequence[Word], duration: float, *, limit: int = 10) -> lis
         result.append((t, emoji))
         last = t
         if len(result) >= limit:
-            break
-    # Если ключевых слов нет, всё равно даём лёгкие акценты на началах фраз.
-    if not result and words:
-        last = -10.0
-        from signature_captions import split_groups
+            return result
+
+    # Если нет слов из словаря, добавляем нейтральные ✨ только
+    # на смысловые слова. Никаких случайных и неуместных символов.
+    if words and len(result) < limit:
+        from signature_captions import split_groups, pick_main_word
+        extras: list[tuple[float, str]] = []
         for group in split_groups(words):
-            t = float(group[0][0])
-            if 0.35 <= t <= duration - 0.4 and t - last >= 4.2:
-                result.append((t, None))
-                last = t
-                if len(result) >= min(6, limit):
-                    break
-    return result
+            chosen = group[pick_main_word(group)]
+            t = float(chosen[0])
+            clean = re.sub(r"[^а-яёa-z0-9]", "", chosen[2].lower())
+            if 0.25 <= t <= duration - 0.40 and len(clean) >= 5:
+                extras.append((t, "✨"))
+        for t, symbol in extras:
+            if any(abs(t - existing) < 1.20 for existing, _ in result):
+                continue
+            result.append((t, symbol))
+            if len(result) >= limit:
+                break
+    return sorted(result)
 
 
 def pick_caption_cues(
     words: Sequence[Word], duration: float, *,
-    style: str = "soft", limit: int = 22,
+    style: str = "soft", limit: int = 36,
 ) -> list[tuple[float, str | None]]:
     """Очень тихие аудио-сигналы на переходах слов, а не на каждом слове."""
     if style not in ("soft", "tick"):
         raise ValueError("Звук субтитров: soft или tick.")
     if duration <= 0:
         return []
-    minimum_gap = 2.0 if style == "soft" else 1.35
+    minimum_gap = 1.00 if style == "soft" else 0.75
     last = -10.0
     result = []
     for start, end, word in sorted(words, key=lambda w: w[0]):
@@ -182,8 +196,8 @@ def make_sfx_track(
     if intensity not in ("soft", "punch", "caption_soft", "caption_tick"):
         raise ValueError("Недопустимая интенсивность звуков.")
     total = max(1, round(duration*rate))
-    peak = {"soft":0.12, "punch":0.20, "caption_soft":0.034,
-            "caption_tick":0.063}[intensity]
+    peak = {"soft":0.12, "punch":0.20, "caption_soft":0.095,
+            "caption_tick":0.13}[intensity]
     with wave.open(str(target), "wb") as wav:
         wav.setnchannels(1)
         wav.setsampwidth(2)
@@ -280,7 +294,7 @@ def apply_effects(
         if visual:
             yratio = {"top": .22, "middle": .51, "bottom": .72}[caption_position]
             # Ограничение, чтобы до двух минут оставаться лёгким для runner.
-            for i,(start,symbol) in enumerate(visual[:8]):
+            for i,(start,symbol) in enumerate(visual[:16]):
                 path = folder/f"emoji_{i}.png"
                 try:
                     emoji_image(symbol, path)
@@ -295,7 +309,7 @@ def apply_effects(
                 filters.append(alpha)
                 dest = f"[stage{i}]"
                 filters.append(
-                    f"{prev}[emoji{i}]overlay=x='main_w-overlay_w-0.06*main_w':"
+                    f"{prev}[emoji{i}]overlay=x='main_w*(0.70+0.03*mod({i},2))':"
                     f"y='{yratio}*main_h+12*max(0,1-(t-{start:.2f})*4)':"
                     f"enable='between(t,{start:.2f},{clip_end:.2f})'"
                     f":shortest=1{dest}"
