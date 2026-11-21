@@ -238,7 +238,7 @@ def main() -> None:
                 insert_style=str(config.get("insert_style","reference_soft")),
                 insert_density=str(config.get(
                     "insert_density",
-                    "subtle" if style=="reference_dynamic" else "balanced",
+                    "balanced",
                 )),
                 insert_sound=str(config.get(
                     "insert_sound",
