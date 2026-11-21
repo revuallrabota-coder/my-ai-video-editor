@@ -158,9 +158,9 @@
     </div>
     <label class="field" for="captionDelay">Синхронизация: надпись позже голоса</label>
     <select id="captionDelay">
-      <option value="0.0">Без задержки</option>
+      <option value="0.0" selected>Без задержки — точная синхронизация с речью</option>
       <option value="0.15">+0,15 секунды</option>
-      <option value="0.3" selected>+0,30 секунды — новый стандарт</option>
+      <option value="0.3">+0,30 секунды</option>
       <option value="0.45">+0,45 секунды</option>
       <option value="0.6">+0,60 секунды</option>
       <option value="0.8">+0,80 секунды</option>
@@ -168,7 +168,7 @@
     <p class="note">Если титры забегают вперёд речи, выбери +0,45 или +0,60. Скорость речи не меняется. В режиме 20 МБ команду можно поменять в чате: /sync 0.45.</p>
     <label class="field" for="subtitleStyle">Стиль субтитров</label>
     <select id="subtitleStyle">
-      <option value="reference_dynamic" selected>🎬 Нежные фразы: одно главное слово внутри предложения</option>
+      <option value="reference_dynamic" selected>🎬 Референс: маленькие + крупное слово + маленькие (плавно)</option>
       <option value="signature">Розовый: по одному слову, плавное всплытие</option>
       <option value="contrast">Контрастный: по одному слову</option>
       <option value="classic">Классический: по одному слову</option>
@@ -176,7 +176,7 @@
       <option value="contrast_phrases">Контрастный: старый вариант фразами</option>
       <option value="classic_phrases">Классический: старый вариант фразами</option>
     </select>
-    <p class="note">Новый режим «Нежные фразы» выводит сразу короткое предложение, выделяя одно смысловое слово более крупным и цветным. Вся фраза плавно всплывает и мягко исчезает. Тень очень лёгкая, а полупрозрачный фон появляется только иногда и всегда вместе с надписью. Маленький эмодзи располагается рядом с фразой, не перекрывая текст. Для прежней анимации каждого слова отдельно доступны Signature, Contrast и Classic. Предпросмотр показывает только приблизительный стиль.</p>
+    <p class="note">🎞 По твоему референсу: небольшие слова появляются первыми, затем крупное розовое ключевое слово, к которому плавно добавляются следующие небольшие слова. Положение фраз меняется влево и вправо. Нежная овальная тень точно повторяет положение слова, а не висит отдельно. Все слова привязаны к твоей речи.</p>
     <label class="field" for="captionVariant">Вариант цвета и оформления надписей</label>
     <select id="captionVariant">
       <option value="reference_soft" selected>Reference Soft — нежно-розовый + молочный</option>
@@ -338,8 +338,23 @@
       <option value="matte">Matte — приглушённый</option>
     </select>
     <p class="note">Для маникюра, где важен точный оттенок гель-лака, выбирай «Без фильтра» или Clean Studio.</p>
-    <label class="field" for="speed">Скорость</label>
-    <select id="speed"><option value="1.0" selected>×1.0</option><option value="1.1">×1.1</option><option value="1.2">×1.2</option><option value="1.3">×1.3</option><option value="1.5">×1.5</option></select>
+    <label class="field" for="pauseRemoval">✂️ Насколько сильно убирать паузы в речи</label>
+    <select id="pauseRemoval">
+      <option value="tight" selected>Сильно — убрать паузы между словами (рекомендую)</option>
+      <option value="balanced">Умеренно — оставить небольшие вдохи</option>
+      <option value="gentle">Осторожно — убрать только длинные паузы</option>
+      <option value="off">Не вырезать паузы</option>
+    </select>
+    <p class="note">Монтаж идёт по таймкодам распознанной речи, сохраняя слова целиком. Кадр, голос и субтитры склеиваются по одним временным отметкам.</p>
+    <label class="field" for="speed">⚡ Скорость разговорного видео</label>
+    <select id="speed">
+      <option value="1.0">×1.0 — обычная скорость</option>
+      <option value="1.1">×1.1 — слегка быстрее</option>
+      <option value="1.2" selected>×1.2 — по умолчанию для Reels</option>
+      <option value="1.3">×1.3 — быстро</option>
+      <option value="1.5">×1.5 — очень быстро</option>
+    </select>
+    <p class="note">Скорость увеличивает и видео, и речь, не меняя высоту голоса. По умолчанию ×1.2, но её можно выбрать заново для каждого проекта.</p>
     <label class="field" for="exportQuality">Качество готового видео</label>
     <select id="exportQuality">
       <option value="high" selected>Full HD · 1080×1920 · высокое качество</option>
@@ -445,6 +460,7 @@
       audioProfile:byId('audio').value,
       filter:selectedText('filter'),
       speed:Number(byId('speed').value),
+      pauseRemoval:byId('pauseRemoval').value,
       exportQuality:byId('exportQuality').value,
       subtitleDelay:Number(byId('captionDelay').value)
     };
@@ -468,7 +484,7 @@
     byId('next').hidden=current===4;
     if(current===4){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['Референс',s.referenceVideo||'нет'],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['Референс',s.referenceVideo||'нет'],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -1100,6 +1116,7 @@
       audio_profile:s.audioProfile,
       filter_style:byId('filter').value,
       speed:s.speed,
+      pause_removal:s.pauseRemoval,
       export_quality:s.exportQuality,
       subtitle_delay:s.subtitleDelay,
       sound_effects:s.soundEffects,
