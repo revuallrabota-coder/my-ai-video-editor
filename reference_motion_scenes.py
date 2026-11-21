@@ -25,6 +25,7 @@ class MotionCue:
     end: float
     label: str
     kind: str
+    caption: str = ""
 
 
 def select_motion_cues(words: Sequence[Word], duration: float,
@@ -60,8 +61,13 @@ def select_motion_cues(words: Sequence[Word], duration: float,
             continue
         start=min(start,duration-1.65)
         finish=min(duration-.02,start+2.65)
+        context=[re.sub(r"[^а-яёА-ЯЁa-zA-Z0-9\-]","",str(w))
+                 for a,b,w in sorted_words if start-1.25<=a<=start+1.3
+                 and b>a]
+        excerpt=" ".join(w for w in context if w).strip()[:44]
         result.append(MotionCue(start,finish,label,
-                                "television" if len(result)%2==0 else "collage"))
+                                "television" if len(result)%2==0 else "collage",
+                                excerpt))
         anchor=max(start,anchor)+gap
     return result
 
@@ -119,7 +125,11 @@ def make_motion_assets(source: Path, folder: Path, cue: MotionCue,
     b=ImageDraw.Draw(bg)
     b.rounded_rectangle((28,90,692,1175),radius=35,
                         outline=(240,219,228,255),width=3)
-    b.text((95,166),"МОМЕНТ ИСТОРИИ",font=_font(20,True),
+    excerpt=cue.caption[:42] or "REELS · MOTION"
+    excerpt_size=22
+    while excerpt_size>14 and b.textbbox((0,0),excerpt,font=_font(excerpt_size))[2]>525:
+        excerpt_size-=1
+    b.text((95,166),excerpt,font=_font(excerpt_size),
            fill=(159,120,145,255))
     label=cue.label
     size=57
@@ -128,7 +138,7 @@ def make_motion_assets(source: Path, folder: Path, cue: MotionCue,
     b.text((95,218),label,font=_font(size,True),fill=(46,39,43,255))
     b.rounded_rectangle((95,289,95+min(490,22*len(label)+90),302),
                         radius=6,fill=(245,179,209,255))
-    b.text((96,1110),"СОХРАНЯЕМ ВАЖНОЕ",font=_font(17),
+    b.text((96,1110),"REELS · MOTION STORY",font=_font(17),
            fill=(171,126,151,255))
     main=Image.new("RGBA",(WIDTH,HEIGHT),(0,0,0,0))
     d=ImageDraw.Draw(main)
