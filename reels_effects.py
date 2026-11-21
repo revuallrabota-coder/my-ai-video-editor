@@ -387,7 +387,8 @@ def apply_effects(
             caption_sfx_count = len(caption_cues)
         if insert_sound=="on" and has_audio and insert_count:
             cue_track=folder/"retro_insert_accents.wav"
-            make_retro_sound_track(cue_track, rendered_retro, duration)
+            make_retro_sound_track(cue_track, rendered_retro, duration,
+                                   style=insert_style)
             args.extend(["-i",str(cue_track)])
             track_inputs.append(f"[{current_input}:a:0]")
             current_input+=1
