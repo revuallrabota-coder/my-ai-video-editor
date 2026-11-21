@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PIL import Image,ImageChops
 from reference_dynamic_captions import (
-    build_reference_dynamic_ass,phrase_groups,phrase_geometry,
+    build_reference_dynamic_ass,phrase_groups,phrase_geometry,phrase_emoji_anchors,
 )
 from reels_effects import pick_caption_cues
 
@@ -62,6 +62,9 @@ class GentleReferenceTests(unittest.TestCase):
             self.assertLessEqual(width,455)
             self.assertEqual(cx,360)
             self.assertEqual(cy,692)
+        anchors=phrase_emoji_anchors(self.WORDS,"middle","refined","old_money")
+        self.assertEqual(len(anchors),len(spans))
+        self.assertTrue(all(70 <= x <= 600 and 630 <= y <= 745 for _,_,x,y in anchors))
         cues=pick_caption_cues(self.WORDS,4.5)
         self.assertLess(len(cues),len(self.WORDS)//2+1)
 
