@@ -740,14 +740,14 @@
       }
       status.textContent='Проверяю целостность файла и запускаю GitHub Actions…';
       var response;
-      for(var retries=0;retries<4;retries++){
+      for(var retries=0;retries<10;retries++){
         try{
           response=await request('/upload/'+id+'/finish','POST',
             JSON.stringify({done:true}),false);
           break;
         }catch(err){
-          if(retries===3 || !String(err.message).includes('ещё не доступна'))throw err;
-          await new Promise(function(resolve){setTimeout(resolve,1500*(retries+1))});
+          if(retries===9 || !String(err.message).includes('ещё не доступна'))throw err;
+          await new Promise(function(resolve){setTimeout(resolve,Math.min(12000,2000*(retries+1)))});
         }
       }
       status.textContent='✅ Видео '+Math.round(file.size/1000000)+
