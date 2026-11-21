@@ -1,27 +1,103 @@
-"""Dynamic captions modeled on the supplied 93s salon reference.
+"""Читаемые субтитры Reels по таймкодам речи, с безопасными полями.
 
-Original technique, not a copy of the third-party bot's watermark:
-variable-size red emphasized words, small floating white phrases,
-occasional translucent rounded black backing, varied safe text positions.
-Speech timestamps always come from verified/transcribed original audio.
+Все текстовые слои и подложки используют ОДИН и тот же центр и время.
+Ни один длинный акцент не должен пересекать края изображения 9:16.
 """
 from __future__ import annotations
 
+import math
 import re
+import subprocess
+from functools import lru_cache
 from typing import Sequence
 
-from font_presets import choose_font
+from font_presets import FontSpec, choose_font
 from signature_captions import (
     ass_color, ass_time, pick_main_word, safe_text, split_groups,
 )
 from word_captions import word_events
 
 Word = tuple[float, float, str]
+PLAY_WIDTH, PLAY_HEIGHT = 720, 1280
+TEXT_SAFE_WIDTH = 508
+CENTER_X = PLAY_WIDTH // 2
+
+COLOR_PALETTES = {
+    "editorial": ("#F0443E", "#FFFFFF"),
+    "luxe": ("#D8BFA0", "#FFF4E5"),
+    "minimal": ("#FFFFFF", "#EFEFEF"),
+    "neon": ("#D7FF6C", "#F3F7E7"),
+    "pop": ("#FF7BB6", "#FFF3F9"),
+    "old_money": ("#CEB68A", "#FFF3E1"),
+    "vintage": ("#D79B6D", "#F4DFC7"),
+    "street": ("#DEEF5A", "#F5F5F0"),
+    "elegant": ("#F0DBDC", "#FFFFFF"),
+}
 
 
-def _rounded_plate(half_width: int, half_height: int = 46, radius: int = 22) -> str:
-    """ASS vector path, correctly rounded corners rather than a hard box."""
-    w, h, r = half_width, half_height, radius
+@lru_cache(maxsize=24)
+def _font_file(family: str) -> str | None:
+    """Use exact installed font metrics where available, never download fonts."""
+    try:
+        result = subprocess.run(
+            ["fc-match", "-f", "%{file}", family],
+            capture_output=True, text=True, timeout=4, check=True,
+        )
+        value = result.stdout.strip()
+        from pathlib import Path
+        if value and Path(value).is_file():
+            return value
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return None
+
+
+def _estimated_width(text: str, size: int, font: FontSpec) -> float:
+    """Conservative fallback if Pillow/fontconfig is not installed."""
+    capital = sum(c.isupper() for c in text if c.isalpha())
+    latin = sum(c.isascii() and c.isalpha() for c in text)
+    others = sum(c.isalpha() for c in text) - capital
+    spaces = text.count(" ")
+    punctuation = max(0, len(text) - capital - others - spaces)
+    return size * (0.75 * capital + 0.57 * others + 0.60 * latin * 0.0
+                   + 0.30 * spaces + 0.36 * punctuation) * font.scale_x / 100
+
+
+def _measure_width(text: str, size: int, font: FontSpec) -> float:
+    try:
+        from PIL import ImageFont
+        path = _font_file(font.name)
+        if path:
+            rendered = ImageFont.truetype(path, size=size)
+            return rendered.getlength(text) * font.scale_x / 100
+    except (ImportError, OSError, ValueError):
+        pass
+    return _estimated_width(text, size, font)
+
+
+def fit_caption_size(
+    text: str,
+    requested: int,
+    font: FontSpec,
+    *,
+    max_width: int = TEXT_SAFE_WIDTH,
+) -> int:
+    """Choose actual ASS font size to keep any word/phrase inside safe margins."""
+    if not text.strip():
+        return 30
+    candidate = min(90, max(28, int(requested)))
+    # Conservative correction for slight libass/Pillow font measurement differences.
+    budget = max_width * 0.91
+    for size in range(candidate, 23, -1):
+        if _measure_width(text, size, font) <= budget:
+            return size
+    return 24
+
+
+def _rounded_plate(half_width: int, half_height: int, radius: int = 20) -> str:
+    """Closed libass vector shape, centered on the exact subtitle position."""
+    w, h = max(45, half_width), max(23, half_height)
+    r = min(radius, w // 2, h // 2)
     return (
         f"m {-w+r} {-h} l {w-r} {-h} "
         f"b {w} {-h} {w} {-h+r//2} {w} {-h+r} "
@@ -29,6 +105,35 @@ def _rounded_plate(half_width: int, half_height: int = 46, radius: int = 22) -> 
         f"l {-w+r} {h} b {-w} {h} {-w} {h-r//2} {-w} {h-r} "
         f"l {-w} {-h+r} b {-w} {-h+r//2} {-w} {-h} {-w+r} {-h}"
     )
+
+
+def _wrap_two_lines(text: str, font: FontSpec, requested: int) -> tuple[str, int, float, int]:
+    """Wrap only long small phrases. Do not break a single Russian word."""
+    size = fit_caption_size(text, requested, font)
+    if len(text.split()) < 2 or size >= 28:
+        return text, size, _measure_width(text, size, font), 1
+    tokens = text.split()
+    candidates = [
+        (" ".join(tokens[:i]), " ".join(tokens[i:]))
+        for i in range(1, len(tokens))
+    ]
+    left, right = min(
+        candidates,
+        key=lambda pair: max(
+            _measure_width(pair[0], requested, font),
+            _measure_width(pair[1], requested, font)
+        ),
+    )
+    size = min(
+        fit_caption_size(left, requested, font),
+        fit_caption_size(right, requested, font),
+    )
+    if size < 28:
+        return text, 24, _measure_width(text, 24, font), 1
+    return left + r"\N" + right, size, max(
+        _measure_width(left, size, font),
+        _measure_width(right, size, font),
+    ), 2
 
 
 def build_reference_dynamic_ass(
@@ -42,33 +147,25 @@ def build_reference_dynamic_ass(
     background_style: str = "occasional",
     animation_style: str = "float",
 ) -> tuple[str, int]:
-    """Build independently animated subtitles with intermittent backing."""
     if caption_position not in ("top", "middle", "bottom"):
         raise ValueError("Недопустимое положение субтитров.")
-    variants = {
-        "editorial": ("#F0443E","#FFFFFF"),
-        "luxe": ("#D8BFA0","#FFF4E5"),
-        "minimal": ("#FFFFFF","#EFEFEF"),
-        "neon": ("#D7FF6C","#F3F7E7"),
-        "pop": ("#FF7BB6","#FFF3F9"),
-        "old_money": ("#CEB68A","#FFF3E1"),
-        "vintage": ("#D79B6D","#F4DFC7"),
-        "street": ("#DEEF5A","#F5F5F0"),
-        "elegant": ("#F0DBDC","#FFFFFF"),
-    }
-    if caption_variant not in variants:
+    if caption_variant not in COLOR_PALETTES:
         raise ValueError("Неизвестный вариант оформления субтитров.")
-    if background_style not in ("off","occasional","frequent","always"):
+    if background_style not in ("off", "occasional", "frequent", "always"):
         raise ValueError("Недопустимый режим подложки субтитров.")
-    if animation_style not in ("float","pop","slide"):
+    if animation_style not in ("float", "pop", "slide"):
         raise ValueError("Недопустимая анимация текста.")
-    font = choose_font(font_profile)
-    tiny_font = choose_font(small_font_profile)
-    main_hex, small_hex = variants[caption_variant]
-    primary = ass_color(main_hex if color == "auto" else color)
+
+    big_font = choose_font(font_profile)
+    small_font = choose_font(small_font_profile)
+    accent_hex, small_hex = COLOR_PALETTES[caption_variant]
+    primary = ass_color(accent_hex if color == "auto" else color)
     white = ass_color(small_hex)
-    # Безопасная зона Reels: не прячем текст под нижние кнопки/описание.
-    ybase = {"top": 410, "middle": 720, "bottom": 860}[caption_position]
+
+    # The whole readable composition stays in the central 70% of the frame.
+    # y changes by <=14 px: no more scattered words across the salon background.
+    ybase = {"top": 400, "middle": 713, "bottom": 866}[caption_position]
+
     header = (
         "[Script Info]\nScriptType: v4.00+\n"
         "PlayResX: 720\nPlayResY: 1280\n"
@@ -78,128 +175,113 @@ def build_reference_dynamic_ass(
         " OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut,"
         " ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow,"
         " Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Main,{font.name},91,{primary},{primary},&H0020191C,"
-        f"&H99000000,1,0,0,0,{font.scale_x},{font.scale_y},0,0,"
-        "1,1.2,1.0,5,35,35,40,1\n"
-        f"Style: Tiny,{tiny_font.name},35,{white},{white},&H0020191C,"
-        f"&H89000000,{tiny_font.bold},{tiny_font.italic},0,0,"
-        f"{tiny_font.scale_x},{tiny_font.scale_y},0,0,1,1.0,1.0,5,38,38,40,1\n"
-        f"Style: Plate,DejaVu Sans,12,{white},{white},&H00101010,"
+        f"Style: Main,{big_font.name},69,{primary},{primary},&H0020191C,"
+        f"&H99000000,{big_font.bold},{big_font.italic},0,0,"
+        f"{big_font.scale_x},{big_font.scale_y},0,0,"
+        f"1,{big_font.outline},0.8,5,64,64,40,1\n"
+        f"Style: Tiny,{small_font.name},36,{white},{white},&H0020191C,"
+        f"&H89000000,{small_font.bold},{small_font.italic},0,0,"
+        f"{small_font.scale_x},{small_font.scale_y},0,0,"
+        "1,1.0,0.5,5,64,64,40,1\n"
+        "Style: Plate,DejaVu Sans,12,&H00FFFFFF,&H00FFFFFF,&H00101010,"
         "&H73000000,0,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1\n"
         "\n[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
+
+    # Pick one emphasized semantic word per 2–3 word group. Every other word
+    # appears as one small subtitle, without a duplicated distant "context".
     groups = split_groups(words)
-    emphasized: dict[int, tuple[int, str]] = {}
-    seq = 0
-    for group_id, group in enumerate(groups):
-        main = pick_main_word(group)
-        others = safe_text(" ".join(w[2] for j,w in enumerate(group) if j != main))
-        # Supplemental small white phrases, not always on-screen.
-        context = others[:31] if group_id % 2 == 0 else ""
-        emphasized[seq+main] = (group_id, context)
-        seq += len(group)
-    # Маленькие служебные слова не должны мелькать по 0.1-0.2 секунды.
-    # Объединяем до трёх подряд в одну читаемую мини-фразу. Крупные
-    # смысловые слова остаются отдельными анимированными акцентами.
-    timed = word_events(words)
-    readable: list[tuple[int, float, float, str]] = []
+    main_indexes: set[int] = set()
+    offset = 0
+    for group in groups:
+        main_indexes.add(offset + pick_main_word(group))
+        offset += len(group)
+    events = word_events(words)
+    readable: list[tuple[float, float, str, bool]] = []
     i = 0
-    while i < len(timed):
-        begin, end, word = timed[i]
-        start_index = i
-        if i in emphasized:
-            readable.append((i, begin, end, word))
+    while i < len(events):
+        start, end, word = events[i]
+        if i in main_indexes:
+            readable.append((start, end, word, True))
             i += 1
             continue
-        pieces = [word]
+        parts = [word]
         j = i + 1
-        while j < len(timed) and j not in emphasized and len(pieces) < 3:
-            nxt_start, nxt_end, nxt_word = timed[j]
-            if nxt_start - end > 0.19 or nxt_end - begin > 1.0:
+        while j < len(events) and j not in main_indexes and len(parts) < 3:
+            nxt_start, nxt_end, nxt_word = events[j]
+            if nxt_start - end > 0.16 or nxt_end - start > 1.05:
                 break
-            pieces.append(nxt_word)
+            parts.append(nxt_word)
             end = nxt_end
             j += 1
-        readable.append((start_index, begin, end, " ".join(pieces)))
+        readable.append((start, end, " ".join(parts), False))
         i = j
 
     lines: list[str] = []
-    for index, begin, end, word in readable:
-        if end - begin < 0.065:
+    for index, (begin, end, raw, strong) in enumerate(readable):
+        if end - begin < 0.07:
             continue
-        group_id, contextual = emphasized.get(index, (-1, ""))
-        strong = group_id >= 0
-        # Deterministic 3-way placement: float up/down and slightly off-center.
-        x_offsets = (-85, 20, 85, -35, 55, -60)
-        y_offsets = (-90, -20, 36, -48, 70, 0)
-        base_x = 360 + x_offsets[(group_id if strong else index) % len(x_offsets)]
-        base_y = ybase + y_offsets[(group_id if strong else index) % len(y_offsets)]
-        lifetime = max(75, round((end-begin)*1000))
-        rise = min(480, max(95, round(lifetime * .68)))
-        fade = min(195, max(32, round(lifetime*.27)))
-        fade_out = min(145, max(23, round(lifetime*.19)))
-        size = (
-            (107, 82, 96, 72)[group_id % 4] if strong else
-            (34, 42, 32, 45, 36)[index % 5]
-        )
-        if len(word) > 12:
-            size = max(32 if not strong else 37, round(size*.78))
-        if len(word) > 17:
-            size = min(size, 44 if strong else 33)
-        delta = 24 if strong else 12
-        scale = 88 if strong else 96
-        shown = safe_text(word).strip()[:42]
-        if not shown:
+        clean = safe_text(raw)
+        if not clean:
             continue
-        # Все анимации используют реальные таймкоды произнесённых слов.
-        # float — мягко вверх, slide — мягко вбок, pop — без рывка масштаба.
-        if animation_style == "slide":
-            movement = (r"\move("+str(base_x+min(18,delta))+","+str(base_y)+","
-                        +str(base_x)+","+str(base_y)+",0,"+str(rise)+")")
-        elif animation_style == "pop":
-            movement = r"\pos("+str(base_x)+","+str(base_y)+")"
-            scale = 91 if strong else 96
+        shown = clean.upper() if strong else clean
+        # Short accent = punchy but not huge. Even a 16-letter word is fitted.
+        desired = (74, 65, 70, 61)[index % 4] if strong else (37, 34, 39)[index % 3]
+        face = big_font if strong else small_font
+        shown, size, measured, line_count = _wrap_two_lines(shown, face, desired)
+        # Guard against font substitutions with wider real glyph metrics.
+        if measured > TEXT_SAFE_WIDTH * 0.91:
+            size = fit_caption_size(shown.replace(r"\N", " "), size, face)
+            measured = min(measured, TEXT_SAFE_WIDTH * 0.91)
+        y = ybase + (-9, 0, 9)[index % 3]
+        lifetime = max(100, int((end - begin)*1000))
+        rise = min(235, max(60, int(lifetime*0.48)))
+        fade = min(130, max(25, int(lifetime*0.22)))
+        fade_out = min(105, max(20, int(lifetime*0.20)))
+        if fade + fade_out >= lifetime:
+            fade = int(lifetime*0.22)
+            fade_out = int(lifetime*0.18)
+        delta = 11 if strong else 7
+        if animation_style == "float":
+            movement = (
+                rf"\move({CENTER_X},{y+delta},{CENTER_X},{y},0,{rise})"
+            )
+        elif animation_style == "slide":
+            movement = (
+                rf"\move({CENTER_X+delta},{y},{CENTER_X},{y},0,{rise})"
+            )
         else:
-            movement = (r"\move("+str(base_x)+","+str(base_y+delta)+","
-                        +str(base_x)+","+str(base_y)+",0,"+str(rise)+")")
-        text = (
-            r"{\an5"+movement+
-            r"\fad("+str(fade)+","+str(fade_out)+")"
-            r"\fscx"+str(scale)+r"\fscy"+str(scale)+r"\blur0.45"
-            r"\t(0,"+str(rise)+r",0.65,\fscx100\fscy100)"
-            r"\fs"+str(size)+"}"+(shown.upper() if strong else shown)
+            movement = rf"\pos({CENTER_X},{y})"
+        scale = 94 if strong else 97
+        fade_tag = rf"\fad({fade},{fade_out})"
+        text_tag = (
+            r"{\an5" + movement + fade_tag
+            + rf"\fscx{scale}\fscy{scale}"
+            + rf"\t(0,{rise},0.65,\fscx100\fscy100)"
+            + rf"\fs{size}\q2\blur0.35" + "}"
         )
-        style = "Main" if strong else "Tiny"
-        # A dark translucent pill only every fourth group, not everywhere.
-        use_plate = (
-            background_style == "always" or
-            (background_style == "frequent" and strong and group_id % 2 == 0) or
-            (background_style == "occasional" and strong and group_id % 4 == 2)
+        # Put backing behind the ACTUAL event at the SAME x/y and begin/end.
+        # 6–12 px padding, with max width capped inside Reels safe margins.
+        plate = (
+            background_style == "always"
+            or background_style == "frequent" and index % 2 == 0
+            or background_style == "occasional" and (index % 3 == 0)
         )
-        if use_plate:
-            w = min(294, max(94, round(len(shown)*size*.39)+34))
-            h = 51 if size > 90 else 43
+        if plate:
+            half_w = min(268, int(math.ceil(measured / 2)) + 18)
+            half_h = int(size * (0.73 if line_count == 1 else 1.12)) + 9
             shape = (
-                r"{\an5\pos("+str(base_x)+","+str(base_y)+r")\p1"
-                r"\1c&H181616&\1a&H8C&\fad("+str(fade)+","+str(fade_out)+")}"
-                +_rounded_plate(w,h)
+                r"{\an5" + movement + fade_tag
+                + r"\p1\1c&H181616&\1a&H84&}"
+                + _rounded_plate(half_w, half_h)
             )
             lines.append(
                 f"Dialogue: 0,{ass_time(begin)},{ass_time(end)},Plate,,0,0,0,,{shape}\n"
             )
+        style = "Main" if strong else "Tiny"
         lines.append(
-            f"Dialogue: 2,{ass_time(begin)},{ass_time(end)},{style},,0,0,0,,{text}\n"
+            f"Dialogue: 2,{ass_time(begin)},{ass_time(end)},{style},,0,0,0,,"
+            + text_tag + shown + "\n"
         )
-        if strong and contextual:
-            context_y = base_y-61 if base_y > 450 else base_y+66
-            other = (
-                r"{\an5\move("+str(base_x)+","+str(context_y+11)+","
-                +str(base_x)+","+str(context_y)+",0,"+str(rise)+")"
-                r"\fad("+str(fade)+","+str(fade_out)+")\fs30}"
-                +contextual
-            )
-            lines.append(
-                f"Dialogue: 1,{ass_time(begin)},{ass_time(end)},Tiny,,0,0,0,,{other}\n"
-            )
-    return header+"".join(lines),len(lines)
+    return header + "".join(lines), len(lines)
