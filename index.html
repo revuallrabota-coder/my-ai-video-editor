@@ -1199,7 +1199,7 @@
       if(videos.length!==1)throw new Error('Для одного монтажа выбери ровно одно исходное видео.');
       if(photoInput.files.length)throw new Error('Вставки фотографий сервер пока не поддерживает. Убери их для первого теста.');
       if(ratio!=='9:16')throw new Error('Сейчас реальный экспорт работает в 9:16. Выбери вертикальный формат.');
-      if(byId('fontFile').files.length)throw new Error('Загрузка собственного шрифта пока не поддерживается: выбери один из встроенных.');
+
       var settings=buildRenderSettings();
       var reference=byId('referenceVideo').files[0];
       if(settings.mode==='reference' && !reference)throw new Error('Для режима по референсу выбери второй видеофайл.');
