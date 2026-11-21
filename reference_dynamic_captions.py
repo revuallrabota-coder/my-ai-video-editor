@@ -255,7 +255,8 @@ def build_reference_dynamic_ass(
         )
         if plate:
             half_w=min(246,max(44,int(math.ceil(measured/2))+15))
-            half_h=int(size*(0.69 if line_count==1 else 1.12))+8
+            # Compact, text-sized backplate; no giant detached banner.
+            half_h=int(size*(0.48 if line_count==1 else 0.95))+6
             left,top=CENTER_X-half_w,y-half_h
             if animation_style=="float":
                 plate_move=rf"\move({left},{top+delta},{left},{top},0,{rise})"
