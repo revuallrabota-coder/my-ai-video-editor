@@ -1,4 +1,4 @@
-name: "📥 Монтаж видео до 50 МБ (Cloudflare KV)"
+name: "📥 Монтаж видео до 300 МБ (Cloudflare KV)"
 
 on:
   workflow_dispatch:
@@ -40,7 +40,7 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install "requests>=2.31,<3"
       - name: "Проверить синтаксис"
-        run: python -m py_compile process_uploaded_video.py bot_api_editor.py telegram_editor.py reference_editor.py speech_review.py reels_effects.py export_profiles.py reference_dynamic_captions.py retro_inserts.py font_presets.py video_filters.py
+        run: python -m py_compile process_uploaded_video.py bot_api_editor.py telegram_editor.py reference_editor.py speech_review.py reels_effects.py export_profiles.py reference_dynamic_captions.py retro_inserts.py reference_motion_scenes.py font_presets.py video_filters.py
       - name: "Загрузить частями и выполнить монтаж"
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
