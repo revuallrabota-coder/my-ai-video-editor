@@ -25,6 +25,8 @@ on:
       - "test_reference_motion.py"
       - "process_uploaded_video.py"
       - "cloudflare_launcher.js"
+      - "test_upload_300mb.mjs"
+      - "CLOUDFLARE_300MB.md"
       - ".github/workflows/upload-video-50mb.yml"
       - "CLOUDFLARE_50MB.md"
       - "Dockerfile"
@@ -64,6 +66,9 @@ jobs:
         run: python -m py_compile bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py speech_review.py word_captions.py reels_effects.py font_presets.py editor_api.py export_profiles.py reference_dynamic_captions.py process_uploaded_video.py video_filters.py test_reels_looks.py test_caption_safe_area.py retro_inserts.py reference_motion_scenes.py test_retro_inserts.py test_gentle_reference.py
       - name: "Проверить синтаксис Cloudflare Worker"
         run: node --input-type=module --check < cloudflare_launcher.js
+
+      - name: "Протестировать передачу 300 МБ через Worker без 300 МБ в оперативной памяти"
+        run: node test_upload_300mb.mjs
 
       - name: "Проверить правки распознавания и зум по фразам"
         run: python -m unittest -v test_speech_review.py
