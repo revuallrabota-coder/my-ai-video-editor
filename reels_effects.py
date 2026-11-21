@@ -292,7 +292,8 @@ def apply_effects(
         current_input = 1
         emoji_count = 0
         if visual:
-            yratio = {"top": .22, "middle": .51, "bottom": .72}[caption_position]
+            # Стикер рядом с центральной зоной титра, а не на краю.
+            yratio = {"top": .265, "middle": .515, "bottom": .635}[caption_position]
             # Ограничение, чтобы до двух минут оставаться лёгким для runner.
             for i,(start,symbol) in enumerate(visual[:16]):
                 path = folder/f"emoji_{i}.png"
