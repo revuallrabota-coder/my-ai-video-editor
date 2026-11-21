@@ -378,7 +378,7 @@
   var videoInput=byId('videos');
   var selectedClips=[]; // Ordered, editable collection; each File stays on device.
   var photoInput=byId('photos');
-  function fmtBytes(n){return n>=1073741824?(n/1073741824).toFixed(2)+' ГБ':(n/1048576).toFixed(1)+' МБ'}
+  function fmtBytes(n){return n>=1000000000?(n/1000000000).toFixed(2)+' ГБ':(n/1000000).toFixed(1)+' МБ'}
   function selectedText(id){return byId(id).options[byId(id).selectedIndex].text}
   function getSettings(){
     return {
