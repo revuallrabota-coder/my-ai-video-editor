@@ -47,7 +47,7 @@ app.add_middleware(
     expose_headers=["Content-Disposition"],
 )
 
-MAX_FILE_MB = max(10, min(300, int(os.getenv("MAX_FILE_MB", "300"))))
+MAX_FILE_MB = max(10, min(500, int(os.getenv("MAX_FILE_MB", "500"))))
 MAX_BYTES = MAX_FILE_MB * 1_000_000  # decimal MB: match Worker and iPad
 MAX_VIDEO_SECONDS = 125
 TTL_SECONDS = 2 * 60 * 60
