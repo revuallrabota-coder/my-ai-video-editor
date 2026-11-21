@@ -403,6 +403,7 @@ def montage_by_reference(
             caption_sound=subtitle_sfx,
             insert_style=insert_style, insert_density=insert_density,
             insert_sound=insert_sound,
+            font_profile=font_profile, small_font_profile=small_font_profile,
         )
     return {
         "before": round(source_duration, 1),
