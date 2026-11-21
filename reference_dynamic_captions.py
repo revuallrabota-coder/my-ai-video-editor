@@ -201,12 +201,23 @@ def _phrase_layout(
         if matches:
             score,chosen,width=min(matches,key=lambda item:item[0])
             return chosen,base,accent,width,emphasis
-    # Very long, unusual Russian tokens are never allowed offscreen.
-    base=20
-    accent=26
-    widths=[_line_length(group,[i],emphasis,base,accent,little,big)
-            for i in indexes]
-    return [[i] for i in indexes[:2]],base,accent,max(widths),emphasis
+    # Fallback retains EVERY spoken word. A long single word may shrink,
+    # but the transcript is never silently truncated.
+    for base in range(20,14,-1):
+        accent=max(18,int(base*1.22))
+        choices=[]
+        for lines in options:
+            widest=max(_line_length(group,line,emphasis,base,accent,little,big)
+                       for line in lines)
+            if widest<=452:
+                choices.append((widest,lines))
+        if choices:
+            widest,lines=min(choices,key=lambda x:x[0])
+            return lines,base,accent,widest,emphasis
+    lines=options[-1]
+    widest=max(_line_length(group,line,emphasis,15,18,little,big)
+               for line in lines)
+    return lines,15,18,widest,emphasis
 
 
 def phrase_geometry(
