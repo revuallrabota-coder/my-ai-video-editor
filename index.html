@@ -85,7 +85,7 @@
 
   <section class="card page active" data-page="0">
     <h2>Загрузить видео</h2>
-    <p>Выбери одно исходное видео с iPad или телефона, до 50 МБ. Референс ниже необязателен и не заменяет исходник.</p>
+    <p>Выбери одно исходное видео с iPad или телефона, до 300 МБ. Референс ниже необязателен и не заменяет исходник.</p>
     <label class="upload">
       <div class="emoji">📎</div>
       <strong>Выбрать видео</strong>
@@ -276,7 +276,7 @@
     </select>
     <label class="field" for="hookText">Текст хука (свой текст)</label>
     <input id="hookText" type="text" maxlength="58" placeholder="Например: Найди ошибку за 3 секунды!">
-    <p class="note">Шрифты, эмодзи, плавные анимации, звук и подложки передаются в новый режим загрузки до 50 МБ. Для старого режима через чат доступны не все настройки.</p>
+    <p class="note">Шрифты, эмодзи, плавные анимации, звук и подложки передаются в новый режим загрузки до 300 МБ. Для старого режима через чат доступны не все настройки.</p>
   </section>
 
   <section class="card page" data-page="3">
@@ -323,18 +323,18 @@
     <p>Проверь выбранные параметры и запускай монтаж одной кнопкой. Стили и фильтры применяются к видео в обработчике GitHub Actions.</p>
     <div id="summary"></div>
     <div class="alert" style="margin:16px 0">
-      <strong>🎬 Монтаж Reels · до 50 МБ</strong>
+      <strong>🎬 Монтаж Reels · до 300 МБ</strong>
       <p class="note">Исходник загрузится из приложения частями. После этого бот пришлёт черновик речи на проверку, затем готовый MP4 без дополнительного сжатия в Telegram.</p>
       <label class="field" for="launcherBase">Адрес Cloudflare (настраивается один раз)</label>
       <input id="launcherBase" type="url" inputmode="url" autocomplete="off" placeholder="https://твой-worker.workers.dev" style="width:100%;max-width:100%">
       <button class="btn primary" id="upload50Button" type="button" style="width:100%;margin-top:12px">🎬 Смонтировать Reels</button>
       <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
-      <p class="mini" id="upload50Status" role="status" aria-live="polite">Поддержка до 50 МБ требует подключённого Cloudflare KV. Видео сохраняем в Full HD.</p>
+      <p class="mini" id="upload50Status" role="status" aria-live="polite">Поддержка до 300 МБ требует подключённого Cloudflare KV. Видео сохраняем в Full HD.</p>
       <button class="btn secondary" id="checkUploadedResult" type="button" style="width:100%;margin-top:8px" hidden>⬇️ Скачать готовое Full HD</button>
       <details style="margin-top:12px">
         <summary style="cursor:pointer;font-weight:650">Первое подключение Cloudflare · инструкция</summary>
         <p class="note">Нужно один раз привязать KV-хранилище под именем <strong>UPLOADS</strong> и опубликовать новый код Worker.</p>
-        <p class="note"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/CLOUDFLARE_50MB.md" target="_blank" rel="noopener noreferrer">Как включить загрузку до 50 МБ на iPad</a></p>
+        <p class="note"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/CLOUDFLARE_300MB.md" target="_blank" rel="noopener noreferrer">Как включить загрузку до 300 МБ на iPad</a></p>
       </details>
     </div>
     <!-- Скрытые элементы прежних прототипов сохраняют совместимость JS,
@@ -437,7 +437,7 @@
     var files=Array.from(videoInput.files);
     var source=files[0];
     byId('videoInfo').textContent=source?
-      ('Исходник: '+source.name+' · '+fmtBytes(source.size)+(source.size>50000000?' ⚠️ Больше 50 МБ, выбери меньший файл.':'')):
+      ('Исходник: '+source.name+' · '+fmtBytes(source.size)+(source.size>300000000?' ⚠️ Больше 300 МБ, выбери меньший файл.':'')):
       'Исходное видео пока не выбрано. Нажми «Выбрать видео» выше.';
     if(previewUrl)URL.revokeObjectURL(previewUrl);
     previewUrl=files.length?URL.createObjectURL(files[0]):null;
@@ -635,7 +635,7 @@
   });
 
 
-  // Прямой безопасный входной файл до 50 MB через Cloudflare KV.
+  // Прямой безопасный входной файл до 300 MB через Cloudflare KV.
   // Обычный Bot API не скачивает больше 20 MB: здесь он не используется
   // для исходника. Размер частей 4 MB и поочерёдная отправка с iPad.
   byId('upload50Button').addEventListener('click',async function(){
@@ -654,10 +654,10 @@
       if(ratio!=='9:16')throw new Error('Для Reels выбери вертикальный формат 9:16.');
       if(byId('fontFile').files.length)throw new Error('Свой файл шрифта пока нельзя передать: выбери встроенный.');
       var settings=buildRenderSettings();
-      if(settings.mode==='reference')throw new Error('Для первого теста 50 МБ выбери «Мой стиль» (без второго видео-референса).');
+      if(settings.mode==='reference')throw new Error('Для загрузки до 300 МБ выбери «Мой стиль» (без второго видео-референса).');
       var file=videos[0];
-      if(file.size>50000000){
-        throw new Error('Исходник «'+file.name+'» весит '+fmtBytes(file.size)+'. Максимум 50 МБ. Выбери другой файл или экспортируй его размером до 50 МБ.');
+      if(file.size>300000000){
+        throw new Error('Исходник «'+file.name+'» весит '+fmtBytes(file.size)+'. Максимум 300 МБ.');
       }
       if(file.size<4096){
         throw new Error('Файл «'+file.name+'» пустой или меньше 4 КБ. Выбери настоящий видеофайл в разделе «Выбрать видео».');
@@ -681,21 +681,62 @@
         if(!response.ok)throw new Error(data.error||('Cloudflare ответил HTTP '+response.status));
         return data;
       }
-      status.textContent='Подготавливаю прямую загрузку 50 МБ…';
-      var start=await request('/upload/start','POST',
-        JSON.stringify({filename:file.name,size:file.size,settings:settings}),false);
-      var partSize=start.chunk_size;
-      var parts=start.parts;
-      var id=start.upload_id;
-      try{localStorage.setItem('personalEditorLastUpload',JSON.stringify({id:id,url:url,created:Date.now()}))}catch(ignore){}
+      status.textContent='Подготавливаю загрузку видео до 300 МБ…';
+      // Resume an interrupted upload only for the same selected video/settings.
+      // Local storage holds metadata, never video bytes.
+      var old=null,signature=JSON.stringify(settings);
+      try{old=JSON.parse(localStorage.getItem('personalEditorLastUpload')||'null')}catch(ignore){}
+      var id=null,partSize=4000000,parts=0,completed=new Set();
+      if(old && old.url===url && old.filename===file.name &&
+          old.size===file.size && old.settings===signature &&
+          Date.now()-old.created<2.5*60*60*1000){
+        try{
+          var resumed=await request('/upload/'+old.id+'/status','GET');
+          if(resumed.input_size===file.size && resumed.state==='uploading'){
+            id=old.id;
+            parts=resumed.input_parts;
+            (resumed.uploaded_parts||[]).forEach(function(i){completed.add(i)});
+            status.textContent='↩️ Продолжаю загрузку: уже получено '+completed.size+' частей.';
+          }else if(resumed.state==='queued' || resumed.state==='done'){
+            status.textContent='✅ Этот файл уже загружен. Монтаж запущен.';
+            return;
+          }
+        }catch(ignore){ /* expired session: start a fresh transfer */ }
+      }
+      if(!id){
+        var start=await request('/upload/start','POST',
+          JSON.stringify({filename:file.name,size:file.size,settings:settings}),false);
+        id=start.upload_id;
+        partSize=start.chunk_size;
+        parts=start.parts;
+        try{localStorage.setItem('personalEditorLastUpload',
+          JSON.stringify({id:id,url:url,filename:file.name,size:file.size,
+             settings:signature,created:Date.now()}))}catch(ignore){}
+      }
+      if(!Number.isInteger(partSize) || partSize!==4000000 ||
+          parts!==Math.ceil(file.size/partSize) || !Number.isInteger(parts)){
+        throw new Error('Сервер вернул неверный размер частей загрузки.');
+      }
       byId('checkUploadedResult').hidden=false;
+      progress.value=Math.round(completed.size*100/parts);
       for(var i=0;i<parts;i++){
+        if(completed.has(i))continue;
         var a=i*partSize,b=Math.min(file.size,(i+1)*partSize);
-        // Blob.slice не держит весь файл в памяти iPad одновременно.
+        // Blob.slice keeps only one 4MB chunk in the iPad webview.
         var chunk=file.slice(a,b);
-        await request('/upload/'+id+'/'+i,'PUT',chunk,true);
-        progress.value=Math.round((i+1)*100/parts);
-        status.textContent='📤 Загружено '+progress.value+'% · '+(i+1)+' из '+parts+' частей';
+        for(var tries=0;tries<4;tries++){
+          try{
+            await request('/upload/'+id+'/'+i,'PUT',chunk,true);
+            break;
+          }catch(err){
+            if(tries===3)throw new Error('Не удалось передать часть '+(i+1)+
+              '. Повторно нажми «Смонтировать Reels», загрузка продолжится. '+err.message);
+            await new Promise(function(resolve){setTimeout(resolve,(tries+1)*1200)});
+          }
+        }
+        completed.add(i);
+        progress.value=Math.round(completed.size*100/parts);
+        status.textContent='📤 Загружено '+progress.value+'% · '+completed.size+' из '+parts+' частей';
       }
       status.textContent='Проверяю целостность файла и запускаю GitHub Actions…';
       var response;
