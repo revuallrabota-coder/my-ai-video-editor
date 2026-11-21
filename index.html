@@ -189,7 +189,14 @@
           <option value="vintage">Vintage — ретро курсив</option>
           <option value="street">Street — плотный графичный</option>
           <option value="refined">Elegant — утончённый современный</option>
-        </select></div>
+                  <option value="roboto">Roboto — современный чёткий кириллический</option>
+          <option value="open_sans">Open Sans — мягкий чистый</option>
+          <option value="noto_sans">Noto Sans — универсальный русский</option>
+          <option value="ubuntu">Ubuntu — живой современный</option>
+          <option value="carlito">Carlito — лаконичный деловой</option>
+          <option value="lato_black">Lato Heavy — мощный акцент</option>
+          <option value="modern_condensed">Modern Condensed — компактный узкий</option>
+</select></div>
       <div><label class="field" for="fontSmall">Мелкий шрифт</label>
         <select id="fontSmall">
           <option value="modern" selected>Modern — тонкий современный</option>
@@ -204,7 +211,14 @@
           <option value="vintage">Vintage — ретро подпись</option>
           <option value="street">Street — графичный</option>
           <option value="refined">Elegant — изящный</option>
-        </select></div>
+                  <option value="roboto">Roboto — современный чёткий кириллический</option>
+          <option value="open_sans">Open Sans — мягкий чистый</option>
+          <option value="noto_sans">Noto Sans — универсальный русский</option>
+          <option value="ubuntu">Ubuntu — живой современный</option>
+          <option value="carlito">Carlito — лаконичный деловой</option>
+          <option value="lato_black">Lato Heavy — мощный акцент</option>
+          <option value="modern_condensed">Modern Condensed — компактный узкий</option>
+</select></div>
     </div>
     <div class="split">
       <div>
@@ -233,8 +247,8 @@
     <input id="outline" type="range" min="0" max="8" value="0">
     <label class="field" for="shadow">Мягкая тень: <span id="shadowValue">2</span></label>
     <input id="shadow" type="range" min="0" max="10" value="2">
-    <label class="option"><input id="emoji" type="checkbox" checked> ✨ Эмодзи + тематические ретро-вставки</label>
-    <p class="note">В стилях Old Money и Vintage автоматически появляются архивные объёмные карточки в момент ключевых слов: камера, деньги, маникюр, идеи и другие. Под них подбираются короткие авторские звуки. Отключи галочку, чтобы убрать и стикеры, и вставки.</p>
+    <label class="option"><input id="emoji" type="checkbox" checked> ✨ Эмодзи + тематические вставки под выбранный стиль</label>
+    <p class="note">Для Old Money, Vintage, Elegant, Street, Editorial, Minimal, Neon, Pop и Luxe автоматически выбираются свои карточки и звуковые акценты. Они появляются на ключевых словах. Галочка отключает и стикеры, и вставки.</p>
     <label class="field" for="soundfx">🔊 Звуковые акценты на ключевых словах</label>
     <select id="soundfx">
       <option value="soft" selected>Тихие мягкие акценты</option>
@@ -463,7 +477,14 @@
       old_money:'Georgia, "Times New Roman", serif',
       vintage:'Georgia, "Times New Roman", serif',
       street:'Impact, "Arial Narrow", sans-serif',
-      refined:'"Helvetica Neue", Arial, sans-serif'
+      refined:'"Helvetica Neue", Arial, sans-serif',
+      roboto:'Roboto, Arial, sans-serif',
+      open_sans:'"Open Sans", Arial, sans-serif',
+      noto_sans:'"Noto Sans", Arial, sans-serif',
+      ubuntu:'Ubuntu, Arial, sans-serif',
+      carlito:'Carlito, Arial, sans-serif',
+      lato_black:'Lato, Arial Black, sans-serif',
+      modern_condensed:'"Arial Narrow", "Helvetica Neue", sans-serif'
     };
     big.style.fontFamily=styles[byId('fontBig').value]||'Arial,sans-serif';
     big.style.fontWeight=byId('fontBig').value==='clean'?'500':'900';
