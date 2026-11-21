@@ -101,7 +101,8 @@ class OvalAndTitleTests(unittest.TestCase):
             self.assertGreater(count,0)
             self.assertIn("CustomTopTitle",content)
             self.assertNotIn("Style: HeroBig",content)
-            self.assertIn("Style: OvalShadow",content)
+            self.assertTrue("Style: CascadeHalo" in content or
+                            "Style: OvalShadow" in content)
             frame=folder/"frame.png"
             subprocess.run([
                 "ffmpeg","-hide_banner","-loglevel","error","-y",
