@@ -339,6 +339,38 @@ def main() -> None:
                 send_text(token,owner,"🎧 Видео получено. Распознаю речь и готовлю черновик.")
                 words=transcribe_words(source,model_size="small",language="ru")
                 words,delay=wait_for_transcript_review(token,owner,words,seconds,delay)
+                # Explain WHY an illustration appears, never hide arbitrary
+                # decorative insert choices from the author of the Reels.
+                if config.get("insert_style","reference_soft")=="reference_soft":
+                    from semantic_editing import choose_semantic_cues
+                    plan=choose_semantic_cues(
+                        words,seconds,str(config.get("insert_density","subtle"))
+                    )
+                    if plan:
+                        descriptions={
+                            "error":"акцент на ошибке",
+                            "inspect":"лупа на важной детали",
+                            "success":"показать исправление",
+                            "compare":"сравнить два варианта",
+                            "time":"указать время",
+                            "speech":"выделить вопрос",
+                            "camera":"сцена про съёмку",
+                            "phone":"показать приложение",
+                            "next":"переход к следующему шагу",
+                        }
+                        lines=[
+                            str(round(c.start,1))+" с: "+
+                            descriptions.get(c.kind,c.reason)
+                            for c in plan[:6]
+                        ]
+                        send_text(token,owner,
+                            "🧠 План смыслового монтажа по речи:\n"+
+                            "\n".join(lines)+
+                            "\n\nСлучайные вставки не добавляю.")
+                    else:
+                        send_text(token,owner,
+                            "🧠 По этой речи крупных смысловых вставок не нужно: "
+                            "сохраню чистый монтаж и аккуратные субтитры.")
                 send_text(token,owner,"✅ Текст принят. Монтирую с сохранением Full HD.")
             selected_style=str(config.get("subtitle_style","reference_dynamic"))
             animation="phrase_float" if selected_style.endswith("_phrases") else "word_pop"
