@@ -439,12 +439,15 @@ def main() -> None:
                 "\n✨ Эмодзи: " + str(stats.get("emoji_count", 0))
                 + " · 🔊 акценты: " + str(stats.get("sfx_count", 0))
                 + " · 🎵 звуки титров: " + str(stats.get("caption_sfx_count", 0))
-                + " · 🖼 винтажные вставки: " + str(stats.get("insert_count", 0))
+                + " · 🧠 смысловые акценты: " + str(stats.get("semantic_cue_count", 0))
+                + " · 🎞 графика/вставки: " + str(stats.get("insert_count", 0))
+                + " · 🎨 иконки из ZIP: " + str(stats.get("private_asset_count", 0))
                 + " · 🔔 звуки вставок: " + str(stats.get("insert_sfx_count", 0))
             )
             LOG.info("Reels effects counts %s", {
                 k:stats.get(k,0) for k in
-                ("emoji_count","sfx_count","caption_sfx_count","insert_count","insert_sfx_count")
+                ("emoji_count","sfx_count","caption_sfx_count","insert_count",
+                 "insert_sfx_count","semantic_cue_count","private_asset_count")
             })
             if not out.is_file() or out.stat().st_size < 1000:
                 raise RuntimeError("FFmpeg не создал готовый MP4.")
