@@ -70,6 +70,44 @@ class RetroInsertsTests(unittest.TestCase):
                 self.assertEqual(im.getpixel((0,0))[3],0)
                 self.assertGreater(im.getpixel((240,180))[3],0)
 
+    def test_motion_scenes_follow_speech_and_use_own_frames(self):
+        from reference_motion_scenes import select_motion_cues,make_motion_assets
+        from PIL import ImageChops
+        words=[(4.72,5.16,"маникюр"),(5.20,5.52,"важный"),
+               (6.00,6.55,"результат")]
+        cues=select_motion_cues(words,8,density="subtle")
+        self.assertEqual(len(cues),1)
+        self.assertEqual(cues[0].kind,"television")
+        self.assertEqual(cues[0].label,"МАНИКЮР")
+        with tempfile.TemporaryDirectory() as td:
+            folder=Path(td)
+            source=folder/"video.mp4"
+            subprocess.run([
+                "ffmpeg","-hide_banner","-loglevel","error","-y",
+                "-f","lavfi","-i","testsrc2=s=240x426:r=8:d=8",
+                "-f","lavfi","-i","sine=frequency=320:duration=8",
+                "-c:v","libx264","-preset","ultrafast",
+                "-c:a","aac","-shortest",str(source)
+            ],check=True,capture_output=True,timeout=80)
+            layers=make_motion_assets(source,folder,cues[0],0)
+            self.assertEqual(len(layers),3)
+            for file in layers:
+                with Image.open(file) as im:
+                    self.assertEqual(im.size,(720,1280))
+                    self.assertEqual(im.mode,"RGBA")
+            with Image.open(layers[1]) as scene:
+                self.assertGreater(scene.getpixel((400,650))[3],0)
+            result=folder/"final.mp4"
+            stats=apply_effects(source,result,words,
+                  sound="off",emoji="off",caption_sound="off",
+                  insert_style="reference_soft",insert_density="subtle",
+                  insert_sound="off",quality="balanced")
+            self.assertEqual(stats["insert_count"],1)
+            duration,has_sound=duration_and_audio(result)
+            self.assertTrue(7.5 < duration < 8.3)
+            self.assertTrue(has_sound)
+            self.assertGreater(result.stat().st_size,10000)
+
     def test_thematic_sound_not_silent(self):
         with tempfile.TemporaryDirectory() as td:
             path=Path(td)/"sound.wav"
