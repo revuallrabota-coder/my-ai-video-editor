@@ -57,16 +57,36 @@ class GentleReferenceTests(unittest.TestCase):
     def test_emoji_geometry_follows_real_phrase_bounds(self):
         spans=phrase_geometry(self.WORDS,"middle","refined","old_money")
         self.assertGreater(len(spans),0)
+        centers=set()
         for start,end,width,cx,cy in spans:
             self.assertLess(start,end)
             self.assertLessEqual(width,455)
-            self.assertEqual(cx,360)
-            self.assertEqual(cy,692)
+            self.assertTrue(290 <= cx <= 430)
+            self.assertTrue(560 <= cy <= 830)
+            centers.add((cx,cy))
+        self.assertGreater(len(centers),1)
         anchors=phrase_emoji_anchors(self.WORDS,"middle","refined","old_money")
         self.assertEqual(len(anchors),len(spans))
-        self.assertTrue(all(70 <= x <= 600 and 630 <= y <= 745 for _,_,x,y in anchors))
+        self.assertTrue(all(70 <= x0 <= 600 and 70 <= x1 <= 600
+                            for _,_,x0,_,x1,_ in anchors))
         cues=pick_caption_cues(self.WORDS,4.5)
         self.assertLess(len(cues),len(self.WORDS)//2+1)
+
+    def test_hero_title_stars_and_continuous_motion(self):
+        ass,count=build_reference_dynamic_ass(
+            self.WORDS, caption_variant="reference_soft",
+            font_profile="old_money",small_font_profile="refined",
+            intro_animated=True, intro_title="Бот который монтирует")
+        self.assertIn("Style: HeroBig,",ass)
+        self.assertIn("Style: HeroStar,",ass)
+        self.assertIn("МОНТИРУЕТ",ass)
+        self.assertGreaterEqual(ass.count("HeroStar,,"),3)
+        self.assertIn(r"\p1",ass)
+        self.assertGreater(count,len(phrase_groups(self.WORDS)))
+        lines=[row for row in ass.splitlines() if "Phrase,," in row or "PhrasePlate,," in row]
+        motions=[re.search(r"\\move\((\d+),(\d+),(\d+),(\d+),0,(\d+)\)", row) for row in lines]
+        self.assertTrue(all(m is not None for m in motions))
+        self.assertTrue(any(m.group(1)!=m.group(3) for m in motions))
 
     def test_true_ffmpeg_plate_stays_with_floating_phrase(self):
         # Matte and text are ONE libass dialogue event. Verify actual pixels.
