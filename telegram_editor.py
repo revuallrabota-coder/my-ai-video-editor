@@ -336,6 +336,8 @@ def write_ass(
             content, hook, position=hook_position if placement is None else placement,
             duration=seconds,
             color=accent_color, font_profile=font_profile,
+            y_center=(290 if top_title.strip()
+                      and top_title_mode in ("intro","always") else 202),
         )
         complete = append_top_title(
             complete, top_title, top_title_mode,
