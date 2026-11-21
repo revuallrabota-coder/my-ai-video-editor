@@ -35,6 +35,7 @@ const CHOICES = {
   caption_variant: ["reference_soft","editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant"],
   small_font_profile: ["elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined","roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed"],
   background_style: ["off","occasional","frequent","always"],
+  top_title_mode: ["auto","off","intro","always"],
   animation_style: ["float","pop","slide"],
   subtitle_sfx: ["off","soft","tick"],
   insert_style: ["off","reference_soft","retro","old_money","vintage",
@@ -171,6 +172,12 @@ function verifiedWorkerSettings(config) {
   const captionVariant = field(config.caption_variant,"caption_variant","editorial");
   const smallFont = field(config.small_font_profile,"small_font_profile","modern");
   const backgroundStyle = field(config.background_style,"background_style","occasional");
+  // The user-written title is independent from the hook and subtitle words.
+  const topTitle=String(config.top_title??"").trim();
+  if (topTitle.length>70 || /[\\{}\r\n]/.test(topTitle)) {
+    throw new Error("Название сверху: до 70 символов, одной строкой.");
+  }
+  const topTitleMode=field(config.top_title_mode,"top_title_mode","auto");
   const animationStyle = field(config.animation_style,"animation_style","float");
   const subtitleSound = field(config.subtitle_sfx,"subtitle_sfx","soft");
   const insertStyle=field(config.insert_style,"insert_style","reference_soft");
@@ -196,6 +203,8 @@ function verifiedWorkerSettings(config) {
     small_font_profile: smallFont,
     caption_variant: captionVariant,
     background_style: backgroundStyle,
+    top_title: topTitle,
+    top_title_mode: topTitleMode,
     animation_style: animationStyle,
     subtitle_sfx: subtitleSound,
     audio_profile: original.audio_profile,
