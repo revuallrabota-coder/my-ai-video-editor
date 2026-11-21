@@ -319,9 +319,12 @@ def write_ass(
     caption_variant: str = "editorial",
     background_style: str = "occasional",
     animation_style: str = "float",
+    top_title: str = "",
+    top_title_mode: str = "auto",
 ) -> int:
     words = words_override if words_override is not None else transcribe_words(video_path)
     from reels_effects import add_hook_to_ass
+    from top_video_title import append_top_title
 
     def save_subtitles(content: str, *, placement: str | None = None) -> int:
         seconds, _ = duration_and_audio(video_path)
@@ -333,6 +336,10 @@ def write_ass(
             content, hook, position=hook_position if placement is None else placement,
             duration=seconds,
             color=accent_color, font_profile=font_profile,
+        )
+        complete = append_top_title(
+            complete, top_title, top_title_mode,
+            seconds, color=accent_color,
         )
         output_ass.write_text(complete, encoding="utf-8")
         return sum(line.startswith("Dialogue: ") for line in complete.splitlines())
@@ -347,12 +354,15 @@ def write_ass(
             caption_variant=caption_variant,
             background_style=background_style,
             animation_style=animation_style,
-            intro_animated=True,
+            intro_animated=(top_title_mode=="auto"),
             intro_title=hook if hook_position in ("start","both") else "",
         )
         # The giant intro already displays the starting hook; avoid duplication.
-        return save_subtitles(content, placement=(
-            "end" if hook_position in ("end","both") else "off"))
+        return save_subtitles(
+            content,
+            placement=("end" if hook_position in ("end","both") else "off")
+                if top_title_mode=="auto" else hook_position,
+        )
 
     if caption_animation == "word_pop":
         from word_captions import build_word_pop_ass
@@ -465,6 +475,8 @@ def edit_video(
     background_style: str = "occasional",
     animation_style: str = "float",
     subtitle_sfx: str = "off",
+    top_title: str = "",
+    top_title_mode: str = "auto",
     insert_style: str = "off",
     insert_density: str = "balanced",
     insert_sound: str = "on",
@@ -505,6 +517,7 @@ def edit_video(
                 caption_variant=caption_variant,
                 background_style=background_style,
                 animation_style=animation_style,
+                top_title=top_title, top_title_mode=top_title_mode,
             )
             if subtitle_events:
                 burn_subtitles(work, ass, staged, quality=quality)
