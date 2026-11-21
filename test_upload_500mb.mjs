@@ -23,7 +23,8 @@ const origin="https://revuallrabota-coder.github.io";
 const data=new Map();
 let chunkReads=0;
 const uploads={
-  async put(key,value,options={}){data.set(key,{value,metadata:options.metadata??null})},
+  async put(key,value,options={}){data.set(key,{value,metadata:options.metadata??null,
+    ttl:options.expirationTtl??null,expiration:options.expiration??null})},
   async get(key,type){
     if (/user-video:.*:(?:\d+)$/.test(key))chunkReads++;
     const row=data.get(key);
@@ -60,6 +61,8 @@ async function request(path,method="GET",body,internal=false){
 const health=(await request("/health")).data;
 assert.equal(health.max_upload_mb,500);
 assert.equal(health.max_files,12);
+assert.equal(health.retention_days,3);
+assert.equal(health.status_tracking,true);
 assert.equal((await request("/upload/start","POST",{
   files:[{name:"a.mp4",size:250_000_000},{name:"b.mov",size:250_000_001}],
   size:500_000_001,settings:{}
@@ -88,6 +91,7 @@ const created=await request("/upload/start","POST",{
 assert.equal(created.status,201,JSON.stringify(created.data));
 assert.equal(created.data.parts,126);
 assert.equal(created.data.chunk_size,4_000_000);
+assert.equal(data.get("user-video:"+created.data.upload_id+":meta").ttl,259200);
 const id=created.data.upload_id;
 const manifest=await uploads.get("user-video:"+id+":meta","json");
 assert.equal(manifest.size,500_000_000);
@@ -107,6 +111,7 @@ assert.equal((await request("/upload/start","POST",{
 })).status,400);
 const prefix="user-video:"+id+":";
 assert.equal((await request("/upload/"+id+"/0","PUT",new ArrayBuffer(4_000_000))).status,200);
+assert.equal(data.get("user-video:"+id+":0").ttl,259200);
 // First and last chunks of middle/end files test boundary arithmetic:
 assert.equal((await request("/upload/"+id+"/99","PUT",new ArrayBuffer(1_000_000))).status,400);
 assert.equal((await request("/upload/"+id+"/99","PUT",new ArrayBuffer(3_000_000))).status,200);
@@ -125,6 +130,62 @@ assert.equal((await request("/upload/"+id+"/status")).data.uploaded_parts.length
 assert.equal(chunkReads,0,"Never fetch all 500 MB into a Worker at once");
 assert.equal((await request("/upload/"+id+"/finish","POST",{})).status,202);
 assert.equal(dispatched,1);
+// Durable, owner-only progress persists independently of the iPad session.
+assert.equal((await request("/internal/upload/"+id+"/progress","POST",{
+  stage:"joining",message:"🎞️ Склеиваю 3 видео"
+},true)).status,200);
+let tracked=(await request("/upload/"+id+"/status")).data;
+assert.equal(tracked.stage,"joining");
+assert.equal(tracked.progress_percent,53);
+assert.match(tracked.stage_label,/Склеиваю/);
+assert.equal(tracked.retention_days,3);
+assert.ok(tracked.expires_at>Date.now()+71*60*60*1000);
+assert.equal(data.get("user-video:"+id+":progress:joining").ttl,259200);
+assert.equal((await request("/internal/upload/"+id+"/progress","POST",{
+  stage:"fake_stage"
+},true)).status,400);
+const privateDenied=await worker.fetch(new Request(base+"/upload/"+id+"/status"),env);
+assert.equal(privateDenied.status,403);
+// Simulate a large output. Every part expires at the SAME absolute time, so
+// a slowly uploaded MP4 does not leave partially expired old chunks behind.
+assert.equal((await request("/internal/upload/"+id+"/result/start","POST",{
+  size:8_000_000
+},true)).status,200);
+for (let i=0;i<2;i++) {
+  assert.equal((await request("/internal/upload/"+id+"/result/"+i,
+    "PUT",new ArrayBuffer(4_000_000),true)).status,200);
+}
+const firstOutput=data.get("user-video:"+id+":output:0");
+const secondOutput=data.get("user-video:"+id+":output:1");
+assert.ok(firstOutput.expiration>Math.floor(Date.now()/1000)+71*3600);
+assert.equal(firstOutput.expiration,secondOutput.expiration);
+assert.equal((await request("/internal/upload/"+id+"/result/finish","POST",
+  {},true)).status,200);
+assert.equal((await request("/internal/upload/"+id+"/progress","POST",{
+  stage:"done",message:"✅ MP4 готов"
+},true)).status,200);
+tracked=(await request("/upload/"+id+"/status")).data;
+assert.equal(tracked.state,"done");
+assert.equal(tracked.stage,"done");
+assert.equal(tracked.ready,true);
+assert.equal(tracked.size,8_000_000);
+assert.ok(Math.abs(tracked.expires_at-firstOutput.expiration*1000)<1000);
+let cursor=0,cleanupCalls=0;
+do {
+  const reply=await request("/internal/upload/"+id+"/release?from="+cursor,
+    "DELETE",null,true);
+  assert.equal(reply.status,200);
+  cursor=reply.data.next;
+  cleanupCalls++;
+  if(!reply.data.has_more)break;
+} while(cleanupCalls<10);
+assert.equal(cursor,126);
+assert.ok(cleanupCalls>=5);
+assert.ok(data.has("user-video:"+id+":meta"),
+  "Keep small status metadata for 72h even after video source parts are freed");
+assert.equal((await request("/upload/"+id+"/status")).data.stage,"done");
+assert.equal(data.has("user-video:"+id+":0"),false);
+assert.equal(data.has("user-video:"+id+":output:0"),true);
 const protectedManifest=(await request("/internal/upload/"+id+"/manifest","GET",null,true)).data;
 assert.equal(protectedManifest.files.length,3);
 const denied=await worker.fetch(new Request(base+"/internal/upload/"+id+"/manifest"),env);
@@ -163,4 +224,4 @@ assert.equal((await request("/upload/start","POST",{
   files:[{name:"clip.mp4",size:8_000_000}],size:8_000_000,
   assets:[{name:"oversize.zip",size:100_000_001}],settings:{}
 })).status,413);
-console.log("✓ 500MB / 3 ordered videos / private ZIP assets / 4MB chunks / resume / auth");
+console.log("✓ 500MB / 72h auto expiration / durable progress / secure private MP4 / paged source cleanup");
