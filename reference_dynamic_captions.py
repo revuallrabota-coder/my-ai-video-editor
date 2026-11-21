@@ -97,6 +97,34 @@ def _rounded_plate(half_width: int, half_height: int, radius: int=15) -> str:
             f"l 0 {r} b 0 {r//2} 0 0 {r} 0")
 
 
+def _oval_phrase_shadow(width: int, height: int) -> str:
+    """Single capsule path, not ASS BorderStyle=3's sharp-corner rectangle.
+
+    Dimensions follow the *actual rendered phrase* at the current font size.
+    With the same subtitle movement, fade and timing, it never drifts away.
+    """
+    w=max(92,int(width))
+    h=max(52,int(height))
+    x0=-w//2
+    x1=x0+w
+    y0=-h//2
+    y1=y0+h
+    r=h//2
+    k=0.55228475
+    def n(value: float) -> int:
+        return round(value)
+    return (
+        f"m {x0+r} {y0} l {x1-r} {y0} "
+        f"b {n(x1-r+k*r)} {y0} {x1} {n(y0+r-k*r)} {x1} {y0+r} "
+        f"l {x1} {y1-r} "
+        f"b {x1} {n(y1-r+k*r)} {n(x1-r+k*r)} {y1} {x1-r} {y1} "
+        f"l {x0+r} {y1} "
+        f"b {n(x0+r-k*r)} {y1} {x0} {n(y1-r+k*r)} {x0} {y1-r} "
+        f"l {x0} {y0+r} "
+        f"b {x0} {n(y0+r-k*r)} {n(x0+r-k*r)} {y0} {x0+r} {y0}"
+    )
+
+
 def _wrap_two_lines(text: str, font: FontSpec, requested: int) -> tuple[str,int,float,int]:
     """Wrap too-long phrases while maintaining a readable font size."""
     size=fit_caption_size(text,requested,font)
@@ -457,9 +485,11 @@ def build_reference_dynamic_ass(
         f"{little.bold},{little.italic},0,0,"
         f"{little.scale_x},{little.scale_y},0,0,1,0.65,0.75,5,72,72,20,1\n"
         f"Style: PhrasePlate,{little.name},30,{small_color},{small_color},"
-        "&H98201418,&HBA1A1520,"
+        "&H98201418,&HD31A1520,"
         f"{little.bold},{little.italic},0,0,"
-        f"{little.scale_x},{little.scale_y},0,0,3,1.4,0.45,5,72,72,20,1\n"
+        f"{little.scale_x},{little.scale_y},0,0,1,0.65,0.75,5,72,72,20,1\n"
+        "Style: OvalShadow,DejaVu Sans,20,&H00201923,&H00201923,"
+        "&H00201923,&H00201923,0,0,0,0,100,100,0,0,1,0,0,5,0,0,0,1\n"
         "\n[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
@@ -494,6 +524,24 @@ def build_reference_dynamic_ass(
             or background_style=="occasional" and index%6==2
         )
         style="PhrasePlate" if plate else "Phrase"
+        # An actual rounded capsule *behind* the full phrase. Unlike
+        # BorderStyle=3, no hard corners and no independent timing/motion.
+        if plate:
+            max_w=int(2*min(x0-77,x1-77,643-x0,643-x1))
+            oval_w=max(88,min(max_w,round(width+49)))
+            oval_h=round(68 if len(lines)==1 else 112)
+            shadow_shape=_oval_phrase_shadow(oval_w,oval_h)
+            # The shadow and text share exactly the same ASS move/fade:
+            # different layers are necessary for a behind-the-text drawing.
+            shadow_prefix=(
+                "{"+r"\an5"+move+rf"\fad({fade_in},{fade_out})"
+                +r"\blur6\1c&H211923&\1a&H8E&"
+                +r"\clip(72,175,648,1105)\p1"+"}"
+            )
+            events.append(
+                f"Dialogue: 1,{ass_time(start)},{ass_time(end)},"
+                f"OvalShadow,,0,0,0,,{shadow_prefix}{shadow_shape}{{\\p0}}\n"
+            )
         parts=[]
         for number,line in enumerate(lines):
             if number:parts.append(r"\N")
