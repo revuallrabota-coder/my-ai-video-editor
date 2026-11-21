@@ -45,6 +45,22 @@ class RetroInsertsTests(unittest.TestCase):
                 self.assertEqual(im.getpixel((0,0))[3],0)
                 self.assertGreater(im.getpixel((200,180))[3],0)
 
+    def test_every_caption_style_generates_distinct_cutaway(self):
+        from retro_inserts import CARD_STYLES
+        expected=("old_money","vintage","elegant","street","editorial",
+                  "minimal","neon","pop","luxe","retro")
+        self.assertTrue(all(style in CARD_STYLES for style in expected))
+        with tempfile.TemporaryDirectory() as td:
+            appearances=[]
+            for style in expected:
+                output=Path(td)/(style+".png")
+                make_retro_card(output,"РЕЗУЛЬТАТ","🏆",style=style)
+                with Image.open(output) as im:
+                    self.assertEqual(im.size,(480,382))
+                    self.assertEqual(im.mode,"RGBA")
+                    appearances.append(im.getpixel((40,80)))
+            self.assertGreaterEqual(len(set(appearances)),6)
+
     def test_thematic_sound_not_silent(self):
         with tempfile.TemporaryDirectory() as td:
             path=Path(td)/"sound.wav"
