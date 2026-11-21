@@ -400,6 +400,7 @@ def main() -> None:
                 caption_variant=str(config.get("caption_variant","reference_soft")),
                 background_style=str(config.get("background_style","occasional")),
                 subject_layout=str(config.get("subject_layout","standard")),
+                talk_scene=str(config.get("talk_scene","off")),
                 animation_style=str(config.get("animation_style","float")),
                 subtitle_sfx=str(config.get("subtitle_sfx","soft")),
                 pause_removal=str(config.get("pause_removal","tight")),
