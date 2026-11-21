@@ -158,6 +158,15 @@ def validate_settings(config: dict) -> dict:
     subtitle_sfx=option("subtitle_sfx",{
         "off","soft","tick"
     },"soft")
+    retro_default = ("retro" if caption_variant in
+                     ("old_money","vintage","elegant") else "minimal")
+    insert_style=option("insert_style",{
+        "off","retro","minimal"
+    },retro_default if str(config.get("emoji_mode","on"))=="on" else "off")
+    insert_density=option("insert_density",{
+        "subtle","balanced","dynamic"
+    },"balanced")
+    insert_sound=option("insert_sound",{"on","off"},"on")
     color = str(config.get("color", "auto"))
     if color != "auto" and not re.fullmatch(r"#[a-fA-F0-9]{6}", color):
         raise HTTPException(400, "Цвет должен быть auto или #RRGGBB")
@@ -183,6 +192,9 @@ def validate_settings(config: dict) -> dict:
         "small_font_profile":small_font,"caption_variant":caption_variant,
         "background_style":background_style,"animation_style":animation_style,
         "subtitle_sfx":subtitle_sfx,
+        "insert_style":insert_style,
+        "insert_density":insert_density,
+        "insert_sound":insert_sound,
         "color": color, "speed": speed,
         "filter_style": option("filter_style", {
             "none","warm","soft","cool","contrast","clean","film","matte","old_money","vintage","street","elegant",
@@ -273,6 +285,9 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 background_style=s["background_style"],
                 animation_style=s["animation_style"],
                 subtitle_sfx=s["subtitle_sfx"],
+                insert_style=s["insert_style"],
+                insert_density=s["insert_density"],
+                insert_sound=s["insert_sound"],
             )
         else:
             from telegram_editor import edit_video
@@ -285,6 +300,7 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 s["export_quality"], s["subtitle_delay"],
                 s["small_font_profile"], s["caption_variant"],
                 s["background_style"], s["animation_style"], s["subtitle_sfx"],
+                s["insert_style"],s["insert_density"],s["insert_sound"],
             )
         if not output.is_file() or output.stat().st_size < 100:
             raise RuntimeError("Обработчик не создал готовый MP4.")
