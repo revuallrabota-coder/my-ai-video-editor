@@ -73,12 +73,12 @@ class RetroInsertsTests(unittest.TestCase):
     def test_motion_scenes_follow_speech_and_use_own_frames(self):
         from reference_motion_scenes import select_motion_cues,make_motion_assets
         from PIL import ImageChops
-        words=[(4.72,5.16,"маникюр"),(5.20,5.52,"важный"),
-               (6.00,6.55,"результат")]
+        words=[(4.72,5.16,"сравним"),(5.20,5.52,"два"),
+               (6.00,6.55,"варианта")]
         cues=select_motion_cues(words,8,density="subtle")
         self.assertEqual(len(cues),1)
-        self.assertEqual(cues[0].kind,"television")
-        self.assertEqual(cues[0].label,"МАНИКЮР")
+        self.assertEqual(cues[0].kind,"collage")
+        self.assertEqual(cues[0].label,"СРАВНИМ")
         with tempfile.TemporaryDirectory() as td:
             folder=Path(td)
             source=folder/"video.mp4"
