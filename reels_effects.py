@@ -102,26 +102,21 @@ def pick_caption_cues(
     words: Sequence[Word], duration: float, *,
     style: str = "soft", limit: int = 36,
 ) -> list[tuple[float, str | None]]:
-    """Очень тихие аудио-сигналы на переходах слов, а не на каждом слове."""
-    if style not in ("soft", "tick"):
-        raise ValueError("Звук субтитров: soft или tick.")
-    if duration <= 0:
-        return []
-    minimum_gap = 1.00 if style == "soft" else 0.75
-    last = -10.0
-    result = []
-    for start, end, word in sorted(words, key=lambda w: w[0]):
-        t = max(0.0,float(start))
-        clean = re.sub(r"[^а-яёa-z0-9]", "", word.lower())
-        if len(clean) < 4 or t < 0.25 or t > duration - 0.25:
+    """One gentle cue per displayed PHRASE, never a chime on every word."""
+    if style not in ("soft","tick"):
+        raise ValueError("Звуки субтитров: soft или tick.")
+    from reference_dynamic_captions import phrase_groups
+    min_gap=1.22 if style=="soft" else 0.95
+    last=-10.0
+    cues=[]
+    for group in phrase_groups(words):
+        t=float(group[0][0])
+        if t < 0.25 or t > duration-0.30 or t-last < min_gap:
             continue
-        if t-last < minimum_gap:
-            continue
-        result.append((t,None))
-        last = t
-        if len(result) >= limit:
-            break
-    return result
+        cues.append((t,None))
+        last=t
+        if len(cues)>=limit:break
+    return cues
 
 
 def _escape_hook(value: str) -> str:
@@ -196,8 +191,8 @@ def make_sfx_track(
     if intensity not in ("soft", "punch", "caption_soft", "caption_tick"):
         raise ValueError("Недопустимая интенсивность звуков.")
     total = max(1, round(duration*rate))
-    peak = {"soft":0.12, "punch":0.20, "caption_soft":0.095,
-            "caption_tick":0.13}[intensity]
+    peak = {"soft":0.10, "punch":0.18, "caption_soft":0.060,
+            "caption_tick":0.085}[intensity]
     with wave.open(str(target), "wb") as wav:
         wav.setnchannels(1)
         wav.setsampwidth(2)
@@ -267,6 +262,8 @@ def apply_effects(
     insert_style: str = "off",
     insert_density: str = "balanced",
     insert_sound: str = "on",
+    font_profile: str = "bold",
+    small_font_profile: str = "modern",
 ) -> dict:
     """Тематические винтажные cutaway, эмодзи, звук, без изменения речи."""
     from telegram_editor import duration_and_audio, execute
@@ -293,9 +290,22 @@ def apply_effects(
     caption_cues = (pick_caption_cues(words,duration,style=caption_sound)
                     if caption_sound != "off" else [])
     # Обычные смайлы не перекрывают большую иллюстрированную карточку.
-    visual = [(t, symbol) for t, symbol in cues if symbol
-              and all(abs(t - r.time) > 1.15 for r in retro)
-             ] if emoji == "on" else []
+    from reference_dynamic_captions import phrase_geometry
+    geometry=phrase_geometry(words, caption_position,
+                             small_font_profile, font_profile)
+    # Emoji is one small accent on one whole phrase. Coordinates derive
+    # from that exact phrase's measured text width, NOT the video edge.
+    visual=[]
+    used_phrases=set()
+    if emoji=="on":
+        for t,symbol in cues:
+            if not symbol or any(abs(t-r.time)<1.15 for r in retro):
+                continue
+            for k,(start,end,width,cx,cy) in enumerate(geometry):
+                if start-0.05<=t<=end+0.02 and k not in used_phrases:
+                    visual.append((start,end,symbol,width,cx,cy))
+                    used_phrases.add(k)
+                    break
     if (sound == "off" and not visual and not caption_cues and not retro):
         source.replace(target)
         return {"emoji_count": 0, "sfx_count": 0, "caption_sfx_count": 0,
@@ -309,10 +319,9 @@ def apply_effects(
         current_input = 1
         emoji_count = 0
         if visual:
-            # Стикер рядом с центральной зоной титра, а не на краю.
-            yratio = {"top": .265, "middle": .515, "bottom": .635}[caption_position]
-            # Ограничение, чтобы до двух минут оставаться лёгким для runner.
-            for i,(start,symbol) in enumerate(visual[:16]):
+            # One refined sticker beside the actual PHRASE. It fades and
+            # floats together with that phrase, with a 12px breathing gap.
+            for i,(start,clip_end,symbol,text_width,cx,cy) in enumerate(visual[:16]):
                 path = folder/f"emoji_{i}.png"
                 try:
                     emoji_image(symbol, path)
@@ -320,16 +329,19 @@ def apply_effects(
                     LOG.warning("Не удалось подготовить %s: %s", symbol, exc)
                     continue
                 args.extend(["-loop","1","-framerate","30","-i",str(path)])
-                clip_end = min(duration, start+1.0)
-                alpha = (f"[{current_input}:v]format=rgba,"
-                         f"fade=t=in:st={start:.2f}:d=0.16:alpha=1,"
-                         f"fade=t=out:st={max(start+0.22,clip_end-0.18):.2f}:d=0.18:alpha=1[emoji{i}]")
+                clip_end=min(duration,clip_end)
+                sticker_x=min(610,max(74,round(cx+text_width/2+13)))
+                sticker_y=round(cy-23)
+                alpha = (f"[{current_input}:v]scale=52:52,format=rgba,"
+                         f"fade=t=in:st={start:.3f}:d=0.30:alpha=1,"
+                         f"fade=t=out:st={max(start+0.31,clip_end-0.22):.3f}:"
+                         f"d=0.22:alpha=1[emoji{i}]")
                 filters.append(alpha)
                 dest = f"[stage{i}]"
                 filters.append(
-                    f"{prev}[emoji{i}]overlay=x='main_w*(0.70+0.03*mod({i},2))':"
-                    f"y='{yratio}*main_h+12*max(0,1-(t-{start:.2f})*4)':"
-                    f"enable='between(t,{start:.2f},{clip_end:.2f})'"
+                    f"{prev}[emoji{i}]overlay=x='{sticker_x}':"
+                    f"y='{sticker_y+7}-7*min(1,max(0,(t-{start:.3f})/0.42))':"
+                    f"enable='between(t,{start:.3f},{clip_end:.3f})'"
                     f":shortest=1{dest}"
                 )
                 prev = dest
