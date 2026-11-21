@@ -256,10 +256,15 @@
     <label class="field" for="shadow">Мягкая тень: <span id="shadowValue">1</span></label>
     <input id="shadow" type="range" min="0" max="10" value="1">
     <label class="option"><input id="emoji" type="checkbox" checked> ✨ Маленькие эмодзи возле смысловых фраз</label>
-    <label class="option"><input id="motionInserts" type="checkbox" checked> ⭐ Белые анимированные сцены: розовый телевизор, фотоколлажи, звёзды</label>
+    <label class="option"><input id="motionInserts" type="checkbox" checked> 🎯 Смысловой монтаж: вставки только когда этого требует речь</label>
+    <label class="field" for="assetPacks">Твои наборы анимированных вставок (необязательно)</label>
+    <input id="assetPacks" type="file" accept=".zip,application/zip" multiple>
+    <p class="note">Можно прикрепить 4 приватных ZIP-пакета суммарно до 100 МБ. Готовые MOV-иконки и WAV-звуки используются по смыслу, а шаблоны Adobe .mogrt/.ffx не запускаются в FFmpeg. Эти файлы не публикуются в GitHub.</p>
+    <div class="mini" id="assetPacksInfo">Наборы не выбраны: будут использоваться встроенные смысловые графические сцены.</div>
+    <label class="option"><input id="assetSfx" type="checkbox"> 🔈 Добавлять редкие тихие звуки из моих ZIP-пакетов по смыслу</label>
     <label class="field" for="motionFrequency">Как часто добавлять большие вставки</label>
-    <select id="motionFrequency"><option value="subtle">Редко, только на главных моментах</option><option value="balanced" selected>Умеренно, как динамичный Reels</option><option value="dynamic">Часто, для активного монтажа</option></select>
-    <p class="note">По твоему видео: крупный заголовок в начале, белая графическая сцена с розовым ретротелевизором, затем фотоколлаж из кадров ТВОЕГО исходника, силуэты и звёзды. Слои плавно выезжают по очереди. Настрой частоту или отключи большие сцены.</p>
+    <select id="motionFrequency"><option value="subtle" selected>Умно и редко: только когда есть подходящий смысл</option><option value="balanced">Умеренно: смысловые вставки с паузами</option><option value="dynamic">Активнее: но тоже только по теме речи</option></select>
+    <p class="note">Редактор сначала читает распознанную речь: «найди ошибку» → лупа или крестик; «результат» → галочка; «секунды» → часы; «сравним» → фотоколлаж; «монтаж» → графическая сцена. Без смыслового совпадения вставка не появится. В одном видео могут вообще не понадобиться большие вставки.</p>
     <p class="note">Эмодзи появляются плавно только возле смысловых фраз. Большие иллюстрированные карточки больше не добавляются автоматически.</p>
     <label class="field" for="soundfx">🔊 Звуковые акценты на ключевых словах</label>
     <select id="soundfx">
@@ -376,13 +381,16 @@
   var names=['Видео','Монтаж','Подписи','Эффекты','Итог'];
   var byId=function(id){return document.getElementById(id)};
   var videoInput=byId('videos');
-  var selectedClips=[]; // Ordered, editable collection; each File stays on device.
+  var selectedClips=[];
+  var selectedAssetPacks=[]; // Ordered, editable collection; each File stays on device.
   var photoInput=byId('photos');
   function fmtBytes(n){return n>=1000000000?(n/1000000000).toFixed(2)+' ГБ':(n/1000000).toFixed(1)+' МБ'}
   function selectedText(id){return byId(id).options[byId(id).selectedIndex].text}
   function getSettings(){
     return {
       videoFiles:selectedClips.map(function(f){return {name:f.name,sizeBytes:f.size}}),
+      effectPacks:selectedAssetPacks.map(function(f){return {name:f.name,sizeBytes:f.size}}),
+      assetSound:byId('assetSfx').checked,
       referenceVideo:byId('referenceVideo').files[0] ? byId('referenceVideo').files[0].name : null,
       photos:Array.from(photoInput.files).map(function(f){return f.name}),
       ratio:ratio,
@@ -436,7 +444,7 @@
     byId('next').hidden=current===4;
     if(current===4){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Референс',s.referenceVideo||'нет'],['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Референс',s.referenceVideo||'нет'],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Фото',s.photos.length+' шт.'],['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -501,6 +509,15 @@
     appendClips(byId('addVideos').files,false);
     // Allows selecting the same file again after removing it.
     byId('addVideos').value='';
+  });
+  byId('assetPacks').addEventListener('change',function(){
+    selectedAssetPacks=Array.from(byId('assetPacks').files);
+    var bytes=selectedAssetPacks.reduce(function(sum,f){return sum+f.size},0);
+    byId('assetPacksInfo').textContent=selectedAssetPacks.length
+      ? ('📦 '+selectedAssetPacks.length+' набора · '+fmtBytes(bytes)+
+         (bytes>100000000||selectedAssetPacks.length>4
+          ? ' ⚠️ Лимит четыре ZIP и 100 МБ':''))
+      : 'Наборы не выбраны: используются встроенные смысловые сцены.';
   });
   var referenceUrl=null;
   byId('referenceVideo').addEventListener('change',function(){
@@ -712,6 +729,12 @@
       var settings=buildRenderSettings();
       if(settings.mode==='reference')throw new Error('Для проекта до 500 МБ выбери «Мой стиль» (без второго видео-референса).');
       var totalSize=videos.reduce(function(sum,file){return sum+file.size},0);
+      var assets=selectedAssetPacks.slice();
+      var assetSize=assets.reduce(function(sum,file){return sum+file.size},0);
+      if(assets.length>4 || assetSize>100000000)
+        throw new Error('Максимум четыре ZIP-пакета до 100 МБ суммарно.');
+      if(assets.some(function(f){return !/\.zip$/i.test(f.name)||f.size<100}))
+        throw new Error('Для анимаций выбери ZIP-архивы из прикреплённых наборов.');
       if(totalSize>500000000)throw new Error(
         'Общий размер проекта '+fmtBytes(totalSize)+'. Максимум 500 МБ на все видео вместе.');
       for(var f=0;f<videos.length;f++){
@@ -751,9 +774,18 @@
           });
         }
       });
-      var fingerprint=JSON.stringify(videos.map(function(file){
-        return [file.name,file.size,file.lastModified];
-      }));
+      assets.forEach(function(file,index){
+        for(var j=0;j<Math.ceil(file.size/4000000);j++){
+          uploadParts.push({
+            archiveIndex:index,start:j*4000000,
+            end:Math.min(file.size,(j+1)*4000000)
+          });
+        }
+      });
+      var fingerprint=JSON.stringify([
+        ...videos.map(function(file){return ['video',file.name,file.size,file.lastModified]}),
+        ...assets.map(function(file){return ['asset',file.name,file.size,file.lastModified]})
+      ]);
       var old=null,signature=JSON.stringify(settings);
       try{old=JSON.parse(localStorage.getItem('personalEditorLastUpload')||'null')}catch(ignore){}
       var id=null,partSize=4000000,parts=0,completed=new Set();
@@ -777,6 +809,7 @@
       if(!id){
         var start=await request('/upload/start','POST',JSON.stringify({
           files:videos.map(function(file){return {name:file.name,size:file.size}}),
+          assets:assets.map(function(file){return {name:file.name,size:file.size}}),
           size:totalSize,settings:settings
         }),false);
         id=start.upload_id;
@@ -795,7 +828,8 @@
       for(var i=0;i<parts;i++){
         if(completed.has(i))continue;
         var piece=uploadParts[i];
-        var file=videos[piece.clipIndex];
+        var file=piece.archiveIndex===undefined
+          ? videos[piece.clipIndex] : assets[piece.archiveIndex];
         var chunk=file.slice(piece.start,piece.end);
         for(var tries=0;tries<4;tries++){
           try{
@@ -809,8 +843,10 @@
         }
         completed.add(i);
         progress.value=Math.round(completed.size*100/parts);
-        status.textContent='📤 '+progress.value+'% · Видео '+
-          (piece.clipIndex+1)+'/'+videos.length+
+        status.textContent='📤 '+progress.value+'% · '+
+          (piece.archiveIndex===undefined
+            ? 'Видео '+(piece.clipIndex+1)+'/'+videos.length
+            : 'Пакет эффектов '+(piece.archiveIndex+1)+'/'+assets.length)+
           ' · часть '+completed.size+'/'+parts;
       }
       status.textContent='Проверяю целостность файла и запускаю GitHub Actions…';
@@ -935,7 +971,7 @@
       emoji_mode:s.emoji?'on':'off',
       insert_style:s.motionInserts?'reference_soft':'off',
       insert_density:s.motionDensity,
-      insert_sound:'off',
+      insert_sound:s.assetSound?'on':'off',
       hook:s.hook?s.hookText:'',
       hook_position:s.hook?s.hookPosition:'off'
     };
