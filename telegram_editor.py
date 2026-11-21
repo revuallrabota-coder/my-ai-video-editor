@@ -410,8 +410,8 @@ def write_ass(
 
 
     if style == "reference_dynamic" or caption_animation == "reference_dynamic":
-        from reference_dynamic_captions import build_reference_dynamic_ass
-        content, count = build_reference_dynamic_ass(
+        from reference_cascade_captions import build_reference_cascade_ass
+        content, count = build_reference_cascade_ass(
             words, color=color,
             caption_position=caption_position, font_profile=font_profile,
             small_font_profile=small_font_profile,
