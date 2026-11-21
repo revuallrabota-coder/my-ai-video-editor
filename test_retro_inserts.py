@@ -61,6 +61,15 @@ class RetroInsertsTests(unittest.TestCase):
                     appearances.append(im.getpixel((40,80)))
             self.assertGreaterEqual(len(set(appearances)),6)
 
+    def test_new_reference_cutaway_is_original_half_frame_graphic(self):
+        with tempfile.TemporaryDirectory() as td:
+            output=Path(td)/"reference_motion.png"
+            make_retro_card(output,"МОНТАЖ","🎬",style="reference_soft")
+            with Image.open(output) as im:
+                self.assertEqual(im.size,(480,382))
+                self.assertEqual(im.getpixel((0,0))[3],0)
+                self.assertGreater(im.getpixel((240,180))[3],0)
+
     def test_thematic_sound_not_silent(self):
         with tempfile.TemporaryDirectory() as td:
             path=Path(td)/"sound.wav"
