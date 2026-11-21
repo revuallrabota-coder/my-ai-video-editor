@@ -339,10 +339,13 @@ def montage_by_reference(
     top_title: str = "",
     top_title_mode: str = "auto",
     pause_removal: str = "tight",
+    subject_layout: str = "standard",
 ) -> dict:
     """Монтаж с точной синхронизацией речи, динамичным кадром и титрами."""
     from reels_effects import apply_effects, validate_effects
     validate_effects(sound_effects, emoji_mode, hook_position)
+    from portrait_caption_layer import check_layout, choose_text_side, protect_subject
+    subject_layout = check_layout(subject_layout)
     # Без второго файла используем постоянный темп из разобранного
     # 50-секундного пользовательского референса: близкие планы, мягкое
     # движение камеры, без резких ступенек.
@@ -382,6 +385,7 @@ def montage_by_reference(
         # голос. Скорость исходного видео и речи остаётся равной 1.0.
         joined_duration, _ = duration_and_audio(joined)
         words = shift_word_timestamps(words, subtitle_delay, joined_duration)
+        subject_side = choose_text_side(joined) if subject_layout == "beside" else "center"
         # Render title timings from the joined timeline, then burn those
         # titles while making the actual camera move (one less lossy pass).
         count = write_ass(
@@ -395,13 +399,26 @@ def montage_by_reference(
             background_style=background_style,
             animation_style=animation_style,
             top_title=top_title, top_title_mode=top_title_mode,
+            subject_side=subject_side,
         )
         add_virtual_camera(
             joined, dynamic, profile.seconds_per_change,
             camera_style=camera_style, words=words,
             quality=quality, subtitles_ass=subtitles if count else None,
-            intermediate=(emoji_mode == "on"),
+            intermediate=(emoji_mode == "on" or subject_layout != "standard"),
         )
+        if count and subject_layout != "standard":
+            # Camera moves must be identical in the uncaptioned foreground
+            # and captioned image, or the person would leave ghost outlines.
+            clean_camera = folder / "camera_without_captions.mp4"
+            protected = folder / "captions_behind_subject.mp4"
+            add_virtual_camera(
+                joined, clean_camera, profile.seconds_per_change,
+                camera_style=camera_style, words=words, quality=quality,
+                subtitles_ass=None, intermediate=True,
+            )
+            protect_subject(clean_camera, dynamic, protected, quality=quality)
+            dynamic = protected
         effect_stats = apply_effects(
             dynamic, output, words,
             sound=sound_effects, emoji=emoji_mode,
