@@ -277,8 +277,11 @@ def apply_effects(
     sx=frame_width/720
     sy=frame_height/1280
     from retro_inserts import choose_retro_cues, make_retro_card, make_retro_sound_track
-    retro = (choose_retro_cues(words, duration, density=insert_density)
-             if insert_style != "off" else [])
+    from reference_motion_scenes import select_motion_cues, make_motion_assets
+    motion_cues=(select_motion_cues(words,duration,insert_density)
+                 if insert_style=="reference_soft" else [])
+    retro=(choose_retro_cues(words,duration,density=insert_density)
+           if insert_style not in ("off","reference_soft") else [])
     cues = pick_cues(words, duration)
     caption_cues = (pick_caption_cues(words,duration,style=caption_sound)
                     if caption_sound != "off" else [])
@@ -292,14 +295,16 @@ def apply_effects(
     used_phrases=set()
     if emoji=="on":
         for t,symbol in cues:
-            if not symbol or any(abs(t-r.time)<1.15 for r in retro):
+            if (not symbol or any(abs(t-r.time)<1.15 for r in retro)
+                    or any(sc.start-.15<=t<=sc.end+.15 for sc in motion_cues)):
                 continue
             for k,(start,end,x0,y0,x1,y1) in enumerate(geometry):
                 if start-0.05<=t<=end+0.02 and k not in used_phrases:
                     visual.append((start,end,symbol,x0,y0,x1,y1))
                     used_phrases.add(k)
                     break
-    if (sound == "off" and not visual and not caption_cues and not retro):
+    if (sound == "off" and not visual and not caption_cues
+            and not retro and not motion_cues):
         source.replace(target)
         return {"emoji_count": 0, "sfx_count": 0, "caption_sfx_count": 0,
                 "insert_count": 0, "insert_sfx_count": 0}
@@ -380,6 +385,42 @@ def apply_effects(
             insert_count += 1
             rendered_retro.append(insert)
 
+        scene_count = 0
+        for i, scene in enumerate(motion_cues):
+            # Three transparent planes: paper-white stage, original-video
+            # illustration/photo collage, and a late-entering decoration.
+            assets=make_motion_assets(source,folder,scene,i)
+            start,end=scene.start,scene.end
+            for layer,path in enumerate(assets):
+                delay=(0.0,0.26,0.58)[layer]
+                appear=start+delay
+                if appear>=end-.15:continue
+                args.extend(["-loop","1","-framerate","30","-i",str(path)])
+                out_label=f"[motion{i}_{layer}]"
+                fadeout=max(appear+.38,end-.33)
+                filters.append(
+                    f"[{current_input}:v]scale={frame_width}:{frame_height},"
+                    f"format=rgba,fade=t=in:st={appear:.3f}:d=0.36:alpha=1,"
+                    f"fade=t=out:st={fadeout:.3f}:d=0.30:alpha=1{out_label}"
+                )
+                stage=f"[motionstage{i}_{layer}]"
+                # The illustrated object keeps gliding after appearing, while
+                # the white backdrop remains steady.
+                if layer==0:
+                    travel="0"
+                else:
+                    travel=(f"{round(18*sy)}-"
+                            f"{round(24*sy)}*min(1,max(0,(t-{appear:.3f})/0.6))"
+                            f"-{round(5*sy)}*sin((t-{appear:.3f})*1.4)")
+                filters.append(
+                    f"{prev}{out_label}overlay=x=0:y='{travel}':"
+                    f"enable='between(t,{appear:.3f},{end:.3f})'"
+                    f":shortest=1{stage}"
+                )
+                prev=stage
+                current_input+=1
+            scene_count+=1
+
         sfx_count = 0
         caption_sfx_count = 0
         insert_sfx_count = 0
@@ -416,7 +457,7 @@ def apply_effects(
             )
             sound_output = "[mixed]"
 
-        if emoji_count or insert_count:
+        if emoji_count or insert_count or scene_count:
             args.extend(["-filter_complex",";".join(filters),"-map",prev,
                          "-c:v","libx264","-preset",export.preset,"-crf",str(export.crf)])
         elif sfx_count or caption_sfx_count or insert_sfx_count:
@@ -434,4 +475,5 @@ def apply_effects(
         execute(args)
         return {"emoji_count":emoji_count, "sfx_count":sfx_count,
                 "caption_sfx_count":caption_sfx_count,
-                "insert_count":insert_count,"insert_sfx_count":insert_sfx_count}
+                "insert_count":insert_count+scene_count,
+                "insert_sfx_count":insert_sfx_count}
