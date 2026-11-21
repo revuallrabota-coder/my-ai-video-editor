@@ -14,6 +14,8 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt requirements-api.txt ./
 RUN pip install -r requirements.txt -r requirements-api.txt
+# Person-aware captions run on the server, never on the iPad.
+RUN pip install "mediapipe>=0.10.20,<0.11"
 
 COPY . .
 
