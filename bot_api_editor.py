@@ -144,7 +144,7 @@ def render_result(
                 background_style="occasional",
                 animation_style="float",
                 insert_style=("reference_soft" if subtitle_style=="reference_dynamic" else "off"),
-                insert_density="subtle",insert_sound="off",
+                insert_density="balanced",insert_sound="off",
             )
             caption = (
                 "🎬 Монтаж готов! "
