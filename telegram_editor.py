@@ -468,6 +468,7 @@ def edit_video(
     insert_style: str = "off",
     insert_density: str = "balanced",
     insert_sound: str = "on",
+    private_assets = None,
 ) -> dict:
     from reels_effects import apply_effects, validate_effects
     from speech_review import map_words_to_ranges, shift_word_timestamps
@@ -521,6 +522,7 @@ def edit_video(
             caption_sound=subtitle_sfx,
             insert_style=insert_style, insert_density=insert_density,
             insert_sound=insert_sound,
+            private_assets=private_assets,
             font_profile=font_profile, small_font_profile=small_font_profile,
             animation_style=animation_style,
         )
