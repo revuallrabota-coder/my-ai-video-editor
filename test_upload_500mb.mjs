@@ -161,6 +161,9 @@ assert.ok(firstOutput.expiration>Math.floor(Date.now()/1000)+71*3600);
 assert.equal(firstOutput.expiration,secondOutput.expiration);
 assert.equal((await request("/internal/upload/"+id+"/result/finish","POST",
   {},true)).status,200);
+assert.equal(data.get("user-video:"+id+":meta").expiration,
+             firstOutput.expiration,
+             "Manifest and final MP4 chunks must expire at the same time");
 assert.equal((await request("/internal/upload/"+id+"/progress","POST",{
   stage:"done",message:"✅ MP4 готов"
 },true)).status,200);
