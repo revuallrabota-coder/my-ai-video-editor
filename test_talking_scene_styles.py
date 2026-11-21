@@ -1,0 +1,91 @@
+"""Regression checks for two fully rendered talking-head compositions."""
+import json
+import shutil
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+
+from talking_scene_styles import (
+    _arch_mask, _background, append_scene_ornaments,
+    render_scene, validate_talk_scene,
+)
+from reference_cascade_captions import build_reference_cascade_ass
+
+
+class TwoTalkingReelsLooks(unittest.TestCase):
+    def test_presets_are_distinct(self):
+        self.assertEqual(validate_talk_scene("contour"),"contour")
+        self.assertEqual(validate_talk_scene("cream"),"cream")
+        self.assertEqual(validate_talk_scene("off"),"off")
+        with self.assertRaises(ValueError):
+            validate_talk_scene("reels_line_logo")
+        a=_background("contour",(360,640))
+        b=_background("cream",(360,640))
+        self.assertNotEqual(a.getpixel((10,10)),b.getpixel((10,10)))
+        mask=_arch_mask((360,390))
+        self.assertEqual(mask.getpixel((180,370)),255)
+        self.assertEqual(mask.getpixel((0,0)),0)
+
+    def test_studio_captions_preserve_soft_word_animations(self):
+        words=[
+            (0.1,.4,"Смотри"),(.4,.7,"какая"),(.7,1.15,"ошибка"),
+            (1.2,1.5,"видео"),(1.5,1.85,"всё"),(1.85,2.3,"показывает"),
+        ]
+        with tempfile.TemporaryDirectory() as temp:
+            for style in ("contour","cream"):
+                script,count=build_reference_cascade_ass(
+                    words,color="auto",caption_position="studio",
+                    font_profile="bold",small_font_profile="modern",
+                    caption_variant="contour_talk" if style=="contour" else "cream_talk",
+                    background_style="off",animation_style="float",
+                )
+                self.assertGreater(count,2)
+                self.assertIn("\\move(",script)
+                self.assertIn("\\fad(",script)
+                ass=Path(temp)/(style+".ass")
+                ass.write_text(script,"utf-8")
+                append_scene_ornaments(ass,words,style)
+                enhanced=ass.read_text("utf-8")
+                self.assertIn("Style: TalkBadge",enhanced)
+                self.assertIn("Dialogue: 2",enhanced)
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"),
+                         "FFmpeg is not installed")
+    def test_real_ffmpeg_output_keeps_voice_and_arch(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            original=root/"original.mp4"
+            cmd=["ffmpeg","-v","error","-y",
+                 "-f","lavfi","-i","testsrc2=size=360x640:rate=12:duration=1",
+                 "-f","lavfi","-i","sine=frequency=340:duration=1",
+                 "-c:v","libx264","-preset","ultrafast","-c:a","aac",
+                 "-shortest",str(original)]
+            subprocess.run(cmd,check=True,capture_output=True,timeout=25)
+            for style in ("contour","cream"):
+                dest=root/(style+".mp4")
+                render_scene(original,dest,style,quality="balanced")
+                self.assertTrue(dest.is_file() and dest.stat().st_size>1000)
+                probe=subprocess.run([
+                    "ffprobe","-v","quiet","-show_entries",
+                    "stream=codec_type,width,height","-of","json",str(dest)
+                ],check=True,capture_output=True,text=True,timeout=15)
+                streams=json.loads(probe.stdout)["streams"]
+                self.assertTrue(any(s["codec_type"]=="audio" for s in streams))
+                v=next(s for s in streams if s["codec_type"]=="video")
+                self.assertEqual((v["width"],v["height"]),(720,1280))
+
+    def test_full_settings_chain_has_talking_scene(self):
+        repo=Path(__file__).parent
+        html=(repo/"index.html").read_text("utf-8")
+        worker=(repo/"cloudflare_launcher.js").read_text("utf-8")
+        process=(repo/"process_uploaded_video.py").read_text("utf-8")
+        self.assertIn('option value="contour_talk"',html)
+        self.assertIn('option value="cream_talk"',html)
+        self.assertIn("talk_scene:s.talkScene",html)
+        self.assertIn("talk_scene: talkScene",worker)
+        self.assertIn('config.get("talk_scene","off")',process)
+
+
+if __name__=="__main__":
+    unittest.main()
