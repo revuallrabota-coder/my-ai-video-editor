@@ -242,7 +242,10 @@ def main() -> None:
                     str(config.get("caption_variant","editorial"))
                     if str(config.get("emoji_mode","on"))=="on" else "off",
                 )),
-                insert_density=str(config.get("insert_density","balanced")),
+                insert_density=str(config.get(
+                    "insert_density",
+                    "subtle" if style=="reference_dynamic" else "balanced",
+                )),
                 insert_sound=str(config.get(
                     "insert_sound",
                     "off" if str(config.get("sound_effects","soft"))=="off" else "on",
