@@ -443,7 +443,8 @@ def montage_by_reference(
         effect_stats = apply_effects(
             dynamic, output, words,
             sound=sound_effects, emoji=emoji_mode,
-            caption_position=caption_position, quality=quality,
+            caption_position="top" if talk_scene!="off" else caption_position,
+            quality=quality,
             caption_sound=subtitle_sfx,
             insert_style=insert_style, insert_density=insert_density,
             insert_sound=insert_sound,
