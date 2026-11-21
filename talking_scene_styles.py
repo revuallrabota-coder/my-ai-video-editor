@@ -105,7 +105,7 @@ def render_scene(source: Path, output: Path, name: str,
         # crop gently favors the upper half (eyes rather than empty floor).
         filter_complex=(
             f"[0:v]fps=30,scale={w}:{h}:force_original_aspect_ratio=increase,"
-            f"crop={w}:{person_height}:0:(ih-{person_height})*0.30,"
+            f"crop={w}:{person_height}:(iw-{w})/2:(ih-{person_height})*0.30,"
             f"setsar=1,format=rgba[portrait];"
             f"[2:v]format=gray[alpha];"
             f"[portrait][alpha]alphamerge[arch];"
