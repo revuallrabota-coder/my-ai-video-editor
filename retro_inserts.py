@@ -127,64 +127,112 @@ def _emoji_patch(symbol: str, size: int = 140):
         return None
 
 
+CARD_STYLES = {
+    # bg, ink, border, visual shape
+    "retro":     ((235,220,186,251),(77,55,45,255),(145,84,65,255),"archive"),
+    "vintage":   ((232,209,167,251),(84,51,39,255),(162,88,55,255),"archive"),
+    "old_money": ((246,236,214,251),(68,59,54,255),(170,141,87,255),"luxury"),
+    "elegant":   ((248,243,239,250),(79,58,72,255),(189,146,160,255),"luxury"),
+    "street":    ((33,35,42,251),(247,245,232,255),(214,239,70,255),"street"),
+    "editorial": ((247,246,240,251),(39,35,39,255),(220,71,68,255),"clean"),
+    "minimal":   ((243,244,241,249),(48,54,50,255),(116,133,122,255),"clean"),
+    "neon":      ((31,25,51,250),(237,242,243,255),(183,236,85,255),"street"),
+    "pop":       ((255,229,238,251),(98,43,82,255),(241,87,150,255),"street"),
+    "luxe":      ((245,235,218,251),(75,49,45,255),(183,141,101,255),"luxury"),
+}
+
+
 def make_retro_card(
-    target: Path,
-    label: str,
-    symbol: str,
-    style: str = "retro",
+    target: Path, label: str, symbol: str, style: str = "retro",
 ) -> None:
-    """Тиснение, архивная бумага, эмодзи-иллюстрация и физическая тень."""
-    if style not in ("retro","minimal"):
-        raise ValueError("Вставки: retro, minimal или off.")
-    from PIL import Image,ImageDraw,ImageFilter
-    width,height=480,382
-    image=Image.new("RGBA",(width,height),(0,0,0,0))
-    shadow=Image.new("RGBA",(width,height),(0,0,0,0))
-    sd=ImageDraw.Draw(shadow)
-    bounds=(30,26,width-30,height-29)
-    sd.rounded_rectangle((bounds[0]+7,bounds[1]+9,bounds[2]+7,bounds[3]+9),
-                         radius=35,fill=(5,11,9,145))
-    image.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(14)))
-    panel=Image.new("RGBA",(width,height),(0,0,0,0))
+    """Create an ORIGINAL themed cutaway card for every user caption style."""
+    if style not in CARD_STYLES:
+        raise ValueError("Неизвестный стиль вставки: " + str(style))
+    from PIL import Image, ImageDraw, ImageFilter
+
+    paper,ink,accent,shape=CARD_STYLES[style]
+    w,h=480,382
+    image=Image.new("RGBA",(w,h),(0,0,0,0))
+    shade=Image.new("RGBA",(w,h),(0,0,0,0))
+    sd=ImageDraw.Draw(shade)
+    bounds=(29,25,w-29,h-29)
+    radius=12 if shape=="street" else 20 if shape=="clean" else 34
+    sd.rounded_rectangle((37,35,w-21,h-20),
+                         radius=radius,fill=(7,7,10,126))
+    image.alpha_composite(shade.filter(ImageFilter.GaussianBlur(11)))
+    panel=Image.new("RGBA",(w,h),(0,0,0,0))
     brush=ImageDraw.Draw(panel)
-    if style=="retro":
-        paper=(235,220,186,252)
-        ink=(77,55,45,255)
-        accent=(145,84,65,255)
+    brush.rounded_rectangle(bounds,radius=radius,fill=paper,outline=accent,width=3)
+    if shape=="luxury":
+        brush.rounded_rectangle((40,36,w-40,h-39),
+                                radius=radius-8,outline=accent,width=2)
+        for x in (60,w-60):
+            for y in (59,h-60):
+                brush.ellipse((x-4,y-4,x+4,y+4),fill=accent)
+        brush.line((76,65,w-76,65),fill=accent,width=2)
+    elif shape=="archive":
+        brush.rounded_rectangle((39,35,w-39,h-38),
+                                radius=radius-9,outline=ink,width=1)
+        brush.line((72,64,w-72,64),fill=accent,width=2)
+        brush.line((72,h-77,w-72,h-77),fill=accent,width=2)
+        rng=random.Random(label+symbol+style)
+        # Aged paper has locally generated tiny speckles, not stock texture.
+        for _ in range(780):
+            x,y=rng.randrange(46,w-46),rng.randrange(45,h-45)
+            rad=rng.randrange(1,3)
+            brush.ellipse((x,y,x+rad,y+rad),
+                          fill=(123,85,55,rng.randrange(5,24)))
+    elif shape=="street":
+        brush.rectangle((39,37,w-39,46),fill=accent)
+        brush.polygon([(44,61),(120,61),(91,77),(44,77)],fill=accent)
+        brush.rectangle((52,h-79,w-52,h-75),fill=accent)
+        for x in range(60,w-55,34):
+            brush.line((x,56,x-14,80),fill=accent,width=2)
+    else: # clean editorial
+        brush.line((52,65,w-52,65),fill=accent,width=2)
+        brush.rectangle((49,50,65,66),fill=accent)
+
+    icon=_emoji_patch(symbol,152)
+    if icon:
+        # For darker graphics the tinted icon is deliberately lighter.
+        panel.alpha_composite(icon,((w-icon.width)//2,91))
     else:
-        paper=(234,242,235,248)
-        ink=(26,65,59,255)
-        accent=(47,125,103,255)
-    brush.rounded_rectangle(bounds, radius=32, fill=paper,outline=ink,width=3)
-    brush.rounded_rectangle((39,35,width-39,height-38),radius=25,outline=accent,width=2)
-    # Deliberately reproducible aged texture so stickers do not look like
-    # the default flat emoji keyboards.
-    rng=random.Random(label+symbol+style)
-    if style=="retro":
-        for _ in range(1050):
-            x=rng.randrange(45,width-45)
-            y=rng.randrange(41,height-43)
-            rad=rng.choice((0,0,1,1,2))
-            brush.ellipse((x,y,x+rad,y+rad),fill=(115,79,58,rng.randrange(6,25)))
-    brush.line((78,63,width-78,63),fill=accent,width=2)
-    brush.line((78,height-81,width-78,height-81),fill=accent,width=2)
-    brush.ellipse((65,56,80,71),fill=accent)
-    brush.ellipse((width-80,56,width-65,71),fill=accent)
-    emoji=_emoji_patch(symbol,158)
-    if emoji:
-        panel.alpha_composite(emoji,((width-emoji.width)//2,91))
-    else:
-        brush.text((width//2,154),"✦",font=_serif(112),fill=accent,anchor="mm")
+        brush.text((w//2,159),"✦",font=_serif(118),
+                   fill=accent,anchor="mm")
+
     title=str(label).strip().upper()[:22] or "ВАЖНО"
-    font_size=43
-    while font_size>=24:
-        ft=_serif(font_size)
-        if brush.textbbox((0,0),title,font=ft)[2] <= width-112:
+    if shape in ("street","clean"):
+        family=("/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf"
+                if shape=="street" else
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+        from PIL import ImageFont
+        try: chosen=ImageFont.truetype(family,39)
+        except OSError: chosen=_serif(39)
+    else:
+        chosen=_serif(42)
+    font_size=42 if shape not in ("street","clean") else 39
+    while font_size>19:
+        try:
+            from PIL import ImageFont
+            current=ImageFont.truetype(chosen.path,font_size)
+        except (AttributeError,OSError):
+            current=_serif(font_size)
+        bb=brush.textbbox((0,0),title,font=current)
+        if bb[2]-bb[0]<=w-110:
             break
         font_size-=2
-    brush.text((width//2,height-92),title,font=_serif(font_size),
-               fill=ink,anchor="mm",stroke_width=0)
-    brush.text((width//2,height-56),"✦  ARCHIVE  •  REELS  ✦",
+    brush.text((w//2,h-95),title,font=current,fill=ink,anchor="mm")
+    footer={
+        "street":"STREET  •  CUT  •  PLAY",
+        "neon":"NIGHT  •  REELS",
+        "pop":"POP  •  REELS",
+        "elegant":"ELEGANCE  •  REELS",
+        "old_money":"ATELIER  •  REELS",
+        "luxe":"COLLECTION  •  REELS",
+        "editorial":"EDITORIAL  •  REELS",
+        "minimal":"MOTION  •  REELS",
+    }.get(style,"✦  ARCHIVE  •  REELS  ✦")
+    brush.text((w//2,h-58),footer,
                font=_serif(17,False),fill=accent,anchor="mm")
     image.alpha_composite(panel)
     target.parent.mkdir(parents=True,exist_ok=True)
