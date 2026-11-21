@@ -88,7 +88,7 @@ assert.equal(created.status,201,JSON.stringify(created.data));
 assert.equal(created.data.parts,126);
 assert.equal(created.data.chunk_size,4_000_000);
 const id=created.data.upload_id;
-const manifest=(await request("/internal/upload/"+id+"/manifest","GET",null,true)).data;
+const manifest=await uploads.get("user-video:"+id+":meta","json");
 assert.equal(manifest.size,500_000_000);
 assert.deepEqual(manifest.files.map(f=>[f.size,f.offset,f.parts]),[
   [200_000_000,0,50],[199_000_000,50,50],[101_000_000,100,26]
@@ -114,6 +114,8 @@ assert.equal((await request("/upload/"+id+"/status")).data.uploaded_parts.length
 assert.equal(chunkReads,0,"Never fetch all 500 MB into a Worker at once");
 assert.equal((await request("/upload/"+id+"/finish","POST",{})).status,202);
 assert.equal(dispatched,1);
+const protectedManifest=(await request("/internal/upload/"+id+"/manifest","GET",null,true)).data;
+assert.equal(protectedManifest.files.length,3);
 const denied=await worker.fetch(new Request(base+"/internal/upload/"+id+"/manifest"),env);
 assert.equal(denied.status,401);
 // Old single-file API remains usable after the multi-file upgrade.
