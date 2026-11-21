@@ -47,12 +47,13 @@ class CaptionSafeAreaTests(unittest.TestCase):
             font_profile="old_money",small_font_profile="refined",
         )
         self.assertLess(count,len(words))
-        self.assertEqual(count,len(phrase_groups(words)))
+        self.assertEqual(count,2*len(phrase_groups(words)))
         self.assertEqual(count,len(re.findall(r"^Dialogue:",ass,re.M)))
-        # Every phrase including its translucent backplate is ONE event.
-        self.assertEqual(ass.count("Dialogue: 2,"),count)
+        # Rounded vector shadow and phrase are two time-locked ASS layers.
+        self.assertEqual(ass.count("Dialogue: 2,"),len(phrase_groups(words)))
+        self.assertEqual(ass.count("Dialogue: 1,"),len(phrase_groups(words)))
         self.assertNotIn("Dialogue: 0,",ass)
-        self.assertNotIn("Dialogue: 1,",ass)
+        self.assertIn("Style: OvalShadow,",ass)
         self.assertIn("Style: PhrasePlate,",ass)
         self.assertIn("ПАРАЛЛЕЛЬНА",ass)
         self.assertIn(r"\clip(72,175,648,1105)",ass)
