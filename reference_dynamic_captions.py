@@ -332,6 +332,81 @@ def phrase_emoji_anchors(
     return result
 
 
+
+def _hero_events(
+    words: Sequence[Word], explicit_title: str,
+    accent_color: str, pale_color: str,
+) -> list[str]:
+    """Huge original title and animated vector stars above the speaker.
+
+    No invented claims: if no custom title was supplied, the text comes
+    exclusively from the opening words of the provided audio transcript.
+    """
+    spoken=[safe_text(w) for _,_,w in words if safe_text(w)]
+    title=safe_text(explicit_title)
+    if not title:
+        selected=[]
+        for word in spoken[:7]:
+            if selected and len(" ".join(selected+[word]))>40:
+                break
+            selected.append(word)
+            if word.endswith((".", "!", "?")) and len(selected)>=3:
+                break
+        title=" ".join(selected)
+    title=title[:70].strip()
+    if not title:
+        return []
+    tokens=title.split()
+    if not tokens:
+        return []
+    # The prominent line uses the strongest spoken content word.
+    spotlight=max(range(len(tokens)),
+                  key=lambda i:(len(re.sub(r"[^\wа-яёА-ЯЁ]","",tokens[i])),i))
+    header=" ".join(tokens[:spotlight]).strip()
+    huge=tokens[spotlight].strip().upper()
+    footer=" ".join(tokens[spotlight+1:]).strip()
+    intro_end=min(3.9,max(2.35,words[0][0]+3.15 if words else 3.0))
+    intro_start=0.06
+    def subtitle(text: str, y: int, style: str, size: int, layer: int, delay: float):
+        if not text:
+            return ""
+        style_font=choose_font("old_money" if style=="HeroBig" else "refined")
+        # Keep long Russian words inside the 9:16 title safe width.
+        measured=_measure_width(text,size,style_font)
+        while measured>570 and size>23:
+            size-=2
+            measured=_measure_width(text,size,style_font)
+        a=int(delay*1000)
+        return (f"Dialogue: {layer},{ass_time(intro_start+delay)},"
+                f"{ass_time(intro_end)},{style},,0,0,0,,"
+                "{"+rf"\an5\move(360,{y+25},360,{y-5},0,{round((intro_end-intro_start-delay)*1000)})"
+                +rf"\fs{size}\fad(450,340)\blur0.22"
+                +r"\fscx94\fscy94\t(0,630,\fscx100\fscy100)"
+                +"}"+safe_text(text)+"\n")
+    events=[]
+    if header:
+        events.append(subtitle(header,163,"HeroSmall",29,6,0.00))
+    events.append(subtitle(huge,221 if header else 197,"HeroBig",68,7,0.15))
+    if footer:
+        events.append(subtitle(footer,275 if header else 258,"HeroSmall",25,6,0.31))
+    # Four-point metallic/pink stars; no external assets, icons, or text copied.
+    star="m 0 -22 l 5 -5 23 0 5 5 0 22 -5 5 -23 0 -5 -5"
+    stars=((90,151,1.0,0.02),(615,175,.8,.16),(570,291,.54,.48))
+    for i,(x,y,scale,delay) in enumerate(stars):
+        start=intro_start+delay
+        if start>=intro_end-.3:
+            continue
+        ms=round((intro_end-start)*1000)
+        events.append(
+            f"Dialogue: 5,{ass_time(start)},{ass_time(intro_end)},HeroStar,,0,0,0,,"
+            "{"+rf"\an5\move({x},{y+14},{x+5},{y-14},0,{ms})"
+            +rf"\fscx{int(scale*92)}\fscy{int(scale*92)}\fad(300,380)"
+            +r"\t(0,730,\fscx110\fscy110\frz21)\p1"
+            +"}"+star+r"{\p0}"+"\n"
+        )
+    return [event for event in events if event]
+
+
 def build_reference_dynamic_ass(
     words: Sequence[Word],
     *,
@@ -342,6 +417,8 @@ def build_reference_dynamic_ass(
     caption_variant: str="editorial",
     background_style: str="occasional",
     animation_style: str="float",
+    intro_animated: bool=False,
+    intro_title: str="",
 ) -> tuple[str,int]:
     """Gentle phrase-level Reels typography: one phrase, one animated layer.
 
@@ -444,4 +521,14 @@ def build_reference_dynamic_ass(
             f"Dialogue: 2,{ass_time(start)},{ass_time(end)},"
             f"{style},,0,0,0,,{prefix}{''.join(parts)}\n"
         )
+    if intro_animated:
+        header=header.replace("\\n[Events]\\n",
+            f"Style: HeroSmall,{little.name},28,{small_color},{small_color},"
+            "&H80201620,&H990A1018,0,0,0,0,100,100,0,0,1,0.5,0.6,5,70,70,10,1\\n"
+            f"Style: HeroBig,{big.name},68,{accent_color},{accent_color},"
+            "&H70201620,&H9A0A1018,1,0,0,0,100,100,0,0,1,0.65,0.8,5,70,70,10,1\\n"
+            f"Style: HeroStar,DejaVu Sans,28,{small_color},{small_color},"
+            "&H801E1820,&H960A1018,0,0,0,0,100,100,0,0,1,0.4,0.4,5,70,70,10,1\\n"
+            "\\n[Events]\\n")
+        events.extend(_hero_events(words,intro_title,accent_color,small_color))
     return header+"".join(events),len(events)
