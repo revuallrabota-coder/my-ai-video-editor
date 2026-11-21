@@ -63,7 +63,7 @@ def read_chunked_project(
                   "size":size,"parts":parts,"offset":0}]
     if not isinstance(size,int) or size<4096 or size>MAX_BYTES or \
        not isinstance(chunk_size,int) or chunk_size!=4_000_000 or \
-       not isinstance(parts,int) or not 1<=parts<=136 or \
+       not isinstance(parts,int) or not 1<=parts<=165 or \
        not 1<=len(files)<=12:
         raise ValueError("Недостоверные размеры проекта из Cloudflare.")
     validated=[]
@@ -86,15 +86,38 @@ def read_chunked_project(
         expected_offset+=count
         total+=file_size
         validated.append((name,file_size,count,offset))
-    if total!=size or expected_offset!=parts:
-        raise ValueError("Размеры проекта и всех его частей не совпадают.")
+    if total!=size:
+        raise ValueError("Размеры проекта и всех видео не совпадают.")
+    asset_files=meta.get("assets",[])
+    if not isinstance(asset_files,list) or len(asset_files)>4:
+        raise ValueError("Недостоверный список архивов эффектов.")
+    asset_size=0
+    for item in asset_files:
+        if not isinstance(item,dict):
+            raise ValueError("Повреждён перечень эффектов.")
+        name=item.get("name")
+        file_size=item.get("size")
+        count=item.get("parts")
+        offset=item.get("offset")
+        if not isinstance(name,str) or not name.lower().endswith(".zip") or \
+           not isinstance(file_size,int) or not 100<=file_size<=100_000_000 or \
+           not isinstance(count,int) or count!=(file_size+chunk_size-1)//chunk_size or \
+           not isinstance(offset,int) or offset!=expected_offset:
+            raise ValueError("Не совпадают архивы эффектов и их фрагменты.")
+        expected_offset+=count
+        asset_size+=file_size
+        validated.append((name,file_size,count,offset))
+    if expected_offset!=parts or asset_size>100_000_000 or \
+       asset_size!=meta.get("asset_size",0):
+        raise ValueError("Размеры архива эффектов не совпадают с проектом.")
 
     folder.mkdir(parents=True,exist_ok=True)
     targets=[]
     downloaded=0
     for file_no,(name,file_size,count,offset) in enumerate(validated):
         ext=Path(name).suffix.lower()
-        target=folder/f"clip_{file_no+1:03d}{ext}"
+        target=(folder/f"clip_{file_no+1:03d}{ext}" if file_no<len(files)
+                else folder/f"asset_{file_no-len(files)+1:02d}.zip")
         with target.open("wb") as output:
             for index in range(count):
                 part_no=offset+index
@@ -127,9 +150,10 @@ def read_chunked_project(
                          file_no+1,len(validated),index+1,count)
         if target.stat().st_size!=file_size:
             raise RuntimeError("Размер восстановленного видео не совпадает.")
-        targets.append(target)
-    if downloaded!=size:
-        raise RuntimeError("Загруженный видеопроект восстановлен не полностью.")
+        if file_no<len(files):
+            targets.append(target)
+    if downloaded!=size+asset_size:
+        raise RuntimeError("Видео и графические ZIP-пакеты восстановлены не полностью.")
     return meta,targets
 
 
@@ -287,6 +311,16 @@ def main() -> None:
             )
             config=metadata.get("settings") or {}
             mode=config.get("mode","my_style")
+            asset_packs=sorted((root/"source_clips").glob("asset_*.zip"))
+            private_assets=None
+            if asset_packs:
+                from private_effect_assets import prepare_private_effect_assets
+                private_assets=prepare_private_effect_assets(
+                    asset_packs,root/"private_assets"
+                )
+                send_text(token,owner,
+                    "🎨 Приватные наборы проверены: "+str(private_assets.selected_files)+
+                    " подходящих MOV/WAV, шаблоны Adobe не используются напрямую.")
             from clip_montage import join_clips
             seconds,audio=join_clips(
                 clips,source,quality=str(config.get("export_quality","high"))
@@ -333,6 +367,7 @@ def main() -> None:
                     "insert_sound",
                     "off" if str(config.get("sound_effects","soft"))=="off" else "on",
                 )),
+                private_assets=private_assets,
             )
             if mode in ("my_style", "reference"):
                 from reference_editor import montage_by_reference
