@@ -226,48 +226,109 @@ def _phrase_layout(
     return lines,15,18,widest,emphasis
 
 
+
+# Alternating composition positions on the 720x1280 caption stage.
+# Positions and size variants are deterministic, not randomly jittering.
+_PHRASE_SPOTS = ((-22, -82), (42, 68), (-50, 106),
+                 (36, -120), (12, -20), (-42, 42))
+_PHRASE_SCALES = (0.86, 1.06, 0.94, 1.03, 0.88, 1.00)
+
+
+def phrase_motion(
+    index: int, caption_position: str="middle",
+    animation_style: str="float",
+) -> tuple[int,int,int,int,int,int]:
+    """Resting center and full-lifetime motion endpoints for the phrase."""
+    if caption_position not in ("top", "middle", "bottom"):
+        raise ValueError("Недопустимое положение титров.")
+    dx,dy=_PHRASE_SPOTS[index % len(_PHRASE_SPOTS)]
+    cx=CENTER_X+dx
+    cy={"top":410,"middle":692,"bottom":868}[caption_position]+dy
+    if animation_style=="float":
+        return cx,cy,cx-9,cy+19,cx+8,cy-13
+    if animation_style=="slide":
+        return cx,cy,cx+20,cy+7,cx-9,cy-9
+    if animation_style=="pop":
+        return cx,cy,cx-6,cy+12,cx+7,cy-8
+    raise ValueError("Недопустимый тип анимации.")
+
+
+def _dynamic_phrase_layout(
+    group: Sequence[Word], index: int, caption_position: str,
+    little: FontSpec, big: FontSpec,
+) -> tuple[list[list[int]],int,int,float,int]:
+    """Different caption sizes, fitted to the real shifted horizontal center."""
+    lines,base,accent,width,main=_phrase_layout(group,little,big)
+    cx,_,_,_,_,_=phrase_motion(index,caption_position)
+    allowed=2*min(cx-72,648-cx)-14
+    factor=min(_PHRASE_SCALES[index%len(_PHRASE_SCALES)],
+               allowed/max(width,1))
+    base=max(15,round(base*factor))
+    accent=max(base+3,round(accent*factor))
+    current=max(_line_length(group,line,main,base,accent,little,big)
+                for line in lines)
+    while current>allowed and base>15:
+        base-=1
+        accent=max(base+3,accent-1)
+        current=max(_line_length(group,line,main,base,accent,little,big)
+                    for line in lines)
+    return lines,base,accent,current,main
+
+
+def _phrase_lifetime(
+    groups: Sequence[Sequence[Word]], index: int,
+) -> tuple[float,float]:
+    group=groups[index]
+    start=group[0][0]
+    end=max(group[-1][1]+0.15,start+0.66)
+    next_start=groups[index+1][0][0] if index+1<len(groups) else None
+    if next_start is not None:
+        end=min(end,max(start+0.25,next_start-0.015))
+    return start,end
+
+
 def phrase_geometry(
     words: Sequence[Word], caption_position: str,
     small_font_profile: str="modern", font_profile: str="bold",
 ) -> list[tuple[float,float,float,int,int]]:
-    """(start,end,visual_width,center_x,center_y) shared with emoji compositor."""
+    """Real dynamic phrase bounds and variable centers."""
     little=choose_font(small_font_profile)
     big=choose_font(font_profile)
-    y={"top":410,"middle":692,"bottom":868}[caption_position]
-    result=[]
     phrases=phrase_groups(words)
+    result=[]
     for i,group in enumerate(phrases):
-        lines,base,accent,width,main=_phrase_layout(group,little,big)
-        next_start=(phrases[i+1][0][0] if i+1<len(phrases) else None)
-        a=group[0][0]
-        b=max(group[-1][1]+0.15,a+0.66)
-        if next_start is not None:b=min(b,max(a+0.25,next_start-0.015))
-        result.append((a,b,min(455,width),CENTER_X,y))
+        _,_,_,width,_=_dynamic_phrase_layout(
+            group,i,caption_position,little,big)
+        start,end=_phrase_lifetime(phrases,i)
+        cx,cy,_,_,_,_=phrase_motion(i,caption_position)
+        result.append((start,end,width,cx,cy))
     return result
 
 
 def phrase_emoji_anchors(
     words: Sequence[Word], caption_position: str,
     small_font_profile: str="modern", font_profile: str="bold",
-) -> list[tuple[float,float,float,float]]:
-    """Start/end and position of a small emoji next to emphasized phrase line."""
+    animation_style: str="float",
+) -> list[tuple[float,float,float,float,float,float]]:
+    """Emoji starts and ends beside the highlighted line as the phrase moves."""
     little=choose_font(small_font_profile)
     big=choose_font(font_profile)
-    y={"top":410,"middle":692,"bottom":868}[caption_position]
     groups=phrase_groups(words)
     result=[]
     for i,group in enumerate(groups):
-        lines,base,accent,_,main=_phrase_layout(group,little,big)
+        lines,base,accent,_,main=_dynamic_phrase_layout(
+            group,i,caption_position,little,big)
         main_line=next(j for j,line in enumerate(lines) if main in line)
         width=_line_length(group,lines[main_line],main,base,accent,little,big)
-        x=CENTER_X+width/2+10
-        cy=y+(main_line-(len(lines)-1)/2)*base*1.45
-        start=group[0][0]
-        end=max(group[-1][1]+0.15,start+0.66)
-        next_start=groups[i+1][0][0] if i+1<len(groups) else None
-        if next_start is not None:
-            end=min(end,max(start+0.25,next_start-0.015))
-        result.append((start,end,min(600,max(75,x)),cy))
+        cx,cy,sx,sy,ex,ey=phrase_motion(i,caption_position,animation_style)
+        offset=(main_line-(len(lines)-1)/2)*base*1.45
+        start,end=_phrase_lifetime(groups,i)
+        xbase=cx+width/2+12
+        x0=min(600,max(76,xbase+sx-cx))
+        x1=min(600,max(76,xbase+ex-cx))
+        y0=cy+offset+sy-cy
+        y1=cy+offset+ey-cy
+        result.append((start,end,x0,y0,x1,y1))
     return result
 
 
@@ -329,7 +390,8 @@ def build_reference_dynamic_ass(
     events=[]
     for index,group in enumerate(phrases):
         if not group:continue
-        lines,base_size,big_size,width,main=_phrase_layout(group,little,big)
+        lines,base_size,big_size,width,main=_dynamic_phrase_layout(
+            group,index,caption_position,little,big)
         start=group[0][0]
         natural_end=group[-1][1]+0.16
         next_start=(phrases[index+1][0][0] if index+1<len(phrases)
@@ -345,15 +407,9 @@ def build_reference_dynamic_ass(
         if fade_in+fade_out>duration_ms*.8:
             fade_in=int(duration_ms*.35)
             fade_out=int(duration_ms*.20)
-        rise=min(520,max(260,int(duration_ms*.45)))
-        delta=8
-        if animation_style=="float":
-            move=rf"\move(360,{y+delta},360,{y},0,{rise})"
-        elif animation_style=="slide":
-            move=rf"\move({360+delta},{y},360,{y},0,{rise})"
-        else:
-            # Tiny settle instead of the old abrupt 91% -> 100% pop.
-            move=rf"\move(360,{y+4},360,{y},0,{rise})"
+        # Keep subtle movement during the WHOLE lifetime, not only entrance.
+        _,_,x0,y0,x1,y1=phrase_motion(index,caption_position,animation_style)
+        move=rf"\move({x0},{y0},{x1},{y1},0,{duration_ms})"
 
         plate=(
             background_style=="always"
