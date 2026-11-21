@@ -23,7 +23,7 @@
     h3 {font-size:18px;margin:20px 0 10px}
     p {color:var(--muted);line-height:1.48;margin:7px 0 18px}
     .tiny {font-size:12px;color:var(--muted)}
-    .progress {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;margin:16px 0 20px}
+    .progress {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;margin:16px 0 20px}
     .progress-item {text-align:center}
     .num {width:42px;height:42px;margin:auto auto 5px;display:grid;place-items:center;border-radius:50%;background:#fff;color:#aca2c1;border:3px solid #e9dff7;font-weight:800}
     .progress-item.active .num {border-color:#f493ce;background:linear-gradient(135deg,#fc4b9c,#b453ec);color:white;box-shadow:0 5px 14px #df5fc559}
@@ -104,7 +104,10 @@
   <div class="progress" id="progress"></div>
 
   <section class="card page active" data-page="0">
-    <h2>Загрузить видео</h2>
+    <h2>Мой стиль 💗</h2>
+    <p class="note">Один монтаж для всех твоих роликов: склейка, вырезание пауз, скорость, шрифты, смысловые вставки и отправка в Telegram. Все параметры настраиваются отдельно.</p>
+    <input type="radio" name="mode" value="Мой стиль" checked hidden>
+    <h3>Загрузи исходные видео</h3>
     <p>Выбери несколько видео с iPad. <strong>До 500 МБ суммарно</strong> и до 2 минут общей продолжительности. Соединим их по порядку и смонтируем один Reels.</p>
     <label class="upload">
       <div class="emoji">📎</div>
@@ -127,17 +130,6 @@
   </section>
 
   <section class="card page" data-page="1">
-    <h2>💗 Мой стиль</h2>
-    <p>Один монтажный процесс без лишних режимов. Оформление можно менять, не отключая остальные функции.</p>
-    <label class="option selected mode"><input type="radio" name="mode" value="Мой стиль" checked> 🎬 Полный монтаж Reels
-      <small>Склеиваем исходники → вырезаем паузы → ускоряем речь → расставляем субтитры → выбираем смысловые вставки → отправляем MP4 в Telegram.</small></label>
-    <p class="note">На следующих экранах выбирай шрифт, цвет, скорость, количество вставок и звуки. Каждая функция работает независимо от выбранного оформления.</p>
-    <p class="note">На следующем шаге выбери одну фотографию для проверки оформления на своём кадре. Она не добавляется в монтаж без отдельного действия.</p>
-    <input id="photos" type="file" accept="image/*" hidden>
-    <div class="note" id="photoInfo" hidden></div>
-  </section>
-
-  <section class="card page" data-page="2">
     <h2>Шрифты и субтитры</h2>
     <p>Выбери оформление, а затем настрой его на своей фотографии. Все варианты используют один и тот же монтаж с паузами, речью, смысловыми вставками и отправкой в Telegram.</p>
     <label class="field" for="reelsPreset">Готовый стиль Reels</label>
@@ -274,7 +266,7 @@
     <p class="note">Шрифты, эмодзи, плавные анимации, звук и подложки передаются в новый режим загрузки до 500 МБ. Для старого режима через чат доступны не все настройки.</p>
   </section>
 
-  <section class="card page" data-page="3">
+  <section class="card page" data-page="2">
     <h2>Эффекты и фильтр</h2>
     <p>Выбери будущий стиль обработки изображения и звука.</p>
     <label class="field" for="camera">Динамика камеры</label>
@@ -323,7 +315,7 @@
     <div class="alert">Видео действительно обрабатывается сервером только после подключения backend на последнем шаге. Сам этот экран лишь настраивает монтаж.</div>
   </section>
 
-  <section class="card page" data-page="4">
+  <section class="card page" data-page="3">
     <h2>Готовим Reels</h2>
     <p>Проверь выбранные параметры и запускай монтаж одной кнопкой. Стили и фильтры применяются к видео в обработчике GitHub Actions.</p>
     <div id="summary"></div>
@@ -374,7 +366,7 @@
   if(tg){tg.ready();tg.expand();}
   var current=0, ratio='9:16', previewUrl=null;
   var pages=Array.from(document.querySelectorAll('.page'));
-  var names=['Видео','Монтаж','Подписи','Эффекты','Итог'];
+  var names=['Видео','Шрифты','Эффекты','Итог'];
   var byId=function(id){return document.getElementById(id)};
   var videoInput=byId('videos');
   var selectedClips=[];
@@ -440,8 +432,8 @@
       var label=document.createElement('span');label.textContent=name;el.append(num,label);progress.append(el);
     });
     byId('back').hidden=current===0;
-    byId('next').hidden=current===4;
-    if(current===4){
+    byId('next').hidden=current===3;
+    if(current===3){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
       [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
@@ -692,7 +684,7 @@
   });
   function go(dir){
     if(dir>0 && current===0 && !selectedClips.length){alert('Сначала выбери хотя бы одно видео.');return}
-    current=Math.max(0,Math.min(4,current+dir));draw();
+    current=Math.max(0,Math.min(3,current+dir));draw();
   }
   byId('back').addEventListener('click',function(){go(-1)});
   byId('next').addEventListener('click',function(){go(1)});
