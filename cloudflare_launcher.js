@@ -15,7 +15,7 @@ const GITHUB_API =
 
 const GITHUB_UPLOAD_API =
   "https://api.github.com/repos/revuallrabota-coder/my-ai-video-editor/actions/workflows/upload-video-50mb.yml/dispatches";
-const MAX_UPLOAD_BYTES = 50_000_000; // 50 MB, decimal
+const MAX_UPLOAD_BYTES = 300_000_000; // 300 MB, decimal (75 x 4MB KV parts)
 const UPLOAD_PART_BYTES = 4_000_000;
 const UPLOAD_TTL = 3 * 60 * 60; // 3h automatic deletion if runner fails
 
@@ -28,12 +28,16 @@ const CHOICES = {
   caption_position: ["top", "middle", "bottom"],
   font_profile: ["elegant", "clean", "bold", "bebas", "platform", "bubble", "script", "modern", "old_money","vintage","street","refined","roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed"],
   audio_profile: ["off", "balanced", "strong"],
-  video_speed: ["1.0", "1.1", "1.2"],
-  caption_variant: ["editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant"],
+  video_speed: ["1.0", "1.1", "1.2", "1.3", "1.5"],
+  caption_variant: ["reference_soft","editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant"],
   small_font_profile: ["elegant","clean","bold","bebas","platform","bubble","script","modern","old_money","vintage","street","refined","roboto","open_sans","noto_sans","ubuntu","carlito","lato_black","modern_condensed"],
   background_style: ["off","occasional","frequent","always"],
   animation_style: ["float","pop","slide"],
-  subtitle_sfx: ["off","soft","tick"]
+  subtitle_sfx: ["off","soft","tick"],
+  insert_style: ["off","reference_soft","retro","old_money","vintage",
+    "elegant","street","editorial","minimal","neon","pop","luxe"],
+  insert_density: ["subtle","balanced","dynamic"],
+  insert_sound: ["off","on"]
 };
 
 function json(value, status = 200, origin = ORIGIN) {
@@ -146,7 +150,7 @@ function verifiedWorkerSettings(config) {
     hook_position: "start"
   });
   if (original.mode === "reference") {
-    throw new Error("Загрузка 50 МБ пока работает в режиме «Мой стиль», без отдельного референса.");
+    throw new Error("Загрузка 300 МБ пока работает в режиме «Мой стиль», без отдельного референса.");
   }
   const hook = String(config.hook ?? "").trim().slice(0, 58);
   const position = String(config.hook_position ?? "off");
@@ -166,6 +170,9 @@ function verifiedWorkerSettings(config) {
   const backgroundStyle = field(config.background_style,"background_style","occasional");
   const animationStyle = field(config.animation_style,"animation_style","float");
   const subtitleSound = field(config.subtitle_sfx,"subtitle_sfx","soft");
+  const insertStyle=field(config.insert_style,"insert_style","reference_soft");
+  const insertDensity=field(config.insert_density,"insert_density","balanced");
+  const insertSound=field(config.insert_sound,"insert_sound","off");
   const quality = String(config.export_quality ?? "high");
   if (!["high", "balanced"].includes(quality)) {
     throw new Error("Недопустимое качество.");
@@ -194,7 +201,10 @@ function verifiedWorkerSettings(config) {
     hook: position === "off" ? "" : hook,
     hook_position: position,
     export_quality: quality,
-    subtitle_delay: delay
+    subtitle_delay: delay,
+    insert_style: insertStyle,
+    insert_density: insertDensity,
+    insert_sound: insertSound
   };
 }
 
@@ -223,9 +233,32 @@ async function githubDispatch(endpoint, token, inputs) {
   }
 }
 
+// Check KV keys + tiny per-chunk metadata. Never load 300 MB of chunks into a
+// single Worker invocation (Workers have a much smaller memory limit).
+async function storedChunkIndexes(env, uploadId, category, parts, totalBytes) {
+  const prefix=uploadKey(uploadId,category);
+  const stored=new Set();
+  let cursor;
+  do {
+    const page=await env.UPLOADS.list({
+      prefix,limit:1000,...(cursor?{cursor}:{})
+    });
+    for (const item of page.keys) {
+      const suffix=item.name.slice(prefix.length);
+      if (!/^(0|[1-9][0-9]*)$/.test(suffix)) continue;
+      const index=Number(suffix);
+      const expected=Math.min(UPLOAD_PART_BYTES,totalBytes-index*UPLOAD_PART_BYTES);
+      if (Number.isSafeInteger(index) && index>=0 && index<parts &&
+          item.metadata?.bytes===expected) stored.add(index);
+    }
+    cursor=page.list_complete?null:page.cursor;
+  } while(cursor);
+  return stored;
+}
+
 async function workerUploadRoute(request, env, path) {
   if (!env.UPLOADS) {
-    return json({error:"Для видео 50 МБ подключи KV namespace к Worker под именем UPLOADS."},503);
+    return json({error:"Для видео 300 МБ подключи KV namespace к Worker под именем UPLOADS."},503);
   }
   const internal = path.startsWith("/internal/upload/");
   if (internal) {
@@ -283,17 +316,16 @@ async function workerUploadRoute(request, env, path) {
       const expected=Math.min(UPLOAD_PART_BYTES,o.size-i*UPLOAD_PART_BYTES);
       const buffer=await request.arrayBuffer();
       if(buffer.byteLength!==expected)return json({error:"Incorrect result chunk"},400);
-      await env.UPLOADS.put(uploadKey(id,"output:"+i),buffer,{expirationTtl:UPLOAD_TTL});
+      await env.UPLOADS.put(uploadKey(id,"output:"+i),buffer,
+        {expirationTtl:UPLOAD_TTL,metadata:{bytes:buffer.byteLength}});
       return json({ok:true,index:i});
     }
     if (request.method === "POST" && operation === "result/finish") {
       const o=meta.output;
       if (!o || o.state!=="uploading") return json({error:"No result upload"},409);
-      for(let i=0;i<o.parts;i++){
-        const buf=await env.UPLOADS.get(uploadKey(id,"output:"+i),"arrayBuffer");
-        if (!buf || buf.byteLength!==Math.min(UPLOAD_PART_BYTES,o.size-i*UPLOAD_PART_BYTES)){
-          return json({error:"Result KV chunk is not yet available"},409);
-        }
+      const verified=await storedChunkIndexes(env,id,"output:",o.parts,o.size);
+      if (verified.size!==o.parts) {
+        return json({error:"Result KV chunk is not yet available"},409);
       }
       await env.UPLOADS.put(uploadKey(id,"meta"),
         JSON.stringify({...meta,state:"done",output:{...o,state:"ready"}}),
@@ -327,9 +359,14 @@ async function workerUploadRoute(request, env, path) {
     const meta=await env.UPLOADS.get(uploadKey(clientStatus[1],"meta"),"json");
     if (!meta) return json({error:"Файл уже удалён или время хранения истекло."},404);
     const o=meta.output;
+    const uploaded=meta.state==="uploading"
+      ? await storedChunkIndexes(env,clientStatus[1],"",meta.parts,meta.size)
+      : new Set();
     return json({
       ready:meta.state==="done" && o?.state==="ready",
       size:o?.size ?? 0,parts:o?.parts ?? 0,
+      input_size:meta.size,input_parts:meta.parts,
+      uploaded_parts:[...uploaded].sort((a,b)=>a-b),
       state:meta.state
     });
   }
@@ -358,7 +395,7 @@ async function workerUploadRoute(request, env, path) {
     catch { return json({error:"Неверный запрос на загрузку"},400); }
     const size=Number(payload.size);
     if (!Number.isSafeInteger(size) || size < 4096 || size > MAX_UPLOAD_BYTES) {
-      return json({error:"Максимум 50 МБ для одного видео."},413);
+      return json({error:"Максимум 300 МБ для одного видео."},413);
     }
     const original=String(payload.filename ?? "");
     if (!/\.(mp4|mov|m4v|webm|mkv)$/i.test(original)) {
@@ -397,7 +434,8 @@ async function workerUploadRoute(request, env, path) {
     if (buffer.byteLength !== expected) {
       return json({error:"Часть файла не полностью загружена."},400);
     }
-    await env.UPLOADS.put(uploadKey(id,index),buffer,{expirationTtl:UPLOAD_TTL});
+    await env.UPLOADS.put(uploadKey(id,index),buffer,
+      {expirationTtl:UPLOAD_TTL,metadata:{bytes:buffer.byteLength}});
     return json({uploaded:index+1,total:meta.parts});
   }
 
@@ -410,12 +448,11 @@ async function workerUploadRoute(request, env, path) {
     }
     // Confirm all parts have reached KV before launching GitHub.
     // KV is eventually consistent; retry in app when replicas lag.
-    for (let i=0;i<meta.parts;i++) {
-      const buffer=await env.UPLOADS.get(uploadKey(id,i),"arrayBuffer");
-      const expected=Math.min(UPLOAD_PART_BYTES,meta.size-i*UPLOAD_PART_BYTES);
-      if (!buffer || buffer.byteLength !== expected) {
-        return json({error:"Часть "+(i+1)+" ещё не доступна в хранилище; повтори запуск."},409);
-      }
+    const uploaded=await storedChunkIndexes(env,id,"",meta.parts,meta.size);
+    if (uploaded.size!==meta.parts) {
+      const missing=Array.from({length:meta.parts},(_,i)=>i)
+        .find(i=>!uploaded.has(i));
+      return json({error:"Часть "+(missing+1)+" ещё не доступна в хранилище; повтори запуск."},409);
     }
     try {
       await githubDispatch(GITHUB_UPLOAD_API,env.GITHUB_PAT,{
@@ -434,7 +471,7 @@ async function workerUploadRoute(request, env, path) {
     );
     return json({
       started:true,
-      message:"50 МБ переданы. GitHub скачает видео частями, смонтирует ролик и отправит MP4 в Telegram."
+      message:"Видео до 300 МБ передано. GitHub скачает его частями и смонтирует Reels; большой итоговый MP4 скачай из приложения."
     },202);
   }
   return json({error:"Неизвестный маршрут загрузки"},404);
@@ -446,7 +483,9 @@ export default {
     // Health can be checked in Safari; does not expose secrets.
     if (request.method === "GET" && path === "/health") {
       return json({ status: "online", mode: "github-actions-launcher",
-        uploads_50mb_configured: Boolean(env.UPLOADS) });
+        uploads_50mb_configured: Boolean(env.UPLOADS),
+         uploads_300mb_configured: Boolean(env.UPLOADS),
+         max_upload_mb: 300 });
     }
     if (path.startsWith("/internal/upload/")) {
       return workerUploadRoute(request, env, path);
