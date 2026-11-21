@@ -32,7 +32,7 @@ class ContrastCaptionTests(unittest.TestCase):
         bottom,c=build_contrast_ass(words,caption_position="bottom",font_profile="bold")
         self.assertGreater(b,0)
         self.assertGreater(c,0)
-        self.assertIn("Style: Strong,Liberation Sans",top)
+        self.assertIn("Style: Strong,DejaVu Sans",top)
         self.assertIn("Style: Strong,DejaVu Sans",bottom)
         self.assertNotEqual(top,bottom)
 
