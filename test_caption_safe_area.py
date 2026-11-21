@@ -56,9 +56,20 @@ class CaptionSafeAreaTests(unittest.TestCase):
         self.assertIn("Style: PhrasePlate,",ass)
         self.assertIn("ПАРАЛЛЕЛЬНА",ass)
         self.assertIn(r"\clip(72,175,648,1105)",ass)
+        centers=set()
         for line in ass.splitlines():
             if line.startswith("Dialogue: 2,"):
-                self.assertIn(r"\move(360,",line)
+                match=re.search(r"\\move\((\d+),(\d+),(\d+),(\d+),0,(\d+)\)",line)
+                self.assertIsNotNone(match)
+                x0,y0,x1,y1,ms=map(int,match.groups())
+                self.assertTrue(260 <= x0 <= 460)
+                self.assertTrue(260 <= x1 <= 460)
+                self.assertTrue(450 <= y0 <= 960)
+                self.assertTrue(450 <= y1 <= 960)
+                self.assertGreater(ms,100)
+                self.assertNotEqual((x0,y0),(x1,y1))
+                centers.add((x0,y0))
+        self.assertGreater(len(centers),1)
 
     def test_ffmpeg_renders_long_emphasis_inside_9_by_16(self):
         from PIL import Image, ImageChops
