@@ -230,18 +230,18 @@ assert.equal((await request("/upload/start","POST",{
 // The iPad My Style wizard must never reference removed IDs at runtime.
 // Static checks would not catch those since DOM calls only run after opening.
 const html=await readFile(new URL("./index.html",import.meta.url),"utf8");
-const knownIds=new Set([...html.matchAll(/\\bid=["']([^"']+)["']/g)].map(m=>m[1]));
-const referenced=[...html.matchAll(/byId\\(['"]([^'"]+)['"]\\)/g)].map(m=>m[1]);
+const knownIds=new Set([...html.matchAll(/\bid=["']([^"']+)["']/g)].map(m=>m[1]));
+const referenced=[...html.matchAll(/byId\(['"]([^'"]+)['"]\)/g)].map(m=>m[1]);
 const missingIds=[...new Set(referenced.filter(k=>!knownIds.has(k)))];
 assert.deepEqual(missingIds,[],"All referenced UI controls must exist");
-const radioModes=[...html.matchAll(/name="mode"\\s+value="([^"]+)"/g)].map(m=>m[1]);
+const radioModes=[...html.matchAll(/name="mode"\s+value="([^"]+)"/g)].map(m=>m[1]);
 assert.deepEqual(radioModes,["Мой стиль"],"Only one real montage pipeline should be exposed");
 for (const required of ["previewPhoto","previewPhotoImage","fontBig",
                         "fontSmall","replayPreview","previewKeyword",
                         "pauseRemoval","speed","launcherBase"]){
   assert.ok(knownIds.has(required),required+" missing from My Style");
 }
-const presets=html.match(/<select id="reelsPreset">([\\s\\S]*?)<\\/select>/)?.[1];
+const presets=html.match(/<select id="reelsPreset">([\s\S]*?)<\/select>/)?.[1];
 assert.ok(presets,"Visual presets missing");
 const styles=[...presets.matchAll(/value="([^"]+)"/g)].map(m=>m[1]);
 assert.deepEqual(styles,["reference_soft","old_money","editorial","minimal","custom"]);
