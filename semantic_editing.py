@@ -122,7 +122,7 @@ def choose_semantic_cues(
             strong=(kind in {"error","success","compare","phone","time"} and (
                 any(stem in token for stem in ("ошиб","брак","исправ",
                     "результат","сравн","отличи","приложен","телефон",
-                    "секунд","минут")))
+                    "секунд","минут"))))
             strong_inspect=kind=="inspect" and any(
                 phrase in context for phrase in (
                     "найди ошиб", "найти ошиб", "посмотри на ошиб"))
