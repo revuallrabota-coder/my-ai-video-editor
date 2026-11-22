@@ -40,7 +40,7 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install "requests>=2.31,<3" "mediapipe>=0.10.20,<0.11"
       - name: "Проверить синтаксис"
-        run: python -m py_compile studio_kinetic.py private_effect_assets.py talking_scene_styles.py portrait_caption_layer.py process_uploaded_video.py montage_progress.py bot_api_editor.py telegram_editor.py reference_editor.py speech_review.py reels_effects.py export_profiles.py reference_dynamic_captions.py reference_cascade_captions.py telegram_delivery.py retro_inserts.py reference_motion_scenes.py clip_montage.py font_presets.py video_filters.py
+        run: python -m py_compile guide18_fx.py studio_kinetic.py private_effect_assets.py talking_scene_styles.py portrait_caption_layer.py process_uploaded_video.py montage_progress.py bot_api_editor.py telegram_editor.py reference_editor.py speech_review.py reels_effects.py export_profiles.py reference_dynamic_captions.py reference_cascade_captions.py telegram_delivery.py retro_inserts.py reference_motion_scenes.py clip_montage.py font_presets.py video_filters.py
       - name: "Загрузить частями и выполнить монтаж"
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
