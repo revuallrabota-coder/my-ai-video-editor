@@ -1,8 +1,9 @@
-"""Two original art-directed talking-head Reels scenes.
+"""Four original art-directed talking-head Reels scenes.
 
-Contour: muted deep-green topographic lines and cream hand-drawn accents.
-Cream: warm ivory background, dark type and a rounded speaker portrait.
-Both scenes keep spoken-word timings, original voice and optional camera edits.
+Contour: dark green topographic lines, Cream: warm ivory paper.
+Pistachio: soft sage green with forest-green fine line art.
+Burgundy Brown: deep wine-to-cocoa gradient with restrained warm highlights.
+All scenes keep spoken-word timings, original voice and optional camera edits.
 No third-party watermarks, footage, proprietary preset files or logos.
 """
 from __future__ import annotations
@@ -20,7 +21,7 @@ from signature_captions import ass_color, ass_time, safe_text
 from reference_cascade_captions import oval_path
 from reference_dynamic_captions import phrase_groups
 
-VALID_TALK_SCENES = ("off", "contour", "cream")
+VALID_TALK_SCENES = ("off", "contour", "cream", "pistachio", "burgundy_brown")
 STUDIO_CAPTION_POS = "studio"
 
 
@@ -48,6 +49,41 @@ def _background(name: str, size: tuple[int, int]) -> Image.Image:
                 points.append((round(x * scale), round(y * h / 1280)))
             pen.line(points, fill=(150, 192, 166, 41), width=max(1, round(scale)))
         image = Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
+    elif name == "pistachio":
+        # Soft pistachio paper with understated olive contour lines.
+        image = Image.new("RGB", (w, h), (220, 231, 197))
+        pen = ImageDraw.Draw(image)
+        for origin in range(-160, 800, 27):
+            points = []
+            for x in range(-20, 760, 6):
+                y = origin + 18 * math.sin(x / 91 + origin / 125)
+                points.append((round(x * scale), round(y * h / 1280)))
+            pen.line(points, fill=(185, 200, 164), width=max(1, round(scale)))
+        pen.arc((round(454*scale), round(54*h/1280),
+                 round(686*scale), round(290*h/1280)),
+                200, 355, fill=(82, 111, 76), width=max(2, round(2*scale)))
+    elif name == "burgundy_brown":
+        # Two-color burgundy/chocolate gradient, no metallic-text overload.
+        image = Image.new("RGB", (w, h), (70, 29, 45))
+        pen = ImageDraw.Draw(image)
+        for y in range(h):
+            t = y / max(1, h-1)
+            mix = .20 + .58 * t
+            burgundy = (75, 27, 46)
+            chocolate = (79, 51, 41)
+            color = tuple(round(a*(1-mix)+b*mix)
+                          for a,b in zip(burgundy, chocolate))
+            pen.line(((0,y),(w,y)), fill=color)
+        # Large, almost invisible curves produce visual depth, not stickers.
+        for i in range(7):
+            inset = round((38 + i*27)*scale)
+            pen.arc((inset, round((62+i*15)*h/1280),
+                     w+round(140*scale)+inset, round((870+i*65)*h/1280)),
+                    150, 297, fill=(125, 84, 75),
+                    width=max(1, round(scale)))
+        pen.line([(round(73*scale),round(343*h/1280)),
+                  (round(647*scale),round(343*h/1280))],
+                 fill=(158, 113, 97), width=max(1, round(scale)))
     else:
         image = Image.new("RGB", (w, h), (255, 239, 190))
         pen = ImageDraw.Draw(image)
@@ -153,10 +189,16 @@ def append_scene_ornaments(
     script = ass_file.read_text("utf-8")
     if "\n[Events]" not in script:
         raise ValueError("Нет секции Events в субтитрах.")
-    dark = name == "cream"
-    ink = ass_color("#1F2420" if dark else "#FFF6E6")
-    sticker = ass_color("#262F2A" if not dark else "#FDF8E8")
-    letters = ass_color("#FFF6E6" if not dark else "#252520")
+    theme={
+        "contour": ("#FFF2DE", "#263F36", "#FFF2DE"),
+        "cream": ("#29251F", "#FFF8E9", "#29251F"),
+        "pistachio": ("#314C38", "#F7F5E5", "#314C38"),
+        "burgundy_brown": ("#F2DDD0", "#633E34", "#FFF2E5"),
+    }
+    pen_hex, sticker_hex, letters_hex = theme[name]
+    ink = ass_color(pen_hex)
+    sticker = ass_color(sticker_hex)
+    letters = ass_color(letters_hex)
     definition = (
         f"Style: TalkBadge,Lato,24,{letters},{letters},"
         "&H00000000,&H00000000,1,0,0,0,100,100,"
