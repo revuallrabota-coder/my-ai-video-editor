@@ -61,7 +61,7 @@ class VintageCinemaTests(unittest.TestCase):
         for theme,_ in THEMES:
             frame=_scene_image(VintageCue(6.,8.,"настоящая фраза",theme,0),4,0)
             self.assertEqual(frame.size,(720,1280))
-            self.assertNotEqual(frame.getpixel((360,375)),frame.getpixel((30,375)))
+            self.assertGreater(len(frame.crop((210,220,510,510)).getcolors(1000000) or []),5)
 
     def test_ui_and_renderer_use_the_same_vintage_contract(self):
         root=Path(__file__).parent
