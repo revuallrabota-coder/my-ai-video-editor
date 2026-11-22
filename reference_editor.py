@@ -341,6 +341,7 @@ def montage_by_reference(
     pause_removal: str = "tight",
     subject_layout: str = "standard",
     talk_scene: str = "off",
+    guide_effect: str = "off",
 ) -> dict:
     """Монтаж с точной синхронизацией речи, динамичным кадром и титрами."""
     from reels_effects import apply_effects, validate_effects
@@ -458,6 +459,7 @@ def montage_by_reference(
             animation_style=animation_style,
             studio_mode=(talk_scene!="off"),
             studio_scene=talk_scene,
+            guide_effect=guide_effect,
             insert_source=(clean_camera if talk_scene!="off" else None),
         )
     return {
