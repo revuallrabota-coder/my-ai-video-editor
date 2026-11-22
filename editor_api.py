@@ -322,6 +322,11 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 subject_layout=s["subject_layout"],
                 talk_scene=s["talk_scene"],
             )
+        if str(result.get("talk_scene", "off")) != s["talk_scene"]:
+            raise RuntimeError(
+                "Сервер применил не тот стиль. "
+                "Видео не будет выдано как успешно смонтированное."
+            )
         if not output.is_file() or output.stat().st_size < 100:
             raise RuntimeError("Обработчик не создал готовый MP4.")
         with LOCK:
