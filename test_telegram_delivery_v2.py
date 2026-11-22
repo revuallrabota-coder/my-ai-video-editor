@@ -45,7 +45,13 @@ class TelegramDeliveryTests(unittest.TestCase):
     def test_send_video_first_then_fallback_document(self):
         with tempfile.TemporaryDirectory() as td:
             src=Path(td)/"small.mp4"
-            src.write_bytes(b"X"*4096)
+            subprocess.run([
+                "ffmpeg","-hide_banner","-loglevel","error","-y",
+                "-f","lavfi","-i","testsrc2=size=360x640:rate=15:duration=2",
+                "-f","lavfi","-i","sine=frequency=440:duration=2",
+                "-c:v","libx264","-preset","ultrafast",
+                "-c:a","aac","-shortest",str(src)
+            ],capture_output=True,check=True,timeout=55)
             class Response:
                 def __init__(self,ok):
                     self.ok=ok
