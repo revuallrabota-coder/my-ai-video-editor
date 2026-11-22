@@ -114,55 +114,61 @@ def _arch_mask(size: tuple[int, int]) -> Image.Image:
 
 def render_scene(source: Path, output: Path, name: str,
                  *, quality: str = "high") -> None:
-    """Replace the plain full-frame source with the visual scene.
+    """Keep the talking person FULL FRAME in a real 9:16 Reels composition.
 
-    This stage runs BEFORE ASS subtitle animation.  Text therefore sits on
-    the unobstructed designed upper area and never crosses the portrait.
+    A translucent palette gradient lives only behind the moving text in the
+    upper area. The underlying person, camera and room remain visible through
+    it; there is no small square video, static arch or crop of the lower body.
+    Additional editorial motion/photo inserts are added later in reels_effects.
     """
     validate_talk_scene(name)
     if name == "off":
-        raise ValueError("Обычная сцена не требует отдельной композиции.")
+        raise ValueError("No composition needed for ordinary mode.")
     from telegram_editor import duration_and_audio
-    duration, has_audio = duration_and_audio(source)
+    duration, _ = duration_and_audio(source)
     if duration <= 0:
         raise ValueError("Исходное видео не содержит кадров.")
     profile = get_export_profile(quality)
-    w,h=profile.width,profile.height
-    offset = round(h * .37)
-    person_height = h - offset
-    output.parent.mkdir(parents=True,exist_ok=True)
+    w, h = profile.width, profile.height
+    output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="talk_scene_") as directory:
-        folder=Path(directory)
-        bg=folder/"background.png"
-        mask=folder/"arch_mask.png"
-        _background(name,(w,h)).save(bg)
-        _arch_mask((w,person_height)).save(mask)
-        # Scale the original source to the scene width; portrait-window
-        # crop gently favors the upper half (eyes rather than empty floor).
-        filter_complex=(
+        folder = Path(directory)
+        # Draw original colors/lines, then gradually reveal the real video.
+        base = _background(name, (w, h)).convert("RGBA")
+        alpha = Image.new("L", (w, h), 0)
+        alpha_data = alpha.load()
+        solid = round(h * .22)
+        bottom = round(h * .45)
+        for y in range(bottom):
+            opacity = 226 if y < solid else round(
+                226 * (1 - (y-solid)/max(1,bottom-solid))**1.4
+            )
+            for x in range(w):
+                alpha_data[x, y] = max(0, opacity)
+        base.putalpha(alpha)
+        graphic = folder / "transparent_talk_palette.png"
+        base.save(graphic)
+        filter_complex = (
             f"[0:v]fps=30,scale={w}:{h}:force_original_aspect_ratio=increase,"
-            f"crop={w}:{person_height}:(iw-{w})/2:(ih-{person_height})*0.30,"
-            f"setsar=1,format=rgba[portrait];"
-            f"[2:v]format=gray[alpha];"
-            f"[portrait][alpha]alphamerge[arch];"
-            f"[1:v][arch]overlay=0:{offset}:shortest=1:format=auto,"
+            f"crop={w}:{h}:(iw-{w})/2:(ih-{h})/2,setsar=1,format=rgba[portrait];"
+            "[1:v]format=rgba[palette];"
+            "[portrait][palette]overlay=0:0:shortest=1:format=auto,"
             "format=yuv420p[v]"
         )
-        cmd=["ffmpeg","-hide_banner","-loglevel","error","-y",
-             "-i",str(source),
-             "-loop","1","-framerate","30","-i",str(bg),
-             "-loop","1","-framerate","30","-i",str(mask),
-             "-filter_complex",filter_complex,
-             "-map","[v]","-map","0:a:0?",
-             "-c:v","libx264","-preset",profile.preset,
-             "-crf",str(profile.crf),"-pix_fmt","yuv420p",
-             "-c:a","copy","-t",f"{duration:.3f}",
-             "-movflags","+faststart",str(output)]
-        p=subprocess.run(cmd,capture_output=True,text=True,timeout=2400)
-        if p.returncode or not output.is_file():
+        cmd = [
+            "ffmpeg","-hide_banner","-loglevel","error","-y",
+            "-i",str(source),"-loop","1","-framerate","30","-i",str(graphic),
+            "-filter_complex",filter_complex,"-map","[v]","-map","0:a:0?",
+            "-c:v","libx264","-preset",profile.preset,
+            "-crf",str(profile.crf),"-pix_fmt","yuv420p",
+            "-c:a","copy","-t",f"{duration:.3f}",
+            "-movflags","+faststart",str(output),
+        ]
+        result = subprocess.run(cmd,capture_output=True,text=True,timeout=2400)
+        if result.returncode or not output.is_file():
             raise RuntimeError(
-                "Не удалось собрать сцену разговорного Reels: "+
-                p.stderr[-450:]
+                "Не удалось собрать полноэкранный разговорный Reels: "
+                +result.stderr[-450:]
             )
 
 
