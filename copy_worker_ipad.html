@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#351d2c">
+<title>Код Cloudflare для iPad · Мой монтажёр AI</title>
+<style>
+:root{color-scheme:light;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:#f8f4ef;color:#34262d;padding:28px 18px 60px}
+main{margin:auto;max-width:620px}
+.card{background:#fff;border:1px solid #eadfdc;border-radius:24px;padding:24px;box-shadow:0 9px 35px #4c27300e}
+h1{font-size:clamp(24px,6vw,32px);line-height:1.15;margin:0 0 12px}
+p{line-height:1.55;color:#61555b}
+button,.link{display:block;width:100%;padding:17px 18px;font-size:17px;font-weight:750;border:0;border-radius:15px;margin-top:12px;text-align:center;text-decoration:none}
+button.primary{color:white;background:linear-gradient(100deg,#71354c,#391f2f)}
+button.secondary,.link{color:#47283a;background:#f2eae5}
+button:disabled{opacity:.55}
+.status{padding:12px 14px;border-radius:12px;background:#f3f1ec;color:#5e535b;font-size:14px;line-height:1.5}
+.good{background:#e5f2e9;color:#235737}
+.bad{background:#fff0ec;color:#9b342d}
+textarea{display:block;width:100%;height:220px;margin-top:20px;padding:12px;border:1px solid #d6c5cc;border-radius:12px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;white-space:pre}
+small{display:block;color:#73686c;margin-top:13px;line-height:1.5}
+details{margin-top:16px}
+summary{cursor:pointer;color:#523044;font-weight:700}
+li{margin:9px 0;line-height:1.4}
+</style>
+</head>
+<body>
+<main><section class="card">
+<h1>📋 Весь код Cloudflare одной кнопкой</h1>
+<p>Специальная страница для iPad. Не нужно выделять сотни строк в GitHub или удалять их по одной в Cloudflare.</p>
+<div class="status" id="status" aria-live="polite">Загружаю полный код из нашего GitHub…</div>
+<button class="primary" id="copy" type="button" disabled>📋 Скопировать весь код</button>
+<button class="secondary" id="download" type="button" disabled>⬇️ Скачать файл worker.js</button>
+<a class="link" href="https://dash.cloudflare.com/" target="_blank" rel="noopener">Открыть Cloudflare</a>
+<details>
+<summary>Если кнопка копирования не сработала</summary>
+<p>Нажми внутри поля с кодом ниже, затем «Выбрать всё» и «Копировать». Поле содержит весь файл, а не отдельный фрагмент.</p>
+</details>
+<textarea id="source" readonly spellcheck="false" aria-label="Полный код worker.js" placeholder="Полный код появится здесь после загрузки"></textarea>
+<small>Источник: актуальный файл cloudflare_launcher.js из репозитория my-ai-video-editor. Никаких ключей и токенов здесь нет. После вставки в Cloudflare нажми Deploy, затем проверь страницу /health. Рабочая версия содержит style_contract_version: 2.</small>
+</section></main>
+<script>
+(function(){
+"use strict";
+var source=document.getElementById("source");
+var message=document.getElementById("status");
+var copy=document.getElementById("copy");
+var download=document.getElementById("download");
+var fullCode="";
+function update(text,kind){
+  message.textContent=text;
+  message.className="status"+(kind?" "+kind:"");
+}
+fetch("./cloudflare_launcher.js?copy="+Date.now(),{cache:"no-store"})
+.then(function(response){
+  if(!response.ok)throw new Error("HTTP "+response.status);
+  return response.text();
+})
+.then(function(code){
+  if(!code.includes("style_contract_version:2") ||
+     !code.includes("pistachio") ||
+     !code.includes("burgundy_brown") ||
+     !code.includes("export default")){
+    throw new Error("Получена устаревшая или неполная версия кода");
+  }
+  fullCode=code;
+  source.value=code;
+  copy.disabled=false;
+  download.disabled=false;
+  update("✅ Последняя версия получена. "+code.split("\n").length+
+    " строк. Можно копировать весь файл одной кнопкой.","good");
+}).catch(function(error){
+  update("⚠️ Код не загрузился: "+error.message+
+    ". Открой ссылку на исходный файл ниже и попробуй ещё раз.","bad");
+  var a=document.createElement("a");
+  a.href="https://raw.githubusercontent.com/revuallrabota-coder/my-ai-video-editor/main/cloudflare_launcher.js";
+  a.textContent="Открыть исходный код";
+  a.className="link";
+  source.before(a);
+});
+copy.addEventListener("click",function(){
+  if(!fullCode)return;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(fullCode).then(function(){
+      update("✅ Весь код скопирован! Вернись в Cloudflare и вставь вместо старого.","good");
+    },function(){
+      fallbackCopy();
+    });
+  } else fallbackCopy();
+});
+function fallbackCopy(){
+  source.focus();
+  source.select();
+  source.setSelectionRange(0,source.value.length);
+  var success=false;
+  try{success=document.execCommand("copy")}catch(ignore){}
+  if(success){
+    update("✅ Весь код скопирован. Вставь его в Cloudflare.","good");
+  }else{
+    update("Выделен весь файл. Нажми «Копировать» в меню iPad.","");
+  }
+}
+download.addEventListener("click",function(){
+  if(!fullCode)return;
+  var blob=new Blob([fullCode],{type:"text/javascript;charset=utf-8"});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url;
+  a.download="worker.js";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url)},30000);
+  update("⬇️ Подготовлен файл worker.js. Найди его в загрузках Safari.","good");
+});
+})();
+</script>
+</body></html>
