@@ -57,6 +57,20 @@ class GuideFxTests(unittest.TestCase):
         self.assertEqual(cues,plan(WORDS,25,"auto","dynamic"))
         self.assertEqual(plan([],25,"auto"),[]) # no invented spoken words
 
+    def test_automatic_mode_keeps_unrelated_words_and_the_intro_clean(self):
+        unrelated=[
+            (.08,.32,"Сначала"),(.4,.77,"поговорим"),
+            (1.9,2.15,"сегодня"),(4.9,5.3,"маникюр"),
+            (7.9,8.2,"клиент"),(11.,11.4,"покрытие"),
+        ]
+        self.assertEqual(plan(unrelated,13,"auto","dynamic"),[])
+        relevant=unrelated+[(13.2,13.6,"ошибку"),(18.2,18.6,"результат")]
+        cues=plan(relevant,22,"auto","dynamic")
+        self.assertTrue(cues)
+        self.assertTrue(all(c.compact for c in cues))
+        self.assertTrue(all(c.start>=4 for c in cues))
+        self.assertTrue(all(c.label in {"ОШИБКУ","РЕЗУЛЬТАТ"} for c in cues))
+
     def test_manual_mode_uses_only_one_chosen_effect(self):
         for effect in EFFECTS:
             cues=plan(WORDS,25,effect,"balanced")
