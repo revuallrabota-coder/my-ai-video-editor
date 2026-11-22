@@ -35,6 +35,8 @@ COLOR_PALETTES = {
     "elegant": ("#F0DBDC", "#FFFFFF"),
     "contour_talk": ("#F6EDD6", "#FFFFFF"),
     "cream_talk": ("#191710", "#29251B"),
+    "pistachio_talk": ("#294C35", "#324736"),
+    "burgundy_brown_talk": ("#F5DCD0", "#FFF0E6"),
 }
 
 
