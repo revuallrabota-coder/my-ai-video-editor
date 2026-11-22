@@ -87,7 +87,7 @@ SMART_TRIGGERS = (
                            "коллекц", "many", "several", "options", "list")),
     ("split_reel", ("сравн", "разниц", "отлич", "против", "сопостав",
                     "compare", "versus", "difference")),
-    ("match_cut", ("главн", "важн", "ключев", "запомн", "основн",
+    ("match_cut", ("главн", "важн", "ключев", "запомн", "основн", "ошиб", "проблем", "неправ",
                    "самое", "важнейш", "important", "main", "key")),
     ("glass_explainer_reel", ("объясн", "почему", "причин", "потому",
                               "разбер", "поясн", "explain", "because", "why")),
@@ -139,6 +139,9 @@ def _spoken_smart_cues(words: Sequence[Word], duration: float, choice: str,
             if (permitted is None or effect in permitted)
             and any(token.startswith(stem) for stem in stems)
         ), None)
+        if kind is None and token.endswith("%") and token[:-1].isdigit():
+            if permitted is None or "liquid_glass_graph" in permitted:
+                kind=(6,"liquid_glass_graph")
         if token in ("сначала", "first"):
             # "Сначала поговорим" is not proof of a multi-step explanation.
             subsequent = any(
