@@ -83,7 +83,7 @@ class SmartSemanticMontageTests(unittest.TestCase):
             self.assertIn(f'value="{effect}"',ui)
         self.assertIn("'multi:'+selected.join(',')",ui)
         self.assertNotIn("byId('reelsPreset').value='custom';",ui)
-        self.assertIn("const CONTRACT = 6;",worker)
+        self.assertIn("const CONTRACT = 7;",worker)
         self.assertEqual(worker,ipad)
         self.assertIn("validateGuideEffect(s.guide_effect)",worker)
         self.assertIn("retro=[cue for cue in retro if unoccupied",renderer)
