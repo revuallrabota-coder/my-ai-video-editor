@@ -41,7 +41,7 @@ li{margin:9px 0;line-height:1.4}
 <p>Нажми внутри поля с кодом ниже, затем «Выбрать всё» и «Копировать». Поле содержит весь файл, а не отдельный фрагмент.</p>
 </details>
 <textarea id="source" readonly spellcheck="false" aria-label="Полный код worker.js" placeholder="Полный код появится здесь после загрузки"></textarea>
-<small>Источник: актуальный файл cloudflare_launcher.js из репозитория my-ai-video-editor. Никаких ключей и токенов здесь нет. После вставки в Cloudflare нажми Deploy, затем проверь страницу /health. Рабочая версия содержит style_contract_version: 2.</small>
+<small>Источник: актуальный файл cloudflare_launcher.js из репозитория my-ai-video-editor. Никаких ключей и токенов здесь нет. После вставки в Cloudflare нажми Deploy, затем проверь страницу /health. Рабочая версия содержит style_contract_version: 3.</small>
 </section></main>
 <script>
 (function(){
@@ -65,7 +65,7 @@ fetch("./cloudflare_launcher.js?copy="+Date.now(),{cache:"no-store"})
   if(!code.includes("style_contract_version:CONTRACT") ||
      !code.includes("pistachio") ||
      !code.includes("burgundy_brown") ||
-     !code.includes("export default") || !code.includes("const CONTRACT = 2")){
+     !code.includes("export default") || !code.includes("const CONTRACT = 3")){
     throw new Error("Получена устаревшая или неполная версия кода");
   }
   fullCode=code;
