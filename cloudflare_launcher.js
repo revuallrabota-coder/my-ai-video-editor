@@ -8,7 +8,7 @@ const CHUNK = 4000000;
 const MAX_VIDEO = 500000000;
 const MAX_ASSETS = 100000000;
 const TTL = 259200;
-const CONTRACT = 6;
+const CONTRACT = 7;
 const STAGES = {
   queued:35, downloading:42, joining:53, transcribing:63, review:72,
   planning:78, rendering:86, publishing:94, done:100, failed:100
@@ -305,6 +305,27 @@ async function finishUpload(request,env,id) {
   });
   return response({started:true,message:"Видео передано в GitHub Actions. Подтверди текст через Telegram."},202);
 }
+async function githubRunOutcome(env,runId) {
+  // Authenticated lookup from the Worker, never exposing the GitHub PAT.
+  if (!env.GITHUB_PAT || !/^[0-9]{1,20}$/.test(String(runId||""))) return null;
+  try {
+    const result=await fetch("https://api.github.com/repos/"+REPOSITORY+
+      "/actions/runs/"+runId,{
+      headers:{
+        Authorization:"Bearer "+env.GITHUB_PAT,
+        Accept:"application/vnd.github+json",
+        "X-GitHub-Api-Version":"2022-11-28",
+        "User-Agent":"personal-telegram-video-editor"
+      },
+      cf:{cacheTtl:0,cacheEverything:false}
+    });
+    if (!result.ok) return null;
+    const job=await result.json();
+    return {status:job.status,conclusion:job.conclusion};
+  } catch {
+    return null; // Never break ordinary status checks on GitHub outage.
+  }
+}
 async function status(env,id) {
   const meta=await env.UPLOADS.get(key(id,"meta"),"json");
   if (!meta) return response({error:"Загрузка удалена или срок хранения истёк."},404);
@@ -315,8 +336,25 @@ async function status(env,id) {
   const uploaded=meta.state==="uploading" ?
     await completeParts(env,id,{count:meta.parts},"",meta) : new Set();
   const out=meta.output;
-  const phase=latest?.stage ??
+  const storedPhase=latest?.stage ??
     (meta.state==="uploading"?"uploading":meta.state==="done"?"done":"queued");
+  const runId=/^[0-9]{1,20}$/.test(String(latest?.github_run_id||""))
+    ? String(latest.github_run_id) : null;
+  const checkRun=runId && !["done","failed","uploading"].includes(storedPhase)
+    && Date.now()-(latest?.at||Date.now()) > 90000;
+  const github=checkRun ? await githubRunOutcome(env,runId) : null;
+  const runFailed=github?.status==="completed" &&
+    github.conclusion!=="success";
+  const runEnded=github?.status==="completed" &&
+    github.conclusion==="success" && storedPhase!=="done";
+  const phase=runFailed?"failed":storedPhase;
+  const stale= !["done","failed","uploading"].includes(phase) &&
+    Date.now()-(latest?.at||Date.now())>20*60*1000;
+  const label=runFailed
+    ? "GitHub Actions завершился с ошибкой ("+github.conclusion+"). Монтаж не идёт. Открой журнал задания."
+    : runEnded
+      ? "GitHub завершил задачу, но готовый ролик не подтверждён. Проверь Telegram или журнал."
+      : (latest?.message??phase);
   return response({
     ready:meta.state==="done"&&out?.state==="ready",
     size:out?.size??0,parts:out?.parts??0,
@@ -325,14 +363,16 @@ async function status(env,id) {
     input_assets:(meta.assets||[]).map(f=>({name:f.name,size:f.size})),
     uploaded_parts:[...uploaded].sort((a,b)=>a-b),
     state:meta.state,stage:phase,
+    github_run_url:runId?"https://github.com/"+REPOSITORY+"/actions/runs/"+runId:null,
+    stalled:stale || runEnded,
     accepted_talk_scene:meta.settings?.talk_scene??"off",
     accepted_caption_variant:meta.settings?.caption_variant??"reference_soft",
     accepted_insert_style:meta.settings?.insert_style??"off",
     accepted_guide_effect:meta.settings?.guide_effect??"off",
     style_contract_version:CONTRACT,
-    stage_label:latest?.message ?? phase,
-    progress_percent:latest?.percent ??
-      (phase==="uploading"?Math.round(uploaded.size*32/Math.max(meta.parts,1)):phase==="done"?100:35),
+    stage_label:label,
+    progress_percent:runFailed ? 100 : (latest?.percent ??
+      (phase==="uploading"?Math.round(uploaded.size*32/Math.max(meta.parts,1)):phase==="done"?100:35)),
     updated_at:latest?.at??meta.created,
     expires_at:out?.expires_at??meta.expires_at??meta.created+TTL*1000,
     retention_days:3
@@ -385,8 +425,10 @@ async function internalRoute(request,env,path) {
     if (!Object.hasOwn(STAGES,stage)) return response({error:"Unknown stage"},400);
     const percent=STAGES[stage],at=Date.now();
     const message=String(body.message??stage).slice(0,180);
+    const github_run_id=/^[0-9]{1,20}$/.test(String(body.github_run_id||""))
+      ? String(body.github_run_id):null;
     await env.UPLOADS.put(key(id,"progress:"+stage),"1",{
-      expirationTtl:TTL,metadata:{stage,percent,message,at}
+      expirationTtl:TTL,metadata:{stage,percent,message,at,github_run_id}
     });
     return response({ok:true,stage,percent});
   }
