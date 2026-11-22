@@ -122,40 +122,68 @@ def _allowed_auto_effects(choice: str) -> set[str] | None:
 def _spoken_smart_cues(words: Sequence[Word], duration: float, choice: str,
                        density: str) -> list[GuideCue]:
     permitted = _allowed_auto_effects(choice)
-    # First four seconds are reserved for the original person and captions.
+    # First four seconds are reserved for the speaker and natural subtitles.
     gap = SMART_GAP[density]
-    planned: list[GuideCue] = []
-    last = -gap
-    for start, end, spoken in sorted(words, key=lambda w: float(w[0])):
+    ordered = sorted(words, key=lambda w: float(w[0]))
+    candidates = []
+    for start, end, spoken in ordered:
         t = float(start)
         if t < 4.0 or t > duration - 1.85 or float(end) <= t:
-            continue
-        if t - last < gap:
             continue
         token = _clean(str(spoken)).casefold().strip()
         if not token:
             continue
         kind = next((
-            effect for effect, stems in SMART_TRIGGERS
-            if (permitted is None or effect in permitted) and
-            any(token.startswith(stem) for stem in stems)
+            (priority, effect) for priority, (effect, stems)
+            in enumerate(SMART_TRIGGERS)
+            if (permitted is None or effect in permitted)
+            and any(token.startswith(stem) for stem in stems)
         ), None)
-        if kind is None:
-            # "до и после" qualifies as a comparison; "до 5 секунд" does not.
-            if permitted is None or "split_reel" in permitted:
-                if token == "до" and any(
-                    0 < float(st) - t < 3.5 and
-                    _clean(str(word)).casefold().startswith("после")
-                    for st, en, word in words
-                ):
-                    kind = "split_reel"
-        if kind is None:
+        if token in ("сначала", "first"):
+            # "Сначала поговорим" is not proof of a multi-step explanation.
+            subsequent = any(
+                0 < float(st)-t < 4.5 and
+                _clean(str(word)).casefold().startswith(
+                    ("затем","потом","следующ","втор","шаг","этап","second","next")
+                )
+                for st,en,word in ordered
+            )
+            if not subsequent and kind and kind[1]=="apple_ui_toggles":
+                kind = None
+        # "До и после" is a comparison; "до пяти секунд" is not.
+        if kind is None and token=="до" and (
+                permitted is None or "split_reel" in permitted):
+            paired = any(
+                0 < float(st)-t < 3.5 and
+                _clean(str(word)).casefold().startswith("после")
+                for st,en,word in ordered
+            )
+            if paired: kind=(1,"split_reel")
+        if kind:
+            priority,effect=kind
+            candidates.append((t,priority,effect,_clean(str(spoken)).upper()[:22]))
+    if not candidates:
+        return []
+    # Nearby keywords describe a SINGLE phrase. The stronger/more specific
+    # meaning wins: "покажу много вариантов" → carousel, not generic photo.
+    clusters=[]
+    cluster=[]
+    for item in candidates:
+        if cluster and item[0]-cluster[-1][0]>1.65:
+            clusters.append(cluster)
+            cluster=[]
+        cluster.append(item)
+    if cluster:clusters.append(cluster)
+    planned: list[GuideCue] = []
+    last=-gap
+    for cluster in clusters:
+        t,_,effect,label=min(cluster,key=lambda item:(item[1],item[0]))
+        if t-last < gap:
             continue
-        finish = min(duration - .05, t + 1.75)
-        planned.append(GuideCue(kind, t, finish,
-                                _clean(str(spoken)).upper()[:22], compact=True))
-        last = t
-        if len(planned) >= SMART_LIMIT[density]:
+        planned.append(GuideCue(effect,t,min(duration-.05,t+1.75),
+                                label,compact=True))
+        last=t
+        if len(planned)>=SMART_LIMIT[density]:
             break
     return planned
 
