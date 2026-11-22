@@ -30,7 +30,8 @@ SOUND_KEYWORDS={
     "pop":("pop","bubble","click","tick","щелч","хлоп"),
 }
 AUDIO_EXT={".wav",".mp3",".ogg",".m4a"}
-ALLOWED_EXT={".mov",*AUDIO_EXT}
+PHOTO_EXT={".png",".jpg",".jpeg",".webp"}
+ALLOWED_EXT={".mov",*AUDIO_EXT,*PHOTO_EXT}
 ICON_KEYWORDS={
     "error":("error","wrong","cross","ошиб","крест"),
     "inspect":("magnif","search","glass","лупа","поиск"),
@@ -48,6 +49,7 @@ ICON_KEYWORDS={
 class PrivateAssets:
     icons: dict[str,Path]=field(default_factory=dict)
     sounds: dict[str,Path]=field(default_factory=dict)
+    photos: list[Path]=field(default_factory=list)
     ignored_adobe_presets: int=0
     selected_files: int=0
 
@@ -86,21 +88,24 @@ def prepare_private_effect_assets(
                          token in filename.casefold() for token in words)),
                     None
                 )
+                photo_kind=(Path(filename).suffix.lower() in PHOTO_EXT
+                            and len(result.photos)<24)
                 is_mov=filename.lower().endswith(".mov")
                 icon_kind=next((
                     kind for kind,words in ICON_KEYWORDS.items()
                     if is_mov and any(w in filename.casefold() for w in words)
                 ),None)
                 is_icon=filename in required_icons or bool(icon_kind)
-                if not is_icon and filename not in required_sounds and not sound_kind:
+                if not is_icon and filename not in required_sounds and not sound_kind and not photo_kind:
                     continue
                 if member.file_size>MAX_FILE_BYTES or member.file_size>remaining:
                     continue
                 if member.compress_size<128 or member.file_size>member.compress_size*500:
                     continue
                 # Do not extract archive paths; use canonical generated basename.
-                dest=directory/(("icon_" if is_icon else "sound_")+
-                                filename.replace(" ","_"))
+                kind_prefix=("icon_" if is_icon else
+                             "photo_" if photo_kind else "sound_")
+                dest=directory/(kind_prefix+filename.replace(" ","_"))
                 if dest.is_file():
                     continue
                 with z.open(member) as stream, dest.open("wb") as output:
@@ -109,6 +114,21 @@ def prepare_private_effect_assets(
                 if dest.stat().st_size!=member.file_size:
                     dest.unlink(missing_ok=True)
                     continue
+                if photo_kind:
+                    # Image asset is untrusted ZIP content, never a script.
+                    # Check its format and reject unsafe decompression sizes.
+                    try:
+                        from PIL import Image
+                        with Image.open(dest) as picture:
+                            if (picture.width<48 or picture.height<48 or
+                                picture.width*picture.height>18_000_000 or
+                                picture.format not in ("PNG","JPEG","WEBP")):
+                                raise ValueError("bad photo size or format")
+                            picture.verify()
+                    except Exception:
+                        dest.unlink(missing_ok=True)
+                        continue
+                    result.photos.append(dest)
                 remaining-=member.file_size
                 result.selected_files+=1
                 for kind,name in ICON_NAME.items():
