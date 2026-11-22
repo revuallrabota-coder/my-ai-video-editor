@@ -883,6 +883,15 @@
          byId('filter').value==='vintage'){
         byId('filter').value='none';
       }
+      // Old Money keeps its own subtle semantic cutaways, never the pink preset.
+      if(this.value==='old_money'){
+        byId('filter').value='old_money';
+        byId('motionInserts').checked=true;
+        byId('assetSfx').checked=true;
+        byId('guideEffect').value='off';
+        byId('motionFrequency').value='subtle';
+        if(byId('subtitleSfx').value==='off')byId('subtitleSfx').value='soft';
+      }
       if(this.value==='vintage_cinema'){
         byId('filter').value='vintage';
         byId('subtitleSfx').value='typewriter';
@@ -1457,7 +1466,7 @@
       subtitle_delay:s.subtitleDelay,
       sound_effects:s.soundEffects,
       emoji_mode:s.emoji?'on':'off',
-      insert_style:s.motionInserts?(s.captionVariant==='vintage'?'vintage':'reference_soft'):'off',
+      insert_style:s.motionInserts?(s.captionVariant==='vintage'?'vintage':s.captionVariant==='old_money'?'old_money':'reference_soft'):'off',
       guide_effect:s.motionInserts?s.guideEffect:'off',
       insert_density:s.motionDensity,
       insert_sound:s.assetSound?'on':'off',
