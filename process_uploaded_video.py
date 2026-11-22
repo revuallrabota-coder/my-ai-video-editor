@@ -498,7 +498,35 @@ def main() -> None:
             })
             if not out.is_file() or out.stat().st_size < 1000:
                 raise RuntimeError("FFmpeg не создал готовый MP4.")
-            stage("publishing","📦 Экспорт MP4 завершён. Отправляю готовое видео.")
+            # Never deliver a crop/square montage as a correctly rendered Reels.
+            from telegram_editor import media_info
+            video_stream=next((
+                s for s in media_info(out).get("streams",[])
+                if s.get("codec_type")=="video"
+            ),{})
+            width=int(video_stream.get("width") or 0)
+            height=int(video_stream.get("height") or 0)
+            if width<360 or height<640 or abs(width/height-9/16)>.006:
+                raise RuntimeError(
+                    "Экспорт получился не в вертикальном формате 9:16. "
+                    "Ролик не отправляю, исправь настройки рендера."
+                )
+            # A 40-second speaking Reels with explicitly selected cutaways
+            # must not silently export as a static branded template.
+            if (talk_scene!="off" and
+                str(config.get("insert_style","reference_soft"))!="off" and
+                len(words)>=10 and float(stats.get("after",0))>=12 and
+                int(stats.get("insert_count",0))<1):
+                raise RuntimeError(
+                    "Ты выбрала анимированные вставки, но рендер их не создал. "
+                    "Отправка статичного шаблона остановлена."
+                )
+            if (str(config.get("subtitle_sfx","soft"))=="typewriter" and
+                len(words)>=6 and int(stats.get("caption_sfx_count",0))<1):
+                raise RuntimeError(
+                    "Выбран звук печатающей машинки, но в экспорте он не появился."
+                )
+            stage("publishing","📦 Экспорт MP4 9:16 с выбранными эффектами. Отправляю видео.")
             from telegram_delivery import telegram_copy,send_video_to_telegram
             # Direct delivery is the PRIMARY outcome, not a secondary
             # download button hidden behind the Mini App setup wizard.
