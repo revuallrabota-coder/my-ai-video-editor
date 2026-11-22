@@ -158,7 +158,7 @@ def validate_settings(config: dict) -> dict:
         "float","pop","slide"
     },"float")
     subtitle_sfx=option("subtitle_sfx",{
-        "off","soft","tick"
+        "off","soft","tick","typewriter"
     },"soft")
     retro_default=caption_variant
     insert_style=option("insert_style",{
@@ -190,7 +190,7 @@ def validate_settings(config: dict) -> dict:
     if len(top_title)>70 or any(char in top_title for char in "\\{}\n\r"):
         raise HTTPException(400,"Название сверху: максимум 70 символов.")
     top_title_mode=option("top_title_mode",{"auto","off","intro","always"},"auto")
-    sound = option("sound_effects", {"off","soft","punch"}, "off")
+    sound = option("sound_effects", {"off","soft","punch","whoosh"}, "off")
     emoji = option("emoji_mode", {"off","on"}, "off")
     hook_position = option("hook_position", {"start","end","both","off"}, "start")
     validate_effects(sound, emoji, hook_position)
