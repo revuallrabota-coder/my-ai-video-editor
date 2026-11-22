@@ -681,7 +681,7 @@
     big.style.transform=bigFont.stretch;
     var palette={
       reference_soft:'#FFF6F8',editorial:'#FFFFFF',old_money:'#FFF3E1',
-      minimal:'#F9F9F8',elegant:'#FFFFFF'
+      minimal:'#F9F9F8',elegant:'#FFFFFF',vintage:'#E9D6B6'
     };
     var scene=byId('talkScene').value;
     var box=byId('previewBox');
@@ -691,9 +691,13 @@
       contour:'#243b32',cream:'#fff0c5',
       pistachio:'#dce7c5',burgundy_brown:'#502039'
     }[scene]||'#502039';
-    film.style.opacity=scene==='off'?'0':'1';
-    film.style.background='linear-gradient(to bottom,'+
-      pigment+'ee 0%,'+pigment+'c0 24%,'+pigment+'00 48%)';
+    var isVintage=byId('filter').value==='vintage';
+    film.style.opacity=scene==='off'?(isVintage?'.55':'0'):'1';
+    film.style.background=scene==='off'&&isVintage
+      ?'radial-gradient(ellipse at center,transparent 36%,#120f13ac 100%),'+
+       'repeating-linear-gradient(90deg,transparent 0px,transparent 20px,#f0ddae0c 21px,#00000007 22px)'
+      :'linear-gradient(to bottom,'+
+       pigment+'ee 0%,'+pigment+'c0 24%,'+pigment+'00 48%)';
     var showMotion=scene!=='off'&&byId('motionInserts').checked;
     byId('studioPreviewInsert').hidden=!showMotion;
     byId('studioPreviewInsert').style.background=pigment;
@@ -864,6 +868,7 @@
     burgundy_brown_talk:{variant:'burgundy_brown_talk',big:'old_money',small:'refined',color:'#F5DCD0',scene:'burgundy_brown'}
   };
   byId('reelsPreset').addEventListener('change',function(){
+    var wasVintage=byId('captionVariant').value==='vintage';
     var cfg=reelPresets[this.value];
     if(cfg){
       byId('captionVariant').value=cfg.variant;
@@ -874,6 +879,10 @@
       // Only choosing the full Vintage preset activates its own film color,
       // old typewriter accents, and motion engine. Other styles retain user
       // choices and the same non-destructive subtitle/effect controls.
+      if(wasVintage && this.value!=='vintage_cinema' &&
+         byId('filter').value==='vintage'){
+        byId('filter').value='none';
+      }
       if(this.value==='vintage_cinema'){
         byId('filter').value='vintage';
         byId('subtitleSfx').value='typewriter';
