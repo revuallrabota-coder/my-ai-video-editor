@@ -605,9 +605,13 @@ def apply_effects(
         # floating card. They retain the original speech on audio input 0.
         guide_count=0
         for i,cue in enumerate(guide_cues):
+            from guide18_fx import SUBJECT_FX
+            guide_source=(source if cue.effect in SUBJECT_FX
+                          else insert_source or source)
             pattern,count=render_guide(
-                insert_source or source,folder,cue,i,words,
-                palette=studio_scene
+                guide_source,folder,cue,i,words,
+                palette=studio_scene,
+                photos=(private_assets.photos if private_assets is not None else [])
             )
             args.extend(["-framerate","15","-start_number","0",
                          "-i",pattern])
