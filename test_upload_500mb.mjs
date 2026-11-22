@@ -58,6 +58,8 @@ async function request(path,method="GET",body,internal=false){
   try{payload=await response.json()}catch{payload=null}
   return {status:response.status,data:payload};
 }
+// Invalid upload *metadata* are rejected with 400. No binary 413 is
+// involved because all request bodies here are tiny JSON manifests.
 const health=(await request("/health")).data;
 assert.equal(health.max_upload_mb,500);
 assert.equal(health.max_files,12);
@@ -66,15 +68,15 @@ assert.equal(health.status_tracking,true);
 assert.equal((await request("/upload/start","POST",{
   files:[{name:"a.mp4",size:250_000_000},{name:"b.mov",size:250_000_001}],
   size:500_000_001,settings:{}
-})).status,413);
+})).status,400);
 assert.equal((await request("/upload/start","POST",{
   files:Array.from({length:13},(_,i)=>({name:"clip"+i+".mp4",size:4096})),
   settings:{}
-})).status,413);
+})).status,400);
 assert.equal((await request("/upload/start","POST",{
   files:[{name:"x.mp4",size:5000},{name:"y.mov",size:5000}],
   size:5000,settings:{}
-})).status,413);
+})).status,400);
 const files=[
   {name:"first.mp4",size:200_000_000},
   {name:"second.mov",size:199_000_000},
@@ -226,7 +228,7 @@ assert.equal((await request("/upload/"+privateId+"/9","PUT",
 assert.equal((await request("/upload/start","POST",{
   files:[{name:"clip.mp4",size:8_000_000}],size:8_000_000,
   assets:[{name:"oversize.zip",size:100_000_001}],settings:{}
-})).status,413);
+})).status,400);
 // The iPad My Style wizard must never reference removed IDs at runtime.
 // Static checks would not catch those since DOM calls only run after opening.
 const html=await readFile(new URL("./index.html",import.meta.url),"utf8");
