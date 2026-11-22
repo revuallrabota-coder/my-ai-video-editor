@@ -42,8 +42,8 @@ EMOJI_WORDS = (
     ("новинк", "🆕"), ("тренд", "🔥"), ("успех", "🏆"),
     ("сравн", "⚖️"), ("наход", "🔎"),
 )
-_ALLOWED_SFX = {"off", "soft", "punch"}
-_ALLOWED_CAPTION_SFX = {"off", "soft", "tick"}
+_ALLOWED_SFX = {"off", "soft", "punch", "whoosh"}
+_ALLOWED_CAPTION_SFX = {"off", "soft", "tick", "typewriter"}
 _ALLOWED_EMOJI = {"on", "off"}
 _ALLOWED_HOOK = {"start", "end", "both", "off"}
 
@@ -86,10 +86,10 @@ def pick_caption_cues(
     style: str = "soft", limit: int = 36,
 ) -> list[tuple[float, str | None]]:
     """One gentle cue per displayed PHRASE, never a chime on every word."""
-    if style not in ("soft","tick"):
+    if style not in ("soft","tick","typewriter"):
         raise ValueError("Звуки субтитров: soft или tick.")
     from reference_dynamic_captions import phrase_groups
-    min_gap=1.22 if style=="soft" else 0.95
+    min_gap=1.22 if style=="soft" else 0.84
     last=-10.0
     cues=[]
     for group in phrase_groups(words):
@@ -177,11 +177,12 @@ def make_sfx_track(
     rate: int = 48000,
 ) -> None:
     """Тихие короткие собственные pop-звуки, не подавляющие речь."""
-    if intensity not in ("soft", "punch", "caption_soft", "caption_tick"):
+    if intensity not in ("soft", "punch", "whoosh", "caption_soft", "caption_tick", "caption_typewriter"):
         raise ValueError("Недопустимая интенсивность звуков.")
     total = max(1, round(duration*rate))
-    peak = {"soft":0.10, "punch":0.18, "caption_soft":0.060,
-            "caption_tick":0.085}[intensity]
+    peak = {"soft":0.10, "punch":0.18, "whoosh":0.15,
+            "caption_soft":0.060, "caption_tick":0.085,
+            "caption_typewriter":0.14}[intensity]
     with wave.open(str(target), "wb") as wav:
         wav.setnchannels(1)
         wav.setsampwidth(2)
@@ -195,18 +196,34 @@ def make_sfx_track(
                 cursor += zero_count
             if cursor >= total:
                 break
-            n = min(int(rate*(0.095 if intensity.startswith("caption_") else 0.19)),
-                    total-cursor)
+            span = (0.72 if intensity=="caption_typewriter"
+                    else 0.43 if intensity=="whoosh"
+                    else 0.095 if intensity.startswith("caption_") else 0.19)
+            n = min(int(rate*span),total-cursor)
             samples = array("h")
             for i in range(n):
                 t = i/rate
-                envelope = (1-math.exp(-t*110))*math.exp(-t*27)
-                frequency = (985-130*t/0.095
-                             if intensity.startswith("caption_")
-                             else 710-190*t/0.19)
-                audio = (math.sin(2*math.pi*frequency*t)*0.74
-                         + math.sin(2*math.pi*frequency*1.58*t)*0.26)
-                value = int(32767*peak*envelope*audio)
+                if intensity=="caption_typewriter":
+                    # Six delicate paired mechanical clicks per phrase,
+                    # timed like typing rather than one synthetic ringtone.
+                    keytime=t % .116
+                    envelope=(math.exp(-keytime*130)+
+                              .35*math.exp(-abs(keytime-.024)*260))
+                    seed=(i*1664525+1013904223)&0xFFFFFFFF
+                    noise=((seed>>9)/8388608.0)*2-1
+                    audio=noise*.65+math.sin(2*math.pi*1300*t)*.35
+                elif intensity=="whoosh":
+                    envelope=max(0.,math.sin(math.pi*t/span))**1.8
+                    seed=(i*22695477+12345)&0xFFFFFFFF
+                    noise=((seed>>9)/8388608.0)*2-1
+                    audio=noise*.74+math.sin(2*math.pi*(350+540*t/span)*t)*.26
+                else:
+                    envelope=(1-math.exp(-t*110))*math.exp(-t*27)
+                    frequency=(985-130*t/.095 if intensity.startswith("caption_")
+                               else 710-190*t/.19)
+                    audio=(math.sin(2*math.pi*frequency*t)*.74
+                           +math.sin(2*math.pi*frequency*1.58*t)*.26)
+                value=int(32767*peak*envelope*audio)
                 samples.append(max(-32767,min(32767,value)))
             wav.writeframesraw(samples.tobytes())
             cursor += n
@@ -266,7 +283,7 @@ def apply_effects(
 
     validate_effects(sound, emoji, "off")
     if caption_sound not in _ALLOWED_CAPTION_SFX:
-        raise ValueError("Звуки субтитров: off, soft или tick.")
+        raise ValueError("Звуки субтитров: off, soft, tick или typewriter.")
     from retro_inserts import CARD_STYLES
     if insert_style != "off" and insert_style not in CARD_STYLES:
         raise ValueError("Неизвестный стиль вставок: " + insert_style)
@@ -311,7 +328,7 @@ def apply_effects(
           else pick_cues(words,duration))
     caption_cues = (pick_caption_cues(
                         words,duration,
-                        style="tick" if caption_sound=="typewriter" else caption_sound
+                        style=caption_sound
                     ) if caption_sound != "off" else [])
     # Обычные смайлы не перекрывают большую иллюстрированную карточку.
     from reference_dynamic_captions import phrase_emoji_anchors
@@ -551,20 +568,32 @@ def apply_effects(
             sfx_count = len(cues)
         if caption_sound != "off" and has_audio and caption_cues:
             track = folder/"subtitle_pops.wav"
-            intensity = "caption_soft" if caption_sound == "soft" else "caption_tick"
+            intensity = ("caption_typewriter" if caption_sound=="typewriter" else
+                         "caption_soft" if caption_sound=="soft" else "caption_tick")
             make_sfx_track(track,caption_cues,duration,intensity)
             args.extend(["-i",str(track)])
             track_inputs.append(f"[{current_input}:a:0]")
             current_input += 1
             caption_sfx_count = len(caption_cues)
-        if insert_sound=="on" and has_audio and insert_count:
+        if insert_sound=="on" and has_audio and studio_insert_count:
+            # A quiet original whoosh at EACH actual selected moving insert.
+            track=folder/"animated_inserts_whoosh.wav"
+            make_sfx_track(
+                track,[(c.start,None) for c in studio_cues[:studio_insert_count]],
+                duration,"whoosh"
+            )
+            args.extend(["-i",str(track)])
+            track_inputs.append(f"[{current_input}:a:0]")
+            current_input+=1
+            insert_sfx_count+=studio_insert_count
+        if insert_sound=="on" and has_audio and rendered_retro:
             cue_track=folder/"retro_insert_accents.wav"
             make_retro_sound_track(cue_track, rendered_retro, duration,
                                    style=insert_style)
             args.extend(["-i",str(cue_track)])
             track_inputs.append(f"[{current_input}:a:0]")
             current_input+=1
-            insert_sfx_count=insert_count
+            insert_sfx_count+=len(rendered_retro)
         # Dramatic trailer accents only when explicitly enabled and
         # meaningful; low-volume against the unchanged original speech.
         if (insert_sound=="on" and has_audio and private_assets is not None
