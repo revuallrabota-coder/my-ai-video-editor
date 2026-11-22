@@ -344,7 +344,7 @@ def apply_effects(
     # may overlap it. Exactly one primary animation owns this time window.
     guide_cues=(plan_guide(words,duration,guide_effect,insert_density)
                 if insert_style!="off" and guide_effect!="off"
-                and not (insert_style=="vintage" and guide_effect=="auto") else [])
+                else [])
 
     # The FIRST FOUR SECONDS belong exclusively to the speaker and their
     # correctly timed subtitles. All independent decorative planners must
@@ -380,12 +380,16 @@ def apply_effects(
         object_cues=[o for o in object_cues if not any(
             o.start < v.end+.3 and o.end > v.start-.3 for v in vintage_cues)]
     if guide_cues or object_cues:
-        # Eliminate secondary large cards rather than accidentally mixing
-        # animations from different independent planners.
-        retro=[]
-        motion_cues=[]
-        studio_cues=[]
-        semantic_cues=[]
+        # One owner per time window. Keep themed inserts at DIFFERENT times.
+        slots=[(g.start,g.end) for g in guide_cues]
+        slots.extend((o.start,o.end) for o in object_cues)
+        def unoccupied(start: float,end: float) -> bool:
+            return not any(start < stop+.35 and end > begin-.35
+                           for begin,stop in slots)
+        retro=[cue for cue in retro if unoccupied(cue.time,cue.time+1.65)]
+        motion_cues=[cue for cue in motion_cues if unoccupied(cue.start,cue.end)]
+        studio_cues=[cue for cue in studio_cues if unoccupied(cue.start,cue.end)]
+        semantic_cues=[cue for cue in semantic_cues if unoccupied(cue.start,cue.end)]
     semantic_emojis={
         "error":"❌","inspect":"🔎","success":"✅","compare":"↔️",
         "time":"⏱️","speech":"💬","camera":"🎥",
@@ -747,7 +751,8 @@ def apply_effects(
             try:
                 pattern,count=render_guide(
                     guide_source,folder,cue,i,words,
-                palette=studio_scene,
+                palette=(insert_style if insert_style in ("old_money",
+                         "burgundy","pink_tender","vintage") else studio_scene),
                 caption_position=caption_position,
                 # Auto mode never pours unrelated decorative PNGs into a
                 # generic collage. Manual photo collage may use provided
@@ -755,7 +760,7 @@ def apply_effects(
                 photos=([p for p in private_assets.photos
                          if p.name.startswith("photo_sticker_")]
                         if private_assets is not None and
-                        guide_effect in ("image_cluster_reel",
+                        cue.effect in ("image_cluster_reel",
                                          "cutout_grid_reel",
                                          "pov_carousel_spin",
                                          "split_reel") else []),
