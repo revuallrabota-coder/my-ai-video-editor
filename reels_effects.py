@@ -512,6 +512,43 @@ def apply_effects(
                 )
                 prev=stage
                 current_input+=1
+                # Show a real MOVING clip inside the graphic card, not merely
+                # a frozen thumbnail. This source is the clean, original edit
+                # timeline, before any burned subtitles or decorative overlays.
+                # It has no separate audio in the output, so speech stays exact.
+                moving_source=insert_source or source
+                clip_w=max(36,round(width*320/350))
+                clip_h=max(36,round(height*286/430))
+                left=round(width*15/350)
+                top=round(height*15/430)
+                clip_length=max(.2,end-start)
+                args.extend([
+                    "-ss",f"{start:.3f}","-t",f"{clip_length:.3f}",
+                    "-i",str(moving_source),
+                ])
+                live=f"[liveclip{i}]"
+                # Keep the reference's soft slide and the original footage
+                # time-locked. A short fade ensures no hard pop at the edges.
+                filters.append(
+                    f"[{current_input}:v]fps=30,"
+                    f"scale={clip_w}:{clip_h}:force_original_aspect_ratio=increase,"
+                    f"crop={clip_w}:{clip_h},setsar=1,format=rgba,"
+                    f"setpts=PTS-STARTPTS+{start:.3f}/TB,"
+                    f"fade=t=in:st={start:.3f}:d=0.21:alpha=1,"
+                    f"fade=t=out:st={max(start+.22,end-.23):.3f}:"
+                    f"d=0.22:alpha=1{live}"
+                )
+                live_x=(f"main_w-{width}-{round(22*sx)}+{left}+{travel}")
+                live_y=(f"main_h-{height}-{round(122*sy)}+{top}+"
+                        f"{round(18*sy)}*max(0,1-(t-{start:.3f})*3.2)")
+                moving_stage=f"[movingstage{i}]"
+                filters.append(
+                    f"{prev}{live}overlay=x='{live_x}':y='{live_y}':"
+                    f"enable='between(t,{start:.3f},{end:.3f})':"
+                    f"shortest=0:eof_action=pass:repeatlast=0{moving_stage}"
+                )
+                prev=moving_stage
+                current_input+=1
                 studio_insert_count+=1
             insert_count+=studio_insert_count
 
