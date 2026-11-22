@@ -38,7 +38,7 @@ assert.match(html,/id="workerConnectionResult"/);
 assert.match(html,/id="workerHealthLink"/);
 assert.match(html,/function connectedWorkerURL\(\)/);
 assert.match(html,/async function checkWorkerConnection\(\)/);
-assert.match(html,/workerHealth.style_contract_version!==3/);
+assert.match(html,/workerHealth.style_contract_version!==4/);
 assert.match(html,/Приложение проверяет адрес/);
 const presets=html.slice(html.indexOf("var reelPresets={"),
                           html.indexOf("byId('reelsPreset').addEventListener"));
