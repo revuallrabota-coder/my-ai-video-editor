@@ -645,7 +645,8 @@ export default {
          uploads_300mb_configured: Boolean(env.UPLOADS),
          uploads_500mb_configured: Boolean(env.UPLOADS),
          max_upload_mb: 500,max_files:MAX_UPLOAD_FILES,
-         retention_days:3,status_tracking:true,style_contract_version:2 });
+         retention_days:3,status_tracking:true,style_contract_version:2,
+         supported_talk_scenes:CHOICES.talk_scene });
     }
     if (path.startsWith("/internal/upload/")) {
       return workerUploadRoute(request, env, path);
