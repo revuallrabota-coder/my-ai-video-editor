@@ -180,7 +180,8 @@ class FourTalkingReelsLooks(unittest.TestCase):
         self.assertIn('private_assets=private_assets',standard)
         self.assertIn('studio_scene=talk_scene',renderer)
         self.assertIn('studio_scene=talk_scene',standard)
-        self.assertIn('if insert_style != "off":',renderer)
+        # No unmasked second badge layer over the speaker's subtitles.
+        self.assertNotIn('append_scene_ornaments(subtitles, words, talk_scene)',renderer)
         effects=(repo/"reels_effects.py").read_text("utf-8")
         self.assertIn("studio_cues=(select_studio_cues",effects)
         self.assertIn("moving_source=insert_source or source",effects)
