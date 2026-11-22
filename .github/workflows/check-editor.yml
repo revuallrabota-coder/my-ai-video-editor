@@ -14,6 +14,8 @@ on:
       - "index.html"
       - "test_unified_ui.mjs"
       - "video_filters.py"
+      - "vintage_cinema.py"
+      - "test_vintage_cinema.py"
       - "test_visible_video_filters.py"
       - "test_studio_kinetic.py"
       - "test_reels_looks.py"
@@ -91,7 +93,7 @@ jobs:
       - name: "Зависимости для проверки"
         run: python -m pip install "telethon>=1.40,<2" "requests>=2.31,<3" "Pillow>=10,<13" -r requirements-api.txt
       - name: "Проверить синтаксис Python"
-        run: python -m py_compile semantic_object_overlays.py test_semantic_object_overlays.py guide18_fx.py test_guide18_fx.py test_visible_video_filters.py test_studio_kinetic.py studio_kinetic.py test_dynamic_talking_reels.py talking_scene_styles.py test_talking_scene_styles.py portrait_caption_layer.py test_portrait_caption_layout.py clip_montage.py test_clip_montage.py bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py speech_review.py word_captions.py reels_effects.py font_presets.py editor_api.py export_profiles.py reference_dynamic_captions.py reference_cascade_captions.py telegram_delivery.py test_reference_cascade.py test_telegram_delivery.py test_speech_pauses.py process_uploaded_video.py video_filters.py test_reels_looks.py test_caption_safe_area.py retro_inserts.py reference_motion_scenes.py semantic_editing.py private_effect_assets.py test_semantic_editing.py montage_progress.py test_montage_progress.py test_retro_inserts.py test_gentle_reference.py top_video_title.py test_oval_title.py reference_cascade_captions.py telegram_delivery.py test_reference_cascade_v2.py test_telegram_delivery_v2.py test_pause_cut_v2.py
+        run: python -m py_compile semantic_object_overlays.py test_semantic_object_overlays.py guide18_fx.py test_guide18_fx.py test_visible_video_filters.py test_studio_kinetic.py studio_kinetic.py test_dynamic_talking_reels.py talking_scene_styles.py test_talking_scene_styles.py portrait_caption_layer.py test_portrait_caption_layout.py clip_montage.py test_clip_montage.py bot_api_editor.py telegram_editor.py reference_editor.py signature_captions.py contrast_captions.py speech_review.py word_captions.py reels_effects.py font_presets.py editor_api.py export_profiles.py reference_dynamic_captions.py reference_cascade_captions.py telegram_delivery.py test_reference_cascade.py test_telegram_delivery.py test_speech_pauses.py process_uploaded_video.py video_filters.py vintage_cinema.py test_vintage_cinema.py test_reels_looks.py test_caption_safe_area.py retro_inserts.py reference_motion_scenes.py semantic_editing.py private_effect_assets.py test_semantic_editing.py montage_progress.py test_montage_progress.py test_retro_inserts.py test_gentle_reference.py top_video_title.py test_oval_title.py reference_cascade_captions.py telegram_delivery.py test_reference_cascade_v2.py test_telegram_delivery_v2.py test_pause_cut_v2.py
       - name: "Проверить синтаксис Cloudflare Worker"
         run: node --input-type=module --check < cloudflare_launcher.js
 
@@ -154,6 +156,9 @@ jobs:
 
       - name: "Проверить смысловой монтаж и приватные иконки MOV в реальном MP4"
         run: python -m unittest -v test_semantic_editing.py
+
+      - name: "Проверить живое винтажное кино, плёночные звуки и привязку к настоящей речи"
+        run: python -m unittest -v test_vintage_cinema.py
 
       - name: "Проверить винтажные карточки, звуки камеры и вставки в реальном видео"
         run: python -m unittest -v test_retro_inserts.py
