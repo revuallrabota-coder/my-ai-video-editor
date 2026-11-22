@@ -466,6 +466,7 @@ def montage_by_reference(
         "subtitle_events": count,
         "subtitle_delay": round(subtitle_delay, 2),
         "talk_scene": talk_scene,
+        "filter_applied": filter_style,
         **effect_stats,
         "reference_scene_changes": profile.scene_changes,
         "reference_pace_seconds": profile.seconds_per_change,
