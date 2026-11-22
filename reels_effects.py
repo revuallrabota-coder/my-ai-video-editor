@@ -613,8 +613,9 @@ def apply_effects(
                          "-i",pattern])
             fx=f"[guideclip{i}]"
             filters.append(
-                f"[{current_input}:v]fps=30,format=rgba,"
-                f"setpts=PTS-STARTPTS+{cue.start:.3f}/TB{fx}"
+                f"[{current_input}:v]fps=30,"
+                f"scale={frame_width}:{frame_height}:flags=lanczos,"
+                f"format=rgba,setpts=PTS-STARTPTS+{cue.start:.3f}/TB{fx}"
             )
             stage=f"[guidestage{i}]"
             filters.append(
