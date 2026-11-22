@@ -357,8 +357,14 @@ def main() -> None:
             else:
                 stage("transcribing","🎧 Распознаю оригинальную речь и таймкоды.")
                 send_text(token,owner,"🎧 Видео получено. Распознаю речь и готовлю черновик.")
-                words=transcribe_words(source,model_size="small",language="ru")
-                stage("review","📝 Текст готов. Жду твоего /ok или исправлений в Telegram.")
+                # Short talking Reels are particularly sensitive to a single
+                # wrong accent word. Use the stronger recognizer for short
+                # clips; keep the existing cheaper setting for long projects.
+                recognition_model="medium" if seconds<=35 else "small"
+                words=transcribe_words(
+                    source,model_size=recognition_model,language="ru"
+                )
+                stage("review","📝 Текст готов. Жду проверки КАЖДОГО слова перед монтажом.")
                 words,delay=wait_for_transcript_review(token,owner,words,seconds,delay)
                 stage("planning","🧠 Подбираю смысловые вставки по тексту.")
                 # Explain WHY an illustration appears, never hide arbitrary
