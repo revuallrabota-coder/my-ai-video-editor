@@ -319,11 +319,13 @@ def main() -> None:
             config=metadata.get("settings") or {}
             mode=config.get("mode","my_style")
             talk_scene=str(config.get("talk_scene","off"))
-            if talk_scene not in ("off","contour","cream"):
+            if talk_scene not in ("off","contour","cream","pistachio","burgundy_brown"):
                 raise ValueError("Недопустимый формат разговорного Reels.")
             scene_name={
                 "off":"Обычное видео","contour":"Contour Talk",
                 "cream":"Cream Talk",
+                "pistachio":"Pistachio Talk",
+                "burgundy_brown":"Burgundy & Brown",
             }[talk_scene]
             send_text(token,owner,
                 "🎨 Подтверждённый стиль монтажа: "+scene_name+". "
