@@ -459,8 +459,41 @@ def _draw(effect: str, p: float, label: str,
     return img
 
 
+def _compact_protection(mask: Image.Image,
+                        caption_position: str) -> Image.Image:
+    """Exclude the person and the complete animated subtitle zone."""
+    expanded = mask.filter(ImageFilter.MaxFilter(47)).resize(
+        (720, 1280), Image.Resampling.BILINEAR
+    )
+    zones = {
+        "top": (190, 655),
+        "middle": (445, 980),
+        "bottom": (640, 1165),
+    }
+    if caption_position not in zones:
+        raise ValueError("Недопустимое расположение защищённых субтитров.")
+    top, bottom = zones[caption_position]
+    ImageDraw.Draw(expanded).rectangle((65, top, 655, bottom), fill=255)
+    return expanded
+
+
+def _compact_candidates() -> tuple[tuple[int, int], ...]:
+    return (
+        (36, 245), (428, 245),
+        (36, 475), (428, 475),
+        (36, 680), (428, 680),
+        (36, 890), (428, 890),
+    )
+
+
+def _compact_occupancy(mask: Image.Image, x: int, y: int) -> float:
+    area = mask.crop((x-12, y-12, x+268, y+84))
+    return sum(area.histogram()[128:]) / max(1, area.width*area.height)
+
+
 def _compact_frame(label: str, progress: float,
-                   mask: Image.Image) -> Image.Image:
+                   mask: Image.Image, location: tuple[int, int],
+                   caption_position: str) -> Image.Image:
     """A polished 720p micro-overlay with a strict person-shaped alpha hole.
 
     If no corner stays clear of the person's *entire* silhouette, show
@@ -471,25 +504,10 @@ def _compact_frame(label: str, progress: float,
     text = _clean(label).upper()[:22]
     if not text:
         return layer
-    expanded = mask.filter(ImageFilter.MaxFilter(47)).resize(
-        (width, height), Image.Resampling.BILINEAR
-    )
+    expanded = _compact_protection(mask, caption_position)
     chip_w, chip_h = 256, 72
-    candidates = (
-        (36, 288), (width-chip_w-36, 288),
-        (36, 474), (width-chip_w-36, 474),
-        (36, 682), (width-chip_w-36, 682),
-        (36, 870), (width-chip_w-36, 870),
-    )
-    # Protect the subject over every animation frame; <3% overlap allowed
-    # before the mask subtraction, so there are no split half-visible cards.
-    scored = []
-    for x, y in candidates:
-        area = expanded.crop((x-12, y-12, x+chip_w+12, y+chip_h+12))
-        occupancy = sum(area.histogram()[128:]) / max(1, area.width*area.height)
-        scored.append((occupancy, x, y))
-    occupancy, x, y = min(scored)
-    if occupancy > .03:
+    x, y = location
+    if _compact_occupancy(expanded, x, y) > .03:
         return layer
     ease = min(1., max(0., progress * 5.5))
     fade = min(1., ease, max(0., (1-progress)*6))
@@ -519,7 +537,8 @@ def _compact_frame(label: str, progress: float,
 def render(source: Path, folder: Path, cue:GuideCue, index:int,
            words:Sequence[Word],palette:str="burgundy_brown",
            photos:Sequence[Path] | None = None,
-           background_path:Path | None = None) -> tuple[str,int]:
+           background_path:Path | None = None,
+           caption_position:str="middle") -> tuple[str,int]:
     """Return image2 input path and frame count for one verified 3-second cue."""
     if cue.effect not in EFFECTS:
         raise ValueError("Эффект не поддерживается.")
@@ -541,6 +560,23 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
                     original_photos.append(picture)
             except (OSError,ValueError):
                 continue
+    compact_location=None
+    if cue.compact:
+        # Position is chosen ONCE for the whole animation, considering the
+        # moving person's silhouette and every active subtitle frame.
+        protected=[_compact_protection(mask,caption_position)
+                   for mask in masks[::max(1,len(masks)//12)]]
+        ranked=[
+            (max(_compact_occupancy(mask,x,y) for mask in protected),x,y)
+            for x,y in _compact_candidates()
+        ]
+        risk,x,y=min(ranked)
+        if risk>.025:
+            raise RuntimeError(
+                "Нет безопасной области для текста без перекрытия человека "
+                "и обычных субтитров."
+            )
+        compact_location=(x,y)
     grid_frames=[]
     if cue.effect=="screen_push_digital" and background_path is not None:
         if background_path.is_file():
@@ -551,7 +587,10 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
         current=raw[min(i,len(raw)-1)]
         mask=masks[min(i,len(masks)-1)] if masks else None
         if cue.compact:
-            frame=_compact_frame(cue.label,i/max(1,count-1),mask)
+            frame=_compact_frame(
+                cue.label,i/max(1,count-1),mask,
+                compact_location,caption_position
+            )
         else:
             frame=_draw(cue.effect,i/max(1,count-1),cue.label,current,raw,
                         i,mask,words,cue.start,palette,original_photos,
