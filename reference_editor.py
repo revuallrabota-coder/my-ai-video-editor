@@ -418,8 +418,11 @@ def montage_by_reference(
             )
             render_scene(clean_camera, studio_clean, talk_scene, quality=quality)
             if count:
-                if insert_style != "off":
-                    append_scene_ornaments(subtitles, words, talk_scene)
+                # TalkBadge ornaments were painted into the SAME upper band
+                # as subtitles without a person/caption collision mask.
+                # Speech-matched, segmentation-safe micro-overlays are now
+                # rendered later by reels_effects instead, so do not add a
+                # second uncontrolled title or visual layer here.
                 burn_subtitles(studio_clean, subtitles, dynamic, quality=quality)
             else:
                 studio_clean.replace(dynamic)
