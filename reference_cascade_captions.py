@@ -93,9 +93,9 @@ def _caption_slots(group: Sequence[Word], index: int, caption_position: str,
     main=_pick_editorial_keyword(group)
     cx,cy,*_=phrase_motion(index,"top" if caption_position=="studio" else caption_position,animation_style)
     if caption_position=="studio":
-        # The entire upper 35% of the scene belongs to the animated words.
-        # The person's portrait begins at y ~= 474 (in 720x1280 units).
-        cy-=143
+        # Keep moving words in the upper translucent palette while leaving
+        # the full-height portrait visible below and through it.
+        cy-=48
     main_word=safe_text(group[main][2]).upper()
     accent_size=fit_caption_size(main_word,53,big,max_width=485)
     accent_size=max(23,accent_size)
