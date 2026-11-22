@@ -280,6 +280,34 @@
     <p class="note">Можно прикрепить 4 приватных ZIP-пакета суммарно до 100 МБ. Готовые MOV-иконки и WAV-звуки используются по смыслу, а шаблоны Adobe .mogrt/.ffx не запускаются в FFmpeg. Эти файлы не публикуются в GitHub.</p>
     <div class="mini" id="assetPacksInfo">Наборы не выбраны: будут использоваться встроенные смысловые графические сцены.</div>
     <label class="option"><input id="assetSfx" type="checkbox" checked> 🔈 Звуки появления анимированных вставок (Whoosh) и мои WAV из ZIP</label>
+    <label class="field" for="guideEffect">🎬 12 эффектов + 6 стилей из твоего PDF</label>
+    <select id="guideEffect">
+      <option value="auto" selected>✨ Автомонтаж по смыслу речи (без наложений)</option>
+      <option value="off">Без приёмов из PDF, только стандартные титры</option>
+      <optgroup label="12 отдельных эффектов">
+        <option value="pov_carousel_spin">1. Карусель карточек вокруг человека</option>
+        <option value="liquid_glass_graph">2. Жидкое стекло и анимированный график</option>
+        <option value="match_cut">3. Match cut на главном слове</option>
+        <option value="screen_push_digital">4. Пиксельные слова с RGB-сдвигом</option>
+        <option value="apple_ui_toggles">5. Анимированные переключатели iOS</option>
+        <option value="over_shoulder_zoom">6. Наезд камеры и карточки-доказательства</option>
+        <option value="text_behind_me">7. Огромное слово за человеком *</option>
+        <option value="notification_stack">8. Стопка уведомлений над головой</option>
+        <option value="phone_3d_float">9. Видео в парящем 3D-телефоне</option>
+        <option value="split_clones">10. Три копии со сдвигом времени</option>
+        <option value="sticker_cutout">11. Я как стикер *</option>
+        <option value="zoom_through_text">12. Пролёт сквозь большую букву</option>
+      </optgroup>
+      <optgroup label="6 дополнительных стилей">
+        <option value="glass_explainer_reel">13. Объяснялка со стеклянными карточками</option>
+        <option value="cinematic_type_reel">14. Кинотипографика с перебивкой</option>
+        <option value="image_cluster_reel">15. Картинки над головой</option>
+        <option value="cutout_grid_reel">16. Человек поверх сетки 2×2 *</option>
+        <option value="depth_ui_reel">17. Интерфейс за спиной *</option>
+        <option value="split_reel">18. Разделённый экран с VS</option>
+      </optgroup>
+    </select>
+    <p class="note">Все сцены около 3 секунд, слова только из твоей речи. Автоматический режим выбирает разные приёмы по теме, а крупные сцены никогда не наслаиваются. * Для вырезания силуэта нужна модель сегментации: если она не загрузится, бот сообщит об ошибке, а не заменит эффект обычным стикером. Настроенные выше титры и цветовая палитра сохраняются.</p>
     <label class="field" for="motionFrequency">Как часто добавлять большие вставки</label>
     <select id="motionFrequency"><option value="subtle">Редко: крупные акценты по смыслу</option><option value="balanced">Умеренно: вставки каждые несколько фраз</option><option value="dynamic" selected>Динамично: больше коротких вставок и переходов</option></select>
     <p class="note">Редактор сначала читает распознанную речь: «найди ошибку» → лупа или крестик; «результат» → галочка; «секунды» → часы; «сравним» → фотоколлаж; «монтаж» → графическая сцена. В разговорных стилях дополнительно создаются короткие анимированные фотокарточки из твоего собственного видео на границах фраз, чтобы монтаж не превращался в неподвижный шаблон.</p>
@@ -464,6 +492,7 @@
       shadow:Number(byId('shadow').value),
       emoji:byId('emoji').checked,
       motionInserts:byId('motionInserts').checked,
+      guideEffect:byId('guideEffect').value,
       motionDensity:byId('motionFrequency').value,
       soundEffects:byId('soundfx').value,
       topTitle:byId('topTitleText').value.trim(),
@@ -926,22 +955,22 @@
       throw new Error('По адресу '+url+' отвечает не наш монтажёр.');
     }
     out.style.whiteSpace='pre-line';
-    if(version!==3){
+    if(version!==4){
       out.textContent='⚠️ Приложение проверяет: '+url+
         '\nВерсия по этому адресу: '+(version==null?'старая, без номера':version)+
-        '. Нужна версия 3.\nСравни этот адрес с Cloudflare → Workers & Pages → Visit. '+
+        '. Нужна версия 4.\nСравни этот адрес с Cloudflare → Workers & Pages → Visit. '+
         'Если отличаются, вставь адрес обновлённого Worker. '+
         'Если совпадают, обновление не опубликовано на этом адресе.';
       return false;
     }
     if(data.uploads_500mb_configured!==true){
-      out.textContent='⚠️ Версия 3 активна: '+url+
+      out.textContent='⚠️ Версия 4 активна: '+url+
         '. Но не подключено KV-хранилище UPLOADS.';
       return false;
     }
     try{localStorage.setItem('personalEditorLauncher',url)}catch(ignore){}
     out.textContent='✅ Подключение правильное!\nWorker: '+url+
-      '\nВерсия: 3 · загрузка до 500 МБ настроена. Можно монтировать.';
+      '\nВерсия: 4 · загрузка до 500 МБ настроена. Можно монтировать.';
     return true;
   }
   byId('checkWorkerConnection').addEventListener('click',async function(){
@@ -1150,13 +1179,13 @@
       }
       status.textContent='Проверяю, что Cloudflare поддерживает выбранный стиль…';
       var workerHealth=await request('/health','GET');
-      if(workerHealth.style_contract_version!==3){
+      if(workerHealth.style_contract_version!==4){
         byId('workerHealthLink').href=url+'/health';
         byId('workerHealthLink').style.display='inline-block';
         throw new Error(
           'Приложение проверяет адрес '+url+
           '. Версия сервера: '+(workerHealth.style_contract_version??'старая, без номера')+
-          ', требуется версия 3. Сравни адрес с Cloudflare → Workers & Pages → Visit. '+
+          ', требуется версия 4. Сравни адрес с Cloudflare → Workers & Pages → Visit. '+
           'Если отличается, замени адрес в поле «Адрес Cloudflare». '+
           'Если совпадает, проверь публикацию Deploy именно этого Worker.'
         );
@@ -1403,6 +1432,7 @@
       sound_effects:s.soundEffects,
       emoji_mode:s.emoji?'on':'off',
       insert_style:s.motionInserts?'reference_soft':'off',
+      guide_effect:s.motionInserts?s.guideEffect:'off',
       insert_density:s.motionDensity,
       insert_sound:s.assetSound?'on':'off',
       hook:s.hook?s.hookText:'',
