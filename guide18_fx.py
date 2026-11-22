@@ -84,7 +84,7 @@ def plan(words: Sequence[Word], duration: float, choice: str,
     interval={"subtle":10.0,"balanced":7.0,"dynamic":5.0}[density]
     starts=[max(.15,float(st)) for st,en,w in words if 0<=st<duration-1.05
             and len(_clean(str(w)))>=3]
-    if not starts:starts=[.25]
+    if not starts:return []  # never fabricate a phrase for a silent clip
     out=[]
     last=-interval
     for start in starts:
@@ -225,7 +225,7 @@ def _draw(effect: str, p: float, label: str,
     fade=min(1,p/.16,(1-p)/.18)
     if effect=="pov_carousel_spin":
         for k in range(8):
-            ang=(k*2*math.pi/8+p*2.0)
+            ang=(k*2*math.pi/8+p*5.76) # ~110 degrees/sec over 3s
             x=int(180+118*math.sin(ang)-35)
             y=int(310+85*math.cos(ang)-49)
             sub=frames[(frame_index+k*4)%len(frames)]
