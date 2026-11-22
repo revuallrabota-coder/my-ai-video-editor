@@ -18,7 +18,9 @@ FILTERS: dict[str,str] = {
     "film": "eq=contrast=1.075:saturation=0.89:gamma=0.995,colorbalance=rs=0.035:bs=-0.025",
     "matte": "eq=contrast=0.92:saturation=0.88:gamma=1.055",
     "old_money": "eq=contrast=0.965:saturation=0.83:gamma=1.035,colorbalance=rs=0.045:bs=-0.035",
-    "vintage": "eq=contrast=0.945:saturation=0.80:gamma=1.030,colorbalance=rs=0.080:bs=-0.053",
+    # True old-film texture, not a barely visible sepia preset. Rendered BEFORE captions.
+    # Fine temporal grain and vignette are intentionally contained to Vintage.
+    "vintage": "eq=contrast=1.070:saturation=0.72:gamma=0.94,colorbalance=rs=0.075:gs=0.018:bs=-0.052,noise=alls=9:allf=t+u,vignette=PI/7.8",
     "street": "eq=contrast=1.18:saturation=1.13:brightness=-0.007,colorbalance=rs=-0.023:bs=0.030",
     "elegant": "eq=contrast=1.035:saturation=0.985:gamma=1.015",
 }
