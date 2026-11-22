@@ -281,7 +281,7 @@
     <div class="mini" id="assetPacksInfo">Наборы не выбраны: будут использоваться встроенные смысловые графические сцены.</div>
     <label class="option"><input id="assetSfx" type="checkbox" checked> 🔈 Звуки появления анимированных вставок (Whoosh) и мои WAV из ZIP</label>
     <label class="field" for="motionFrequency">Как часто добавлять большие вставки</label>
-    <select id="motionFrequency"><option value="subtle">Редко: крупные акценты по смыслу</option><option value="balanced" selected>Умеренно: вставки каждые несколько фраз</option><option value="dynamic">Динамично: больше коротких вставок и переходов</option></select>
+    <select id="motionFrequency"><option value="subtle">Редко: крупные акценты по смыслу</option><option value="balanced">Умеренно: вставки каждые несколько фраз</option><option value="dynamic" selected>Динамично: больше коротких вставок и переходов</option></select>
     <p class="note">Редактор сначала читает распознанную речь: «найди ошибку» → лупа или крестик; «результат» → галочка; «секунды» → часы; «сравним» → фотоколлаж; «монтаж» → графическая сцена. В разговорных стилях дополнительно создаются короткие анимированные фотокарточки из твоего собственного видео на границах фраз, чтобы монтаж не превращался в неподвижный шаблон.</p>
     <p class="note">Эмодзи появляются плавно только возле смысловых фраз. Большие иллюстрированные карточки больше не добавляются автоматически.</p>
     <label class="field" for="soundfx">🔊 Звуковые акценты на ключевых словах</label>
@@ -293,9 +293,9 @@
     </select>
     <label class="field" for="subtitleSfx">🎵 Звук появления субтитров</label>
     <select id="subtitleSfx">
-      <option value="soft" selected>Нежный тихий Pop</option>
+      <option value="soft">Нежный тихий Pop</option>
       <option value="tick">Короткий мягкий Tick</option>
-      <option value="typewriter">⌨️ Печатающая машинка: серия лёгких щелчков</option>
+      <option value="typewriter" selected>⌨️ Печатающая машинка: серия лёгких щелчков</option>
       <option value="off">Без звука</option>
     </select>
     <label class="field" for="topTitleText">🪧 Что написать вверху видео</label>
@@ -838,12 +838,8 @@
       byId('fontSmall').value=cfg.small;
       byId('color').value=cfg.color;
       byId('talkScene').value=cfg.scene;
-      if(cfg.scene!=='off'){
-        byId('motionInserts').checked=true;
-        byId('motionFrequency').value='dynamic';
-        byId('assetSfx').checked=true;
-        byId('subtitleSfx').value='typewriter';
-      }
+      // Scene and typography never overwrite the user's audio, animation
+      // density, filters, source speed or whether effects are enabled.
       // Every curated look uses the same gentle, mixed-size caption renderer.
       byId('subtitleStyle').value='reference_dynamic';
     }
@@ -856,12 +852,6 @@
   ].forEach(function(id){
     byId(id).addEventListener('input',function(){
       if(id==='talkScene'){
-        if(this.value!=='off'){
-          byId('motionInserts').checked=true;
-          byId('assetSfx').checked=true;
-          if(byId('subtitleSfx').value==='soft')
-            byId('subtitleSfx').value='typewriter';
-        }
         // A manually selected canvas must automatically get readable
         // contrasting captions, otherwise burgundy becomes black-on-black.
         // Subsequent color/font edits are still fully independent.
