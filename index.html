@@ -119,6 +119,7 @@
     <p class="note" id="montageStageHint">Полоса показывает этап работы, а не точное оставшееся время.</p>
     <p class="note" id="montageRetention"></p>
     <button type="button" class="btn secondary" id="refreshMontageStatus" style="width:100%;margin:8px 0">🔄 Проверить этап монтажа</button>
+    <a id="montageGithubRun" href="#" target="_blank" rel="noopener noreferrer" hidden>🔍 Открыть журнал задания GitHub Actions</a>
     <button type="button" class="btn primary" id="downloadMasterQuick" style="width:100%;margin:8px 0" hidden>⬇️ Скачать Full HD без перехода по шагам</button>
     <p class="note">После завершения загрузки (100%) можно закрыть приложение: обработка продолжится в GitHub Actions. Закрытие во время передачи файлов останавливает загрузку, которую потом можно возобновить. Этапы придут в Telegram.</p>
   </section>
@@ -1150,6 +1151,10 @@
         byId('montageRetention').textContent='Срок хранения 3 дня и этапы монтажа заработают после обновления Worker.';
         return;
       }
+      var githubLink=byId('montageGithubRun');
+      var verifiedUrl=/^https:\/\/github\.com\/revuallrabota-coder\/my-ai-video-editor\/actions\/runs\/[0-9]+$/.test(data.github_run_url||"");
+      githubLink.hidden=!verifiedUrl;
+      if(verifiedUrl)githubLink.href=data.github_run_url;
       var step=processingStages[data.stage]||processingStages[data.state]||
         processingStages.queued;
       var label=data.stage_label||step[0];
@@ -1158,6 +1163,9 @@
                          data.stage==='done'||data.ready?'✅ ':'🎬 ')+label;
       byId('montageStageProgress').value=
         Number.isFinite(data.progress_percent)?data.progress_percent:index*11;
+      var stageAge=Date.now()-Number(data.updated_at||Date.now());
+      var suspicious=data.stalled===true ||
+        (stageAge>20*60*1000 && !["done","failed","uploading","review"].includes(data.stage));
       byId('montageStageHint').textContent=
         (data.stage==='uploading'
          ? 'Загружено '+(data.uploaded_parts||[]).length+
@@ -1165,7 +1173,8 @@
          : (data.stage==='failed'?'Проект остановлен с ошибкой.':
             data.stage==='done'||data.ready?'Монтаж завершён.':
             'Этап '+index+' из 9. Это не оценка оставшегося времени.'))+
-        (data.stage==='review'?' Проверь чат Telegram и ответь /ok.':'');
+        (data.stage==='review'?' Проверь чат Telegram и ответь /ok.':'')+
+        (suspicious?' ⚠️ Этап давно не обновлялся. Проверь журнал GitHub: монтаж мог остановиться.':'');
       var expires=Number(data.expires_at);
       byId('montageRetention').textContent=expires>Date.now()
         ? '🗑 Автоудаление из Cloudflare: '+
@@ -1254,13 +1263,13 @@
       }
       status.textContent='Проверяю, что Cloudflare поддерживает выбранный стиль…';
       var workerHealth=await request('/health','GET');
-      if(workerHealth.style_contract_version!==6){
+      if(workerHealth.style_contract_version!==7){
         byId('workerHealthLink').href=url+'/health';
         byId('workerHealthLink').style.display='inline-block';
         throw new Error(
           'Приложение проверяет адрес '+url+
           '. Версия сервера: '+(workerHealth.style_contract_version??'старая, без номера')+
-          ', требуется версия 6. Сравни адрес с Cloudflare → Workers & Pages → Visit. '+
+          ', требуется версия 7. Сравни адрес с Cloudflare → Workers & Pages → Visit. '+
           'Если отличается, замени адрес в поле «Адрес Cloudflare». '+
           'Если совпадает, проверь публикацию Deploy именно этого Worker.'
         );
@@ -1312,7 +1321,7 @@
              resumed.accepted_talk_scene===settings.talk_scene &&
              resumed.accepted_caption_variant===settings.caption_variant &&
              resumed.accepted_guide_effect===settings.guide_effect &&
-             resumed.style_contract_version===6 &&
+             resumed.style_contract_version===7 &&
               resumed.accepted_insert_style===settings.insert_style){
             id=old.id;
             parts=resumed.input_parts;
@@ -1331,7 +1340,7 @@
           assets:assets.map(function(file){return {name:file.name,size:file.size}}),
           size:totalSize,settings:settings
         }),false);
-        if(start.style_contract_version!==6 ||
+        if(start.style_contract_version!==7 ||
             start.accepted_insert_style!==settings.insert_style ||
            start.accepted_talk_scene!==settings.talk_scene ||
            start.accepted_caption_variant!==settings.caption_variant ||
