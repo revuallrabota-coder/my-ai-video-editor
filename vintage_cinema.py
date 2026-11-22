@@ -111,6 +111,64 @@ def _draw_icon(d,theme,x,y,c):
     else:
         d.line((x-25,y+1,x-5,y+20,x+30,y-19),fill=c,width=5)
 
+def _draw_archive_prop(draw, cue, frame, ink, fine):
+    """Animate a physical film-era prop without stock images or modern emoji."""
+    wobble = round(9 * math.sin(frame / FPS * 2.3))
+    x, y = 360 + wobble, 375
+    if cue.theme == "clock":
+        # Pocket watch with winding crown and moving second hand.
+        draw.ellipse((x-100,y-100,x+100,y+100),outline=ink,width=7)
+        draw.ellipse((x-90,y-90,x+90,y+90),outline=fine,width=2)
+        draw.arc((x-24,y-137,x+24,y-97),180,360,fill=ink,width=5)
+        for k in range(12):
+            a = k*math.pi/6
+            draw.line((x+75*math.sin(a),y-75*math.cos(a),
+                       x+85*math.sin(a),y-85*math.cos(a)),fill=ink,width=3)
+        a=frame / FPS * 2.3
+        draw.line((x,y,x+65*math.sin(a),y-65*math.cos(a)),fill=ink,width=3)
+        draw.line((x,y,x-25,y-43),fill=ink,width=6)
+    elif cue.theme == "film":
+        for j in range(3):
+            yy=y-96+j*65
+            draw.rectangle((x-132,yy,x+132,yy+55),outline=ink,width=4)
+            for xx in range(x-126,x+127,24):
+                draw.rectangle((xx,yy+4,xx+9,yy+12),fill=fine)
+                draw.rectangle((xx,yy+44,xx+9,yy+51),fill=fine)
+            draw.rectangle((x-91,yy+15,x+91,yy+40),outline=fine,width=2)
+    elif cue.theme == "letter":
+        draw.polygon([(x-120,y-63),(x+115,y-63),(x+115,y+90),(x-120,y+90)],
+                     fill=ink)
+        draw.polygon([(x-110,y-51),(x+105,y-51),(x+105,y+73),(x-110,y+73)],
+                     fill=(74,59,47) if cue.scene!=1 else (213,188,151))
+        draw.line((x-110,y-51,x,y+22,x+105,y-51),fill=fine,width=4)
+        draw.ellipse((x-19,y+4,x+19,y+42),fill=(130,61,45))
+    elif cue.theme == "book":
+        draw.polygon([(x-122,y-83),(x-8,y-66),(x,y-54),(x+8,y-66),
+                      (x+122,y-83),(x+122,y+94),(x+8,y+77),(x,y+90),
+                      (x-8,y+77),(x-122,y+94)],outline=ink)
+        draw.line((x,y-54,x,y+90),fill=ink,width=4)
+        for off in (-20,0,20,40):
+            draw.line((x-106,y+off,x-22,y+off+12),fill=fine,width=2)
+            draw.line((x+22,y+off+12,x+106,y+off),fill=fine,width=2)
+    elif cue.theme in ("inspection","detail"):
+        draw.ellipse((x-105,y-105,x+58,y+58),outline=ink,width=8)
+        draw.ellipse((x-96,y-96,x+49,y+49),outline=fine,width=2)
+        draw.line((x+43,y+44,x+117,y+122),fill=ink,width=17)
+        draw.line((x+43,y+44,x+117,y+122),fill=fine,width=5)
+        if cue.theme=="inspection":
+            draw.line((x-47,y-23,x+5,y-23),fill=ink,width=4)
+            draw.line((x-47,y+4,x+17,y+4),fill=ink,width=4)
+    else:
+        # Archival photographic contact sheet.
+        draw.rectangle((x-115,y-100,x+115,y+110),outline=ink,width=6)
+        for j in range(2):
+            for k in range(2):
+                xx=x-100+k*108; yy=y-84+j*90
+                draw.rectangle((xx,yy,xx+92,yy+74),outline=fine,width=3)
+                draw.line((xx+10,yy+59,xx+43,yy+22,xx+81,yy+59),
+                          fill=ink,width=3)
+
+
 def _scene_image(cue, frame, index):
     w,h=SIZE
     dark=cue.scene!=1
@@ -139,7 +197,7 @@ def _scene_image(cue, frame, index):
     else:
         d.rectangle((42,78,w-42,h-79),outline=(130,92,59),width=3)
         d.rectangle((52,88,w-52,h-89),outline=(172,134,91),width=2)
-    _draw_icon(d,cue.theme,w//2,375,fine)
+    _draw_archive_prop(d,cue,frame,ink,fine)
     font=_font(58,True)
     pieces=cue.phrase.upper().split()
     lines=[]
