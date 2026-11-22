@@ -29,7 +29,7 @@ const CHOICES = {
   talk_scene:"off contour cream pistachio burgundy_brown",
   top_title_mode:"auto off intro always",
   animation_style:"float pop slide",
-  subtitle_sfx:"off soft tick",
+  subtitle_sfx:"off soft tick typewriter",
   insert_style:"off reference_soft retro old_money vintage elegant street editorial minimal neon pop luxe",
   insert_density:"subtle balanced dynamic",
   insert_sound:"off on"
