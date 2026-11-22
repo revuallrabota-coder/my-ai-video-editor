@@ -305,6 +305,7 @@ def apply_effects(
     sx=frame_width/720
     sy=frame_height/1280
     from retro_inserts import choose_retro_cues, make_retro_card, make_retro_sound_track
+    from vintage_cinema import select_vintage_cues, render_vintage_scene, make_vintage_sound_track
     from reference_motion_scenes import select_motion_cues, make_motion_assets
     from studio_kinetic import select_studio_cues, make_studio_card, make_studio_keyword_asset
     from guide18_fx import plan as plan_guide, render as render_guide, sound_track as guide_audio
@@ -328,11 +329,14 @@ def apply_effects(
                  if studio_mode and insert_style!="off" and guide_effect=="off"
                  else [])
     retro=(choose_retro_cues(words,duration,density=insert_density)
-           if insert_style not in ("off","reference_soft") and not studio_mode else [])
+           if insert_style not in ("off","reference_soft","vintage") and not studio_mode else [])
+    vintage_cues=(select_vintage_cues(words,duration,insert_density)
+                  if insert_style=="vintage" else [])
     # In a guide scene, no second independent studio card / kinetic headline
     # may overlap it. Exactly one primary animation owns this time window.
     guide_cues=(plan_guide(words,duration,guide_effect,insert_density)
-                if insert_style!="off" and guide_effect!="off" else [])
+                if insert_style!="off" and guide_effect!="off"
+                and not (insert_style=="vintage" and guide_effect=="auto") else [])
 
     # The FIRST FOUR SECONDS belong exclusively to the speaker and their
     # correctly timed subtitles. All independent decorative planners must
@@ -343,6 +347,7 @@ def apply_effects(
     motion_cues=[c for c in motion_cues if c.start>=intro_clear_seconds]
     studio_cues=[c for c in studio_cues if c.start>=intro_clear_seconds]
     retro=[c for c in retro if c.time>=intro_clear_seconds]
+    vintage_cues=[c for c in vintage_cues if c.start>=intro_clear_seconds]
     guide_cues=[c for c in guide_cues if c.start>=intro_clear_seconds]
     # Legacy full-screen illustrated motion panels obscure the conversation
     # even when semantically triggered. Keep them disabled until redesigned
@@ -359,6 +364,13 @@ def apply_effects(
             # A manually chosen full-screen effect is always intentional.
             object_cues=[o for o in object_cues
                          if not any(overlap(o,g) for g in guide_cues)]
+    if vintage_cues:
+        # Only one full-frame cutaway may own a time window. Uploaded real
+        # stickers remain allowed outside those windows, with face protection.
+        vintage_cues=[v for v in vintage_cues if not any(
+            v.start < g.end+.3 and v.end > g.start-.3 for g in guide_cues)]
+        object_cues=[o for o in object_cues if not any(
+            o.start < v.end+.3 and o.end > v.start-.3 for v in vintage_cues)]
     if guide_cues or object_cues:
         # Eliminate secondary large cards rather than accidentally mixing
         # animations from different independent planners.
@@ -489,6 +501,35 @@ def apply_effects(
             current_input += 1
             insert_count += 1
             rendered_retro.append(insert)
+
+        # True vintage cinema: a short full-height archive-film scene covers
+        # the speaker entirely while their unchanged original speech continues.
+        # Captions in this scene are only real words from the transcription.
+        rendered_vintage = []
+        for i, cue in enumerate(vintage_cues):
+            try:
+                pattern, _ = render_vintage_scene(folder, cue, i)
+            except Exception as exc:
+                LOG.warning("Skipping failed vintage cinema scene: %s", exc)
+                continue
+            args.extend(["-framerate", "12", "-start_number", "0",
+                         "-i", pattern])
+            layer=f"[vintagescene{i}]"
+            filters.append(
+                f"[{current_input}:v]fps=30,scale={frame_width}:{frame_height}:"
+                f"flags=lanczos,format=rgba,"
+                f"setpts=PTS-STARTPTS+{cue.start:.3f}/TB{layer}"
+            )
+            stage=f"[vintagestage{i}]"
+            filters.append(
+                f"{prev}{layer}overlay=x=0:y=0:"
+                f"enable='between(t,{cue.start:.3f},{cue.end:.3f})':"
+                f"shortest=0:eof_action=pass:repeatlast=0{stage}"
+            )
+            prev=stage
+            current_input+=1
+            rendered_vintage.append(cue)
+            insert_count+=1
 
         scene_count = 0
         for i, scene in enumerate(motion_cues):
@@ -855,6 +896,13 @@ def apply_effects(
                 track_inputs.append(f"[{current_input}:a:0]")
                 current_input+=1
                 insert_sfx_count+=studio_insert_count
+        if insert_sound=="on" and has_audio and rendered_vintage:
+            track=folder/"vintage_projector_and_film.wav"
+            make_vintage_sound_track(track, rendered_vintage, duration)
+            args.extend(["-i",str(track)])
+            track_inputs.append(f"[{current_input}:a:0]")
+            current_input+=1
+            insert_sfx_count+=len(rendered_vintage)
         if insert_sound=="on" and has_audio and rendered_retro:
             cue_track=folder/"retro_insert_accents.wav"
             make_retro_sound_track(cue_track, rendered_retro, duration,
