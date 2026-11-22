@@ -84,28 +84,104 @@ def telegram_copy(master: Path, dest: Path, *, max_bytes: int=TELEGRAM_SAFE_BYTE
     raise RuntimeError("Не удалось уменьшить MP4 до лимита Telegram 48 МБ.")
 
 
+def _vertical_geometry(file: Path) -> tuple[int,int,int]:
+    """Actual encoded dimensions for Telegram's inline player metadata."""
+    import math
+    info=media_info(file)
+    stream=next((v for v in info.get("streams",[])
+                 if v.get("codec_type")=="video"),{})
+    width,height=int(stream.get("width") or 0),int(stream.get("height") or 0)
+    if width<360 or height<640 or abs(width/height-9/16)>.006:
+        raise ValueError(
+            "Telegram-копия не в 9:16. "
+            f"Получено {width}x{height}, ожидаем вертикальный Reels."
+        )
+    duration,_=duration_and_audio(file)
+    if duration<=0:
+        raise ValueError("У Telegram-копии неверная длительность.")
+    return width,height,max(1,math.ceil(duration))
+
+
+def _telegram_thumbnail(file: Path, output: Path, duration: int) -> Path | None:
+    """Attach a true vertical 9:16 preview, not Telegram's square guess."""
+    command=[
+        "ffmpeg","-hide_banner","-loglevel","error","-y",
+        "-ss",f"{min(1.0,duration*.2):.2f}","-i",str(file),
+        "-vf","scale=180:320:force_original_aspect_ratio=decrease:"
+              "flags=lanczos,pad=180:320:(ow-iw)/2:(oh-ih)/2,"
+              "setsar=1,format=yuvj420p",
+        "-frames:v","1","-q:v","5",str(output)
+    ]
+    try:
+        result=subprocess.run(command,capture_output=True,
+                              text=True,timeout=60)
+        if result.returncode==0 and output.is_file() and (
+            100 < output.stat().st_size < 190000
+        ):
+            return output
+        LOG.warning("Telegram thumbnail not available; will use metadata.")
+    except (OSError,subprocess.TimeoutExpired):
+        LOG.warning("Telegram thumbnail preparation unavailable.")
+    return None
+
+
 def send_video_to_telegram(token: str, owner: int, file: Path,
                            caption: str) -> None:
-    """Send playable video first, fallback to a normal document if rejected."""
+    """Send 9:16 Reels with explicit player metadata and matching thumbnail.
+
+    Do NOT sendVideoNote: it is inherently a rounded square. If Telegram's
+    player rejects the video, the standard MP4 document remains a fallback.
+    """
     if file.stat().st_size>TELEGRAM_SAFE_BYTES:
         raise ValueError("Telegram-версия превышает безопасный размер 48 МБ.")
+    width,height,duration=_vertical_geometry(file)
     endpoint="https://api.telegram.org/bot"+token+"/"
-    for method,field in (("sendVideo","video"),("sendDocument","document")):
-        try:
-            with file.open("rb") as stream:
-                values={"chat_id":str(owner),"caption":caption[:950]}
-                if method=="sendVideo":
-                    values["supports_streaming"]="true"
-                reply=requests.post(
-                    endpoint+method,data=values,
-                    files={field:(file.name,stream,"video/mp4")},timeout=(30,240)
-                )
-                body=reply.json()
-            if reply.ok and body.get("ok"):
-                LOG.info("Sent playable Reels to Telegram by %s",method)
-                return
-            LOG.warning("Telegram %s rejected video (%s)",method,
-                        str(body.get("description",""))[:160])
-        except (requests.RequestException,ValueError):
-            LOG.warning("Telegram %s network failure",method)
-    raise RuntimeError("Telegram не принял итоговое видео. Оригинал не потерян.")
+    with tempfile.TemporaryDirectory(prefix="tg_preview_") as work:
+        thumb=_telegram_thumbnail(file,Path(work)/"reels-cover.jpg",duration)
+        for method,field in (("sendVideo","video"),("sendDocument","document")):
+            try:
+                from contextlib import ExitStack
+                with ExitStack() as stack:
+                    stream=stack.enter_context(file.open("rb"))
+                    values={"chat_id":str(owner),"caption":caption[:950]}
+                    uploaded={field:(file.name,stream,"video/mp4")}
+                    if method=="sendVideo":
+                        values.update({
+                            "supports_streaming":"true",
+                            "width":str(width),
+                            "height":str(height),
+                            "duration":str(duration)
+                        })
+                        if thumb is not None:
+                            cover=stack.enter_context(thumb.open("rb"))
+                            uploaded["thumbnail"]=(
+                                "reels-cover.jpg",cover,"image/jpeg"
+                            )
+                    reply=requests.post(
+                        endpoint+method,data=values,files=uploaded,
+                        timeout=(30,240)
+                    )
+                    body=reply.json()
+                if reply.ok and body.get("ok"):
+                    if method=="sendVideo":
+                        telegram_video=body.get("result",{}).get("video") or {}
+                        out_w=int(telegram_video.get("width") or 0)
+                        out_h=int(telegram_video.get("height") or 0)
+                        LOG.info("Telegram sent Reels original=%sx%s server=%sx%s",
+                                 width,height,out_w,out_h)
+                        if out_w and out_h and (
+                            abs(out_w/out_h-9/16)>.006
+                        ):
+                            LOG.warning(
+                                "Telegram server reported incorrect player "
+                                "geometry %sx%s despite 9:16 upload.",
+                                out_w,out_h
+                            )
+                    else:
+                        LOG.info("Sent vertical MP4 as Telegram document.")
+                    return
+                LOG.warning("Telegram %s rejected video (%s)",method,
+                            str(body.get("description",""))[:160])
+            except (requests.RequestException,ValueError):
+                LOG.warning("Telegram %s network failure",method)
+    raise RuntimeError("Telegram не принял итоговое видео. Оригинал сохранён.")
