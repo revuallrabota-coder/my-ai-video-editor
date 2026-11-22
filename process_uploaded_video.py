@@ -530,6 +530,7 @@ def main() -> None:
                 )
             selected_guide=str(config.get("guide_effect","off"))
             if (selected_guide not in ("off","auto") and
+                not selected_guide.startswith("multi:") and
                 str(config.get("insert_style","reference_soft"))!="off" and
                 len(words)>=3 and float(stats.get("after",0))>=4 and
                 int(stats.get("guide_effect_count",0))<1):
@@ -545,6 +546,7 @@ def main() -> None:
             if (talk_scene!="off" and
                 str(config.get("insert_style","reference_soft"))!="off" and
                 str(config.get("guide_effect","auto")) not in ("auto","off") and
+                not str(config.get("guide_effect","auto")).startswith("multi:") and
                 len(words)>=10 and float(stats.get("after",0))>=12 and
                 int(stats.get("insert_count",0))<1):
                 raise RuntimeError(
