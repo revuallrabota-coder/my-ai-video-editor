@@ -551,6 +551,7 @@ def edit_video(
     pause_removal: str = "tight",
     subject_layout: str = "standard",
     talk_scene: str = "off",
+    guide_effect: str = "off",
 ) -> dict:
     from reels_effects import apply_effects, validate_effects
     from speech_review import map_words_to_ranges, shift_word_timestamps
@@ -636,6 +637,7 @@ def edit_video(
             animation_style=animation_style,
             studio_mode=(talk_scene!="off"),
             studio_scene=talk_scene,
+            guide_effect=guide_effect,
             insert_source=(work if talk_scene!="off" else None),
         )
     return {
