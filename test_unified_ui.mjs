@@ -33,6 +33,13 @@ assert.match(html,/style\.fontStyle=item\.italic/);
 assert.match(html,/style\.fontWeight=item\.weight/);
 assert.match(html,/byId\('replayPreview'\)\.addEventListener\('click',replaySample\)/);
 assert.match(html,/byId\('reelsPreset'\)\.addEventListener\('change'/);
+assert.match(html,/id="checkWorkerConnection"/,"Must expose actual Worker diagnostics on iPad");
+assert.match(html,/id="workerConnectionResult"/);
+assert.match(html,/id="workerHealthLink"/);
+assert.match(html,/function connectedWorkerURL\(\)/);
+assert.match(html,/async function checkWorkerConnection\(\)/);
+assert.match(html,/workerHealth.style_contract_version!==3/);
+assert.match(html,/Приложение проверяет адрес/);
 const presets=html.slice(html.indexOf("var reelPresets={"),
                           html.indexOf("byId('reelsPreset').addEventListener"));
 assert.ok(presets.length>30 && presets.length<1400);
