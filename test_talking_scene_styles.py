@@ -95,7 +95,7 @@ class FourTalkingReelsLooks(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"),
                          "FFmpeg is not installed")
-    def test_real_ffmpeg_output_keeps_voice_and_arch(self):
+    def test_real_ffmpeg_output_keeps_voice_and_full_portrait(self):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp)
             original=root/"original.mp4"
@@ -170,7 +170,7 @@ class FourTalkingReelsLooks(unittest.TestCase):
         self.assertIn('config.get("talk_scene","off")',process)
         self.assertIn("style_contract_version:CONTRACT",worker)
         self.assertIn("accepted_talk_scene:settings.talk_scene",worker)
-        self.assertIn("workerHealth.style_contract_version!==2",html)
+        self.assertIn("workerHealth.style_contract_version!==3",html)
         self.assertIn("start.accepted_talk_scene!==settings.talk_scene",html)
         renderer=(repo/"reference_editor.py").read_text("utf-8")
         standard=(repo/"telegram_editor.py").read_text("utf-8")
