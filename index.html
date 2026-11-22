@@ -324,6 +324,7 @@
       <option value="off">Оставить звук без изменений</option>
     </select>
     <p class="note">Уменьшаем постоянный фон, сглаживаем громкость речи и защищаем от перегрузки. Голос не заменяется. Сильная очистка иногда искажает речь.</p>
+    <p id="videoFilterPreviewStatus" class="note" aria-live="polite">Фильтр: без обработки</p>
     <label class="field" for="filter">Фильтр</label>
     <select id="filter">
       <option value="none" selected>Без фильтра, сохранять натуральные цвета</option>
@@ -708,6 +709,34 @@
       node.style.borderRadius='0';
       node.style.objectFit='cover';
     });
+    // Mirror the real selected FFmpeg colour preset on BOTH photo and video.
+    // It was previously passed only to export and never rendered in preview.
+    var filterCSS={
+      none:'none',
+      warm:'sepia(.14) saturate(1.13) brightness(1.025)',
+      soft:'contrast(.96) saturate(1.05) brightness(1.025)',
+      cool:'hue-rotate(7deg) saturate(1.12) contrast(1.04)',
+      contrast:'contrast(1.17) saturate(1.11)',
+      clean:'contrast(1.08) saturate(1.08) brightness(1.025)',
+      film:'sepia(.10) contrast(1.09) saturate(.92)',
+      matte:'contrast(.91) saturate(.90) brightness(1.04)',
+      old_money:'sepia(.14) contrast(.95) saturate(.83) brightness(1.045)',
+      vintage:'sepia(.27) contrast(.95) saturate(.80)',
+      street:'contrast(1.17) saturate(1.17)',
+      elegant:'contrast(1.035) saturate(.985) brightness(1.01)'
+    };
+    var selectedFilter=byId('filter').value;
+    media.forEach(function(node){
+      node.style.filter=filterCSS[selectedFilter]||'none';
+      node.style.transition='filter .23s ease';
+    });
+    var filterLabel=byId('videoFilterPreviewStatus');
+    if(filterLabel){
+      filterLabel.textContent=selectedFilter==='none'
+        ?'Фильтр: без обработки'
+        :'Фильтр '+byId('filter').selectedOptions[0].text+
+          ' применяется к фото и видео в предпросмотре';
+    }
     var layout=byId('subjectLayout').value;
     // Beside-person is a schematic preview; the renderer automatically
     // determines the true side from the person's segmentation mask.
