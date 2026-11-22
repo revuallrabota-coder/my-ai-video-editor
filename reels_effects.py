@@ -604,9 +604,10 @@ def apply_effects(
             current_input += 1
             sfx_count = len(cues)
         if caption_sound != "off" and has_audio and caption_cues:
-            private_typewriter=(private_assets.sounds.get("typewriter")
-                                if private_assets is not None and
-                                caption_sound=="typewriter" else None)
+            selected_sound_kind=("typewriter" if caption_sound=="typewriter"
+                                 else "pop")
+            private_typewriter=(private_assets.sounds.get(selected_sound_kind)
+                                if private_assets is not None else None)
             if private_typewriter and private_typewriter.is_file():
                 # An uploaded real typewriter is preferred to a synthesized
                 # substitute. Each key phrase gets a short copy, never louder
