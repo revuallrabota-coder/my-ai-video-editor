@@ -333,6 +333,21 @@ def apply_effects(
     # may overlap it. Exactly one primary animation owns this time window.
     guide_cues=(plan_guide(words,duration,guide_effect,insert_density)
                 if insert_style!="off" and guide_effect!="off" else [])
+
+    # The FIRST FOUR SECONDS belong exclusively to the speaker and their
+    # correctly timed subtitles. All independent decorative planners must
+    # obey this same guard, including explicit PDF techniques and user PNGs.
+    intro_clear_seconds=4.0
+    object_cues=[c for c in object_cues if c.start>=intro_clear_seconds]
+    semantic_cues=[c for c in semantic_cues if c.start>=intro_clear_seconds]
+    motion_cues=[c for c in motion_cues if c.start>=intro_clear_seconds]
+    studio_cues=[c for c in studio_cues if c.start>=intro_clear_seconds]
+    retro=[c for c in retro if c.time>=intro_clear_seconds]
+    guide_cues=[c for c in guide_cues if c.start>=intro_clear_seconds]
+    # Legacy full-screen illustrated motion panels obscure the conversation
+    # even when semantically triggered. Keep them disabled until redesigned
+    # as compact person-safe overlays. Reference-safe PNG/caption accents remain.
+    motion_cues=[]
     if object_cues and guide_cues:
         overlap=lambda a,b: (a.start < b.end+.35 and a.end > b.start-.35)
         if guide_effect=="auto":
@@ -359,7 +374,8 @@ def apply_effects(
     # No stickers merely for saying a generic "маникюр" or "видео".
     cues=([(c.start,semantic_emojis.get(c.kind)) for c in semantic_cues]
           if studio_mode or insert_style=="reference_soft"
-          else pick_cues(words,duration))
+          else [(t,symbol) for t,symbol in pick_cues(words,duration)
+                if t>=intro_clear_seconds])
     caption_cues = (pick_caption_cues(
                         words,duration,
                         style=caption_sound
@@ -627,6 +643,7 @@ def apply_effects(
         # frame sequences. None is a static screenshot or another unplanned
         # floating card. They retain the original speech on audio input 0.
         guide_count=0
+        rendered_guide_cues=[]
         for i,cue in enumerate(guide_cues):
             from guide18_fx import SUBJECT_FX
             guide_source=(source if cue.effect in SUBJECT_FX
@@ -635,6 +652,7 @@ def apply_effects(
                 pattern,count=render_guide(
                     guide_source,folder,cue,i,words,
                 palette=studio_scene,
+                caption_position=caption_position,
                 # Auto mode never pours unrelated decorative PNGs into a
                 # generic collage. Manual photo collage may use provided
                 # client imagery; ordinary word-based props use separate cues.
@@ -676,6 +694,7 @@ def apply_effects(
             current_input+=1
             prev=stage
             guide_count+=1
+            rendered_guide_cues.append(cue)
         insert_count+=guide_count
 
         # Uploaded PNGs are never stretched into giant 400px cards.
@@ -683,11 +702,13 @@ def apply_effects(
         # silhouette protection and a verified clear side of the video.
         from semantic_object_overlays import render_safe_object
         object_count=0
+        rendered_object_cues=[]
         for i,cue in enumerate(object_cues):
             start,end=cue.start,cue.end
             try:
                 pattern,count=render_safe_object(
-                    insert_source or source,folder,cue,i
+                    insert_source or source,folder,cue,i,
+                    caption_position=caption_position,
                 )
             except Exception as exc:
                 LOG.warning("Skipping unsafe/unreadable user PNG: %s",exc)
@@ -708,6 +729,7 @@ def apply_effects(
             prev=stage
             current_input+=1
             object_count+=1
+            rendered_object_cues.append(cue)
         insert_count+=object_count
 
         # Private animated icon MOV, matched to the actual spoken topic.
@@ -794,9 +816,9 @@ def apply_effects(
             from guide18_fx import GuideCue
             audio=folder/"guide_varied_sfx.wav"
             soundtrack_events=sorted([
-                *guide_cues,
+                *rendered_guide_cues,
                 *[GuideCue("notification_stack",o.start,o.end,o.concept)
-                  for o in object_cues]
+                  for o in rendered_object_cues]
             ],key=lambda item:item.start)
             guide_audio(audio,soundtrack_events,duration)
             args.extend(["-i",str(audio)])
