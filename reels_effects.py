@@ -920,9 +920,27 @@ def apply_effects(
         if insert_sound=="on" and has_audio and (guide_count or object_count):
             from guide18_fx import GuideCue
             audio=folder/"guide_varied_sfx.wav"
+            # User-owned object stickers receive action-matched sounds:
+            # book/paper -> page shuffle; clock/key -> muted steps;
+            # phone -> notification; other objects -> soft photo touch.
+            object_sfx={
+                "book":"pov_carousel_spin",
+                "paper":"pov_carousel_spin",
+                "envelope":"pov_carousel_spin",
+                "folder":"pov_carousel_spin",
+                "scroll":"pov_carousel_spin",
+                "clock":"apple_ui_toggles",
+                "key":"apple_ui_toggles",
+                "record":"glass_explainer_reel",
+                "crystal":"glass_explainer_reel",
+                "phone":"notification_stack",
+                "social":"notification_stack",
+                "film":"image_cluster_reel",
+            }
             soundtrack_events=sorted([
                 *rendered_guide_cues,
-                *[GuideCue("notification_stack",o.start,o.end,o.concept)
+                *[GuideCue(object_sfx.get(o.concept,"image_cluster_reel"),
+                           o.start,o.end,o.concept)
                   for o in rendered_object_cues]
             ],key=lambda item:item.start)
             guide_audio(audio,soundtrack_events,duration,style=insert_style)
