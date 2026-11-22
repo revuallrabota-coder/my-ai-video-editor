@@ -456,6 +456,7 @@ def montage_by_reference(
             private_assets=None if talk_scene!="off" else private_assets,
             font_profile=font_profile, small_font_profile=small_font_profile,
             animation_style=animation_style,
+            studio_mode=(talk_scene!="off"),
         )
     return {
         "before": round(source_duration, 1),
