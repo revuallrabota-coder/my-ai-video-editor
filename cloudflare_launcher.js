@@ -8,7 +8,7 @@ const CHUNK = 4000000;
 const MAX_VIDEO = 500000000;
 const MAX_ASSETS = 100000000;
 const TTL = 259200;
-const CONTRACT = 4;
+const CONTRACT = 5;
 const STAGES = {
   queued:35, downloading:42, joining:53, transcribing:63, review:72,
   planning:78, rendering:86, publishing:94, done:100, failed:100
@@ -30,7 +30,7 @@ const CHOICES = {
   top_title_mode:"auto off intro always",
   animation_style:"float pop slide",
   subtitle_sfx:"off soft tick typewriter",
-  insert_style:"off reference_soft retro old_money vintage elegant street editorial minimal neon pop luxe",
+  insert_style:"off reference_soft retro old_money burgundy pink_tender vintage elegant street editorial minimal neon pop luxe",
   insert_density:"subtle balanced dynamic",
   insert_sound:"off on",
   guide_effect:"off auto pov_carousel_spin liquid_glass_graph match_cut screen_push_digital apple_ui_toggles over_shoulder_zoom text_behind_me notification_stack phone_3d_float split_clones sticker_cutout zoom_through_text glass_explainer_reel cinematic_type_reel image_cluster_reel cutout_grid_reel depth_ui_reel split_reel"
@@ -251,6 +251,7 @@ async function uploadStart(request,env) {
   return response({upload_id:id,chunk_size:CHUNK,parts:offset,
     accepted_talk_scene:settings.talk_scene,
     accepted_caption_variant:settings.caption_variant,
+    accepted_insert_style:settings.insert_style,
     accepted_guide_effect:settings.guide_effect,
     style_contract_version:CONTRACT},201);
 }
@@ -306,6 +307,7 @@ async function status(env,id) {
     state:meta.state,stage:phase,
     accepted_talk_scene:meta.settings?.talk_scene??"off",
     accepted_caption_variant:meta.settings?.caption_variant??"reference_soft",
+    accepted_insert_style:meta.settings?.insert_style??"off",
     accepted_guide_effect:meta.settings?.guide_effect??"off",
     style_contract_version:CONTRACT,
     stage_label:latest?.message ?? phase,
