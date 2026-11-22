@@ -48,7 +48,7 @@ class TalkingHeadLayouts(unittest.TestCase):
         processor = Path("process_uploaded_video.py").read_text("utf-8")
         self.assertIn('id="subjectLayout"', html)
         self.assertIn("subject_layout:s.subjectLayout", html)
-        self.assertIn('subject_layout: subjectLayout', worker)
+        self.assertIn('subject_layout:option("subject_layout",s.subject_layout,"standard")', worker)
         self.assertIn('config.get("subject_layout","standard")', processor)
 
 
