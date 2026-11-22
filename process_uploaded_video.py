@@ -498,6 +498,7 @@ def main() -> None:
                 + " · 🔠 крупные анимированные слова: " + str(stats.get("kinetic_word_count", 0))
                 + " · 🎨 фильтр видео: " + str(stats.get("filter_applied", "none"))
                 + " · ✨ Приёмы из гайда: " + str(stats.get("guide_effect_count", 0))
+                + " (" + ", ".join(stats.get("guide_effects_rendered",[])[:5]) + ")"
                 + " · 🎨 иконки из ZIP: " + str(stats.get("private_asset_count", 0))
                 + " · 🔔 звуки вставок: " + str(stats.get("insert_sfx_count", 0))
             )
@@ -520,6 +521,15 @@ def main() -> None:
                 raise RuntimeError(
                     "Экспорт получился не в вертикальном формате 9:16. "
                     "Ролик не отправляю, исправь настройки рендера."
+                )
+            selected_guide=str(config.get("guide_effect","off"))
+            if (selected_guide not in ("off","auto") and
+                str(config.get("insert_style","reference_soft"))!="off" and
+                len(words)>=3 and float(stats.get("after",0))>=4 and
+                int(stats.get("guide_effect_count",0))<1):
+                raise RuntimeError(
+                    "Выбран эффект из PDF, но рендер его не создал. "
+                    "Готовый MP4 не отправляю как корректный."
                 )
             # A 40-second speaking Reels with explicitly selected cutaways
             # must not silently export as a static branded template.
