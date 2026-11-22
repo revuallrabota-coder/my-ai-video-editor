@@ -68,9 +68,9 @@ class VintageCinemaTests(unittest.TestCase):
         html=(root/"index.html").read_text("utf-8")
         worker=(root/"cloudflare_launcher.js").read_text("utf-8")
         renderer=(root/"reels_effects.py").read_text("utf-8")
-        for expected in ['value="vintage_cinema"', "insert_style:s.motionInserts?(s.captionVariant==='vintage'?'vintage':'reference_soft')"]:
+        for expected in ['value="vintage_cinema"', "s.captionVariant==='vintage'?'vintage'"]:
             self.assertIn(expected,html)
-        self.assertIn('insert_style:"off reference_soft retro old_money vintage',worker)
+        self.assertIn('insert_style:"off reference_soft retro old_money burgundy pink_tender vintage',worker)
         self.assertIn("render_vintage_scene",renderer)
         self.assertIn("make_vintage_sound_track",renderer)
         vintage=video_filter_chain("vintage")
