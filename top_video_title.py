@@ -5,7 +5,7 @@ auto-generated three-line hero when a manual title mode is selected.
 """
 from __future__ import annotations
 import re
-from signature_captions import safe_text,ass_time
+from signature_captions import safe_text,ass_time,ass_color
 
 TITLE_MODES = frozenset(("auto","off","intro","always"))
 MAX_TITLE_CHARS = 70
@@ -38,6 +38,7 @@ def title_lines(text: str) -> tuple[str,int]:
 def append_top_title(
     ass_text: str, title: str, mode: str,
     duration: float, *, color: str="auto",
+    studio_scene: bool=False,
 ) -> str:
     """Append timed ASS title; no text or 'off' means no added graphics."""
     if mode not in TITLE_MODES:
@@ -55,8 +56,9 @@ def append_top_title(
         return ass_text
     fadein=min(280,round((end-start)*1000*.24))
     fadeout=min(240,round((end-start)*1000*.2))
+    ink=ass_color(color) if studio_scene and re.fullmatch(r"#[0-9a-fA-F]{6}",color) else "&H00FFFFFF&"
     style=(
-        "Style: CustomTopTitle,DejaVu Sans,32,&H00FFFFFF,&H00FFFFFF,"
+        f"Style: CustomTopTitle,DejaVu Sans,32,{ink},{ink},"
         "&H78231924,&HD0000000,1,0,0,0,100,100,0,0,1,1.15,1.2,5,64,64,30,1\n"
     )
     # Sharp-corner ASS opaque boxes are never used on manually chosen titles.
