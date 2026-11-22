@@ -320,8 +320,13 @@ def apply_effects(
                          studio_mode and emoji=="on") else [])
     motion_cues=(select_motion_cues(words,duration,insert_density)
                  if insert_style=="reference_soft" and not studio_mode else [])
+    # Automatic mode NEVER invokes legacy huge studio cards and kinetic
+    # words. The new speech-matched guide micro-cues handle small accents.
+    # Manual off retains the old studio module for backward-compatible
+    # existing projects that intentionally selected it.
     studio_cues=(select_studio_cues(words,duration,insert_density)
-                 if studio_mode and insert_style!="off" else [])
+                 if studio_mode and insert_style!="off" and guide_effect=="off"
+                 else [])
     retro=(choose_retro_cues(words,duration,density=insert_density)
            if insert_style not in ("off","reference_soft") and not studio_mode else [])
     # In a guide scene, no second independent studio card / kinetic headline
