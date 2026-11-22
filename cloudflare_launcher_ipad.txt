@@ -8,7 +8,7 @@ const CHUNK = 4000000;
 const MAX_VIDEO = 500000000;
 const MAX_ASSETS = 100000000;
 const TTL = 259200;
-const CONTRACT = 3;
+const CONTRACT = 4;
 const STAGES = {
   queued:35, downloading:42, joining:53, transcribing:63, review:72,
   planning:78, rendering:86, publishing:94, done:100, failed:100
@@ -32,7 +32,8 @@ const CHOICES = {
   subtitle_sfx:"off soft tick typewriter",
   insert_style:"off reference_soft retro old_money vintage elegant street editorial minimal neon pop luxe",
   insert_density:"subtle balanced dynamic",
-  insert_sound:"off on"
+  insert_sound:"off on",
+  guide_effect:"off auto pov_carousel_spin liquid_glass_graph match_cut screen_push_digital apple_ui_toggles over_shoulder_zoom text_behind_me notification_stack phone_3d_float split_clones sticker_cutout zoom_through_text glass_explainer_reel cinematic_type_reel image_cluster_reel cutout_grid_reel depth_ui_reel split_reel"
 };
 CHOICES.small_font_profile = CHOICES.font_profile;
 
@@ -109,7 +110,8 @@ function parseSettings(s) {
     subtitle_delay:delay,
     insert_style:option("insert_style",s.insert_style,"reference_soft"),
     insert_density:option("insert_density",s.insert_density,"balanced"),
-    insert_sound:option("insert_sound",s.insert_sound,"off")
+    insert_sound:option("insert_sound",s.insert_sound,"off"),
+    guide_effect:option("guide_effect",s.guide_effect,"auto")
   };
   return settings;
 }
