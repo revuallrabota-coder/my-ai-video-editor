@@ -167,7 +167,7 @@
     <!-- Legacy API requires talkScene, but this control is deliberately hidden.
          All style-specific visual overlays now follow the selected Reels preset. -->
     <input type="hidden" id="talkScene" value="off">
-    <p class="note">Человек остаётся на исходном вертикальном видео 9:16. Анимации, переходы и стикеры автоматически подстраиваются под выбранную эстетику.</p>
+    <p class="note">Человек остаётся в исходном вертикальном кадре 9:16. Анимации, звуки и деликатная цветокоррекция автоматически следуют выбранной эстетике. Для обычного видео цвет ногтей сохраняется без фильтра.</p>
     <label class="field" for="previewPhoto">📷 Фото для примерки оформления</label>
     <input id="previewPhoto" type="file" accept="image/*">
     <p class="note">Прикрепи любой кадр или фотографию: здесь сразу увидишь шрифт, размер, положение, цвет и овальную тень. Фото останется на iPad и не отправится для монтажа.</p>
@@ -367,9 +367,9 @@
       <option value="off">Оставить звук без изменений</option>
     </select>
     <p class="note">Уменьшаем постоянный фон, сглаживаем громкость речи и защищаем от перегрузки. Голос не заменяется. Сильная очистка иногда искажает речь.</p>
-    <p id="videoFilterPreviewStatus" class="note" aria-live="polite">Фильтр: без обработки</p>
-    <label class="field" for="filter">Фильтр</label>
-    <select id="filter">
+    <!-- Compatibility-only filter selection. Actual color correction follows
+         the named Reels aesthetic, avoiding a second misleading control. -->
+    <select id="filter" hidden style="display:none" aria-hidden="true">
       <option value="none" selected>Без фильтра, сохранять натуральные цвета</option>
       <option value="clean">Чистая студия</option>
       <option value="film">Мягкий плёночный свет</option>
@@ -378,8 +378,6 @@
       <option value="burgundy">🍷 Бургунди: глубокий винный свет</option>
       <option value="pink_tender">🎀 Розовая нежность: пудровый мягкий свет</option>
     </select>
-    <p class="note">Винтаж добавляет настоящее плёночное зерно и затемнение углов к исходному видео. При выборе пресета «Винтажное кино» редактор автоматически подбирает архивные сцены, исходя только из произнесённых слов. Первые секунды остаются чистыми; новые сцены не перекрывают разговорную речь.</p>
-    <p class="note">Для маникюра, где важен точный оттенок гель-лака, выбирай «Без фильтра» или Clean Studio.</p>
     <label class="field" for="pauseRemoval">✂️ Насколько сильно убирать паузы в речи</label>
     <select id="pauseRemoval">
       <option value="tight" selected>Сильно — убрать паузы между словами (рекомендую)</option>
@@ -589,7 +587,7 @@
     byId('next').hidden=current===3;
     if(current===3){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Текст относительно человека',s.subjectLayout==='behind'?'за человеком':s.subjectLayout==='beside'?'рядом с человеком':'обычно'],['Готовый стиль',selectedText('reelsPreset')],['Звуковое оформление',selectedText('soundDesign')],['Выбор эффектов',s.guideEffect==='auto'?'Автоматически по смыслу':s.guideEffect==='off'?'Без дополнительных приёмов':s.guideEffect.startsWith('multi:')?'Мои '+s.guideEffect.slice(6).split(',').length+' приёмов':'Ручная настройка'],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Текст относительно человека',s.subjectLayout==='behind'?'за человеком':s.subjectLayout==='beside'?'рядом с человеком':'обычно'],['Готовый стиль',selectedText('reelsPreset')],['Звуковое оформление',selectedText('soundDesign')],['Выбор эффектов',s.guideEffect==='auto'?'Автоматически по смыслу':s.guideEffect==='off'?'Без дополнительных приёмов':s.guideEffect.startsWith('multi:')?'Мои '+s.guideEffect.slice(6).split(',').length+' приёмов':'Ручная настройка'],['Камера',s.camera],['Звук',s.audio],['Цветокоррекция',s.filter==='Без фильтра, сохранять натуральные цвета'?'Натуральные цвета':s.filter+' (по эстетике)'],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -924,7 +922,19 @@
     burgundy_brown_talk:{variant:'burgundy_brown_talk',big:'old_money',small:'refined',color:'#F5DCD0',scene:'burgundy_brown'}
   };
   byId('reelsPreset').addEventListener('change',function(){
-    var wasVintage=byId('captionVariant').value==='vintage';
+    // Color grade is fully determined by the visible aesthetic choice.
+    // Ordinary/default and custom reels retain the actual gel-polish color.
+    var autoGrade={
+      reference_soft:'none',
+      pink_tender:'pink_tender',
+      old_money:'old_money',
+      vintage_cinema:'vintage',
+      editorial:'clean',
+      contour_talk:'none',
+      burgundy_brown_talk:'burgundy',
+      custom:'none'
+    };
+    byId('filter').value=autoGrade[this.value]||'none';
     var cfg=reelPresets[this.value];
     if(cfg){
       byId('captionVariant').value=cfg.variant;
@@ -934,23 +944,16 @@
       byId('talkScene').value='off'; // Preserve fullscreen speaker for every preset.
       // Each preset chooses matching video colors and semantic animation.
       // The user-selected sound mode stays unchanged across every aesthetic.
-      if(wasVintage && this.value!=='vintage_cinema' &&
-         byId('filter').value==='vintage'){
-        byId('filter').value='none';
-      }
       // Old Money keeps its own subtle semantic cutaways, never the pink preset.
       if(this.value==='old_money'){
-        byId('filter').value='old_money';
         byId('motionInserts').checked=true;
         byId('motionFrequency').value='subtle';
       }
       if(this.value==='pink_tender' || this.value==='burgundy_brown_talk'){
-        byId('filter').value=this.value==='pink_tender'?'pink_tender':'burgundy';
         byId('motionInserts').checked=true;
         byId('motionFrequency').value='balanced';
       }
       if(this.value==='vintage_cinema'){
-        byId('filter').value='vintage';
         byId('motionInserts').checked=true;
         byId('motionFrequency').value='balanced';
       }
@@ -963,7 +966,7 @@
   });
   ['color','fontBig','fontSmall','captionVariant','captionBackground',
    'motionInserts','motionFrequency','assetSfx','subtitleSfx',
-   'captionAnimation','position','subjectLayout','outline','shadow','hookText','subtitleStyle','filter',
+   'captionAnimation','position','subjectLayout','outline','shadow','hookText','subtitleStyle',
    'topTitleText','topTitleMode','previewKeyword'
   ].forEach(function(id){
     byId(id).addEventListener('input',function(){
