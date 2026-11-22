@@ -546,7 +546,7 @@
     byId('next').hidden=current===3;
     if(current===3){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Текст относительно человека',s.subjectLayout==='behind'?'за человеком':s.subjectLayout==='beside'?'рядом с человеком':'обычно'],['Готовый стиль',selectedText('reelsPreset')],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Текст относительно человека',s.subjectLayout==='behind'?'за человеком':s.subjectLayout==='beside'?'рядом с человеком':'обычно'],['Готовый стиль',selectedText('reelsPreset')],['Выбор эффектов',s.guideEffect==='auto'?'Автоматически по смыслу':s.guideEffect==='off'?'Без дополнительных приёмов':s.guideEffect.startsWith('multi:')?'Мои '+s.guideEffect.slice(6).split(',').length+' приёмов':'Ручная настройка'],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -1215,13 +1215,13 @@
       }
       status.textContent='Проверяю, что Cloudflare поддерживает выбранный стиль…';
       var workerHealth=await request('/health','GET');
-      if(workerHealth.style_contract_version!==5){
+      if(workerHealth.style_contract_version!==6){
         byId('workerHealthLink').href=url+'/health';
         byId('workerHealthLink').style.display='inline-block';
         throw new Error(
           'Приложение проверяет адрес '+url+
           '. Версия сервера: '+(workerHealth.style_contract_version??'старая, без номера')+
-          ', требуется версия 5. Сравни адрес с Cloudflare → Workers & Pages → Visit. '+
+          ', требуется версия 6. Сравни адрес с Cloudflare → Workers & Pages → Visit. '+
           'Если отличается, замени адрес в поле «Адрес Cloudflare». '+
           'Если совпадает, проверь публикацию Deploy именно этого Worker.'
         );
@@ -1273,7 +1273,7 @@
              resumed.accepted_talk_scene===settings.talk_scene &&
              resumed.accepted_caption_variant===settings.caption_variant &&
              resumed.accepted_guide_effect===settings.guide_effect &&
-             resumed.style_contract_version===5 &&
+             resumed.style_contract_version===6 &&
               resumed.accepted_insert_style===settings.insert_style){
             id=old.id;
             parts=resumed.input_parts;
@@ -1292,7 +1292,7 @@
           assets:assets.map(function(file){return {name:file.name,size:file.size}}),
           size:totalSize,settings:settings
         }),false);
-        if(start.style_contract_version!==5 ||
+        if(start.style_contract_version!==6 ||
             start.accepted_insert_style!==settings.insert_style ||
            start.accepted_talk_scene!==settings.talk_scene ||
            start.accepted_caption_variant!==settings.caption_variant ||
