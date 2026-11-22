@@ -405,6 +405,7 @@ def write_ass(
         complete = append_top_title(
             complete, top_title, top_title_mode,
             seconds, color=accent_color,
+            studio_scene=(caption_position=="studio"),
         )
         output_ass.write_text(complete, encoding="utf-8")
         return sum(line.startswith("Dialogue: ") for line in complete.splitlines())
