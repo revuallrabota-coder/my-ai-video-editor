@@ -150,7 +150,7 @@ class FourTalkingReelsLooks(unittest.TestCase):
         self.assertIn('option value="burgundy_brown_talk"',html)
         self.assertIn('option value="pistachio"',html)
         self.assertIn('option value="burgundy_brown"',html)
-        self.assertIn('"pistachio","burgundy_brown"',worker)
+        self.assertIn('talk_scene:"off contour cream pistachio burgundy_brown"',worker)
         self.assertIn("supported_talk_scenes:CHOICES.talk_scene.split(\" \")",worker)
         self.assertIn("workerHealth.supported_talk_scenes",html)
         self.assertIn("color:'#F5DCD0'",html)
