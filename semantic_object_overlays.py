@@ -117,3 +117,75 @@ def choose_object_cues(
         if len(selected)>=limit:
             break
     return selected
+
+
+def render_safe_object(source: Path, folder: Path,
+                       cue: ObjectCue, index: int) -> tuple[str, int]:
+    """Render a small, speech-matched RGBA illustration without covering anyone.
+
+    The chosen stationary position must remain free over the entire cue;
+    a dilated per-frame silhouette also cuts out any residual overlap. The
+    caller should simply skip the decoration if segmentation is unavailable.
+    """
+    from PIL import Image, ImageChops, ImageFilter
+    from guide18_fx import FPS, _read_video, _mask_frames
+
+    duration = cue.end - cue.start
+    if duration <= 0 or not cue.path.is_file():
+        raise ValueError("Вставка недоступна или имеет неверное время.")
+    frames = _read_video(source, cue.start, duration)
+    masks = _mask_frames(frames)
+    if not frames or not masks:
+        raise RuntimeError("Не удалось найти силуэт человека для безопасной вставки.")
+
+    width, height = 720, 1280
+    with Image.open(cue.path) as original:
+        art = original.convert("RGBA")
+        art.thumbnail((148, 156), Image.Resampling.LANCZOS)
+    if art.width < 6 or art.height < 6 or not art.getchannel("A").getbbox():
+        raise ValueError("В PNG нет пригодного изображения.")
+    # Do not upscale a tiny JPEG/PNG into a fuzzy sticker.
+    w, h = art.size
+    expanded_masks = [
+        mask.filter(ImageFilter.MaxFilter(47)).resize(
+            (width, height), Image.Resampling.BILINEAR
+        ) for mask in masks
+    ]
+    positions = (
+        (34, 280), (width-w-34, 280),
+        (34, 480), (width-w-34, 480),
+        (34, 700), (width-w-34, 700),
+        (34, 870), (width-w-34, 870),
+    )
+    best = None
+    for x, y in positions:
+        # Worst-frame occupancy, not just the first frame: the speaker moves.
+        occupied = max(
+            sum(mask.crop((x-12, y-12, x+w+12, y+h+12))
+                .histogram()[128:]) / max(1, (w+24)*(h+24))
+            for mask in expanded_masks
+        )
+        key = (occupied, y, x)
+        if best is None or key < best[0]:
+            best = (key, x, y)
+    if best is None or best[0][0] > .025:
+        raise RuntimeError("Нет безопасного места рядом с человеком для PNG.")
+
+    _, x, y = best
+    target = folder / f"safe_object_{index:02d}"
+    target.mkdir(parents=True, exist_ok=True)
+    count = max(1, int(__import__("math").ceil(duration * FPS)))
+    for i in range(count):
+        progress = i / max(1, count-1)
+        opacity = min(1., progress*5.2, (1-progress)*5.3)
+        dy = round(9 * (1-min(1., progress*4)))
+        stage = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        stage.alpha_composite(art, (x, y+dy))
+        # Person's silhouette always wins over the decoration.
+        safe_mask = expanded_masks[min(i, len(expanded_masks)-1)]
+        alpha = ImageChops.subtract(stage.getchannel("A"), safe_mask)
+        if opacity < 1.:
+            alpha = alpha.point(lambda value: round(value*max(0., opacity)))
+        stage.putalpha(alpha)
+        stage.save(target / f"frame_{i:03d}.png", compress_level=2)
+    return str(target/"frame_%03d.png"), count
