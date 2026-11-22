@@ -103,3 +103,46 @@ def make_studio_card(
     draw.line((21,409,w-21,409),fill=(*accent,240),width=5)
     output.parent.mkdir(parents=True,exist_ok=True)
     card.save(output)
+
+
+def make_studio_keyword_asset(
+    output: Path, cue: KineticCue, scene: str, variant: int = 0
+) -> None:
+    """Transparent, speech-driven kinetic lettering, no fixed screenshot.
+
+    The exporting FFmpeg compositor moves, scales and fades the RGBA asset.
+    All displayed words come from the Telegram-approved transcript.
+    """
+    if scene not in PALETTES:
+        raise ValueError("Неизвестный формат анимации.")
+    bg,ink,accent=PALETTES[scene]
+    w,h=600,206
+    canvas=Image.new("RGBA",(w,h),(0,0,0,0))
+    draw=ImageDraw.Draw(canvas)
+    variant%=3
+    if variant==0:
+        draw.rounded_rectangle((12,19,w-13,187),radius=30,
+                               fill=(*bg,222),outline=(*accent,216),width=3)
+        draw.rounded_rectangle((32,172,170,178),radius=3,fill=(*accent,240))
+    elif variant==1:
+        draw.rounded_rectangle((16,39,w-18,163),radius=18,
+                               fill=(*bg,203),outline=(*accent,255),width=3)
+        draw.line((33,171,w-55,171),fill=(*accent,235),width=5)
+        draw.ellipse((w-49,163,w-33,179),fill=(*accent,230))
+    else:
+        draw.rounded_rectangle((6,29,w-7,175),radius=11,
+                               fill=(*bg,230))
+        draw.polygon(((14,175),(80,175),(14,197)),fill=(*bg,210))
+        draw.line((25,28,w-28,28),fill=(*accent,230),width=3)
+    label=cue.label.strip().upper()[:24]
+    size=62
+    font=_font(size)
+    while size>26 and draw.textbbox((0,0),label,font=font)[2]>w-80:
+        size-=2
+        font=_font(size)
+    draw.text((w//2,104),label,anchor="mm",font=font,
+              fill=(*ink,255),stroke_width=1,stroke_fill=(*accent,150))
+    # Editorial movement is rendered in FFmpeg; these original layers are
+    # deliberately clean and readable rather than using random stock titles.
+    output.parent.mkdir(parents=True,exist_ok=True)
+    canvas.save(output)
