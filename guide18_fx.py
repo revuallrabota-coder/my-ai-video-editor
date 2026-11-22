@@ -737,40 +737,92 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
     return str(target/"frame_%03d.png"),count
 
 
-def sound_track(path:Path,events:Sequence[GuideCue],duration:float,rate:int=48000):
-    """Three families of original SFX. Different consecutive events differ.
+# Every semantic animation has a STABLE and distinct sound, rather than
+# alternating random pops/whooshes based on event index.
+EFFECT_SOUND_FAMILY = {
+    "pov_carousel_spin":"pages",
+    "image_cluster_reel":"photo",
+    "split_reel":"compare",
+    "match_cut":"emphasis",
+    "glass_explainer_reel":"glass",
+    "apple_ui_toggles":"steps",
+    "liquid_glass_graph":"graph",
+    "notification_stack":"notify",
+    # Previously published effect IDs remain supported in manual/legacy jobs.
+    "screen_push_digital":"emphasis",
+    "over_shoulder_zoom":"photo",
+    "text_behind_me":"emphasis",
+    "phone_3d_float":"glass",
+    "split_clones":"compare",
+    "sticker_cutout":"photo",
+    "zoom_through_text":"emphasis",
+    "cinematic_type_reel":"emphasis",
+    "cutout_grid_reel":"compare",
+    "depth_ui_reel":"glass",
+}
+SOUND_LENGTH = {
+    "pages":0.32, "photo":0.14, "compare":0.28, "emphasis":0.19,
+    "glass":0.36, "steps":0.34, "graph":0.42, "notify":0.31,
+}
+def sound_family(effect: str) -> str:
+    return EFFECT_SOUND_FAMILY.get(effect,"emphasis")
 
-    No supplied copyrighted sounds are bundled by this guide; these synthetic
-    sounds are optional embellishments over the unchanged spoken audio.
+def sound_track(path:Path,events:Sequence[GuideCue],duration:float,
+                rate:int=48000,style:str="reference_soft"):
+    """Synthesize low-volume context-specific SFX for *rendered* scene cues.
+
+    Original voice/audio remains separate. Theme changes pitch/timbre subtly;
+    clips and licensed recordings must be supplied separately.
     """
+    if rate<8000 or rate>96000:raise ValueError("Invalid audio sample rate")
+    base_volume={"pink_tender":0.038,"old_money":0.048,"burgundy":0.053,
+                 "vintage":0.047}.get(style,0.060)
+    pitch={"pink_tender":1.28,"old_money":0.88,"burgundy":0.79,
+           "vintage":0.78}.get(style,1.)
     total=max(1,int(duration*rate))
     track=array("h",[0])*total
-    previous=-1
     for index,event in enumerate(events):
-        family=index%3
-        if event.effect in ("screen_push_digital","match_cut","zoom_through_text"):
-            family=(index+1)%3
-        if family==previous:
-            family=(family+1)%3
-        previous=family
+        family=sound_family(event.effect)
         start=max(0,int(event.start*rate))
-        length=min(total-start,int((.25,.4,.19)[family]*rate))
-        for i in range(max(0,length)):
+        if start>=total:continue
+        length=min(total-start,int(SOUND_LENGTH[family]*rate))
+        for i in range(length):
             t=i/rate
-            seed=(i*1664525+1013904223+index*13731)&0xFFFFFFFF
-            noise=((seed>>8)/16777216.0)*2-1
-            if family==0:  # soft whoosh
-                envelope=math.sin(math.pi*i/max(1,length))**1.6
-                wavevalue=noise*.85+math.sin(2*math.pi*(410+700*t)*t)*.15
-            elif family==1: # tactile typewriter ticks
-                pulse=t%.065
-                envelope=math.exp(-pulse*92)
-                wavevalue=noise*.68+math.sin(2*math.pi*1150*t)*.32
-            else: # pop/snap, not another whoosh
-                envelope=(1-math.exp(-t*100))*math.exp(-t*22)
-                wavevalue=math.sin(2*math.pi*(820-550*t)*t)
-            track[start+i]=max(-32767,min(32767,track[start+i]+
-                round(32767*.065*envelope*wavevalue)))
+            u=i/max(1,length)
+            seed=(i*1664525+1013904223+index*13471)&0xFFFFFFFF
+            noise=((seed>>8)/16777216.)*2-1
+            if family=="pages":  # a soft, tactile 3-card shuffle
+                env=math.sin(math.pi*u)**1.7
+                value=.83*noise+.17*math.sin(2*math.pi*(330+120*u)*pitch*t)
+            elif family=="photo":  # a discrete gentle shutter-like tick
+                env=(1-math.exp(-t*200))*math.exp(-t*36)
+                value=.6*noise+.4*math.sin(2*math.pi*570*pitch*t)
+            elif family=="compare": # two distinct, quiet A/B taps
+                phase=t%.13
+                env=math.exp(-phase*65)*(.9 if t<.13 else .67)
+                value=.25*noise+.75*math.sin(2*math.pi*640*pitch*t)
+            elif family=="emphasis": # one warm emphasis beat
+                env=(1-math.exp(-t*130))*math.exp(-t*26)
+                value=.15*noise+.85*math.sin(2*math.pi*(560-250*u)*pitch*t)
+            elif family=="glass": # lightly resonant chime for an explanation
+                env=(1-math.exp(-t*100))*math.exp(-t*12)
+                value=.72*math.sin(2*math.pi*780*pitch*t)+.28*math.sin(2*math.pi*1170*pitch*t)
+            elif family=="steps": # three muted sequential clicks
+                phase=t%.11
+                env=math.exp(-phase*82)*(.8 if t<.11 else .59)
+                value=.43*noise+.57*math.sin(2*math.pi*690*pitch*t)
+            elif family=="graph": # a restrained ascending tone
+                env=math.sin(math.pi*u)**1.9
+                value=.74*math.sin(2*math.pi*(490+380*u)*pitch*t)+.26*math.sin(2*math.pi*950*pitch*t)
+            else: # notify: two low and unobtrusive alert sounds
+                phase=t%.17
+                env=math.exp(-phase*23)*(.8 if t<.17 else .53)
+                value=.82*math.sin(2*math.pi*690*pitch*t)+.18*math.sin(2*math.pi*1010*pitch*t)
+            # No sound plays when a semantic animation was skipped by renderer.
+            volume=base_volume*(.65 if style=="pink_tender" and family=="photo" else 1.)
+            position=start+i
+            track[position]=max(-32760,min(32760,
+                track[position]+round(32767*volume*env*value)))
     path.parent.mkdir(parents=True,exist_ok=True)
     with wave.open(str(path),"wb") as f:
         f.setnchannels(1);f.setsampwidth(2);f.setframerate(rate)
