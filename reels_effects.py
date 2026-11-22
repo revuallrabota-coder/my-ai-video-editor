@@ -384,10 +384,12 @@ def apply_effects(
         "phone":"📱","next":"➡️",
     }
     # No stickers merely for saying a generic "маникюр" or "видео".
-    cues=([(c.start,semantic_emojis.get(c.kind)) for c in semantic_cues]
-          if studio_mode or insert_style=="reference_soft"
-          else [(t,symbol) for t,symbol in pick_cues(words,duration)
-                if t>=intro_clear_seconds])
+    # Period-accurate vintage uses hand-drawn objects rather than modern emoji.
+    cues=([] if insert_style=="vintage" else
+          [(c.start,semantic_emojis.get(c.kind)) for c in semantic_cues]
+          if studio_mode or insert_style=="reference_soft" else
+          [(t,symbol) for t,symbol in pick_cues(words,duration)
+           if t>=intro_clear_seconds])
     caption_cues = (pick_caption_cues(
                         words,duration,
                         style=caption_sound
@@ -419,7 +421,7 @@ def apply_effects(
                     used_phrases.add(k)
                     break
     if (sound == "off" and not visual and not caption_cues
-            and not retro and not motion_cues and not studio_cues
+            and not retro and not vintage_cues and not motion_cues and not studio_cues
             and not guide_cues and not object_cues and not (private_assets and any(
                 c.kind in private_assets.icons for c in semantic_cues))):
         source.replace(target)
