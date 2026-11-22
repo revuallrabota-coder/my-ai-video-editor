@@ -366,6 +366,9 @@
       <p class="note">Исходные ролики загрузятся частями. Бот пришлёт текст речи на проверку, а готовый Reels отправит прямо в Telegram. Большой исходный MP4 сохранится отдельно без лишнего сжатия, если поддерживает хранилище.</p>
       <label class="field" for="launcherBase">Адрес Cloudflare (настраивается один раз)</label>
       <input id="launcherBase" type="url" inputmode="url" autocomplete="off" placeholder="https://твой-worker.workers.dev" style="width:100%;max-width:100%">
+      <button class="btn secondary" id="checkWorkerConnection" type="button" style="width:100%;margin-top:10px">🔍 Проверить подключённый Cloudflare</button>
+      <p class="mini" id="workerConnectionResult" role="status" aria-live="polite">Нажми проверку: покажу адрес и версию Worker, к которому подключено приложение.</p>
+      <a id="workerHealthLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none">Открыть /health в Safari</a>
       <button class="btn primary" id="upload50Button" type="button" style="width:100%;margin-top:12px">🎬 Смонтировать Reels</button>
       <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
       <p class="mini" id="upload50Status" role="status" aria-live="polite">Поддержка до 500 МБ требует подключённого Cloudflare KV. Видео сохраняем в Full HD.</p>
@@ -847,6 +850,62 @@
   // Worker не получает видео; после запуска пришли файл в Telegram-чат бота.
   var launcherInput=byId('launcherBase');
   try{launcherInput.value=localStorage.getItem('personalEditorLauncher')||''}catch(ignore){}
+  function connectedWorkerURL(){
+    var url=launcherInput.value.trim().replace(/\\/+$/,'');
+    if(!/^https:\\/\\/[a-z0-9.-]+\\.workers\\.dev$/i.test(url)){
+      throw new Error('Впиши настоящий адрес Worker из Cloudflare → Visit, без /health.');
+    }
+    return url;
+  }
+  async function checkWorkerConnection(){
+    var out=byId('workerConnectionResult');
+    var url=connectedWorkerURL();
+    var link=byId('workerHealthLink');
+    link.href=url+'/health';
+    link.style.display='inline-block';
+    out.textContent='🔎 Проверяю '+url+'…';
+    var response=await fetch(url+'/health?check='+Date.now(),{cache:'no-store'});
+    var data={};
+    try{data=await response.json()}catch(ignore){}
+    if(!response.ok){
+      throw new Error('Worker '+url+' вернул HTTP '+response.status+'. Проверь адрес кнопки Visit.');
+    }
+    var version=data.style_contract_version;
+    if(data.status!=='online'){
+      throw new Error('По адресу '+url+' отвечает не наш монтажёр.');
+    }
+    out.style.whiteSpace='pre-line';
+    if(version!==3){
+      out.textContent='⚠️ Приложение проверяет: '+url+
+        '\\nВерсия по этому адресу: '+(version==null?'старая, без номера':version)+
+        '. Нужна версия 3.\\nСравни этот адрес с Cloudflare → Workers & Pages → Visit. '+
+        'Если отличаются, вставь адрес обновлённого Worker. '+
+        'Если совпадают, обновление не опубликовано на этом адресе.';
+      return false;
+    }
+    if(data.uploads_500mb_configured!==true){
+      out.textContent='⚠️ Версия 3 активна: '+url+
+        '. Но не подключено KV-хранилище UPLOADS.';
+      return false;
+    }
+    try{localStorage.setItem('personalEditorLauncher',url)}catch(ignore){}
+    out.textContent='✅ Подключение правильное!\\nWorker: '+url+
+      '\\nВерсия: 3 · загрузка до 500 МБ настроена. Можно монтировать.';
+    return true;
+  }
+  byId('checkWorkerConnection').addEventListener('click',async function(){
+    var button=this;
+    if(button.disabled)return;
+    button.disabled=true;
+    try{await checkWorkerConnection()}
+    catch(err){byId('workerConnectionResult').textContent='⚠️ '+String(err.message||err)}
+    finally{button.disabled=false}
+  });
+  launcherInput.addEventListener('input',function(){
+    byId('workerConnectionResult').textContent=
+      'Адрес изменён. Нажми «Проверить подключённый Cloudflare».';
+    byId('workerHealthLink').style.display='none';
+  });
   byId('launchWithoutCard').addEventListener('click',async function(){
     var button=byId('launchWithoutCard');
     var status=byId('launchStatus');
@@ -995,10 +1054,7 @@
     var progress=byId('upload50Progress');
     if(btn.disabled)return;
     try{
-      var url=launcherInput.value.trim().replace(/\/+$/,'');
-      if(!/^https:\/\/[a-z0-9.-]+\.workers\.dev$/i.test(url)){
-        throw new Error('Сначала укажи адрес своего Cloudflare Worker ниже, без /health.');
-      }
+      var url=connectedWorkerURL();
       var auth=telegramProof();
       var videos=selectedClips.slice();
       if(videos.length<1 || videos.length>12)
@@ -1044,11 +1100,14 @@
       status.textContent='Проверяю, что Cloudflare поддерживает выбранный стиль…';
       var workerHealth=await request('/health','GET');
       if(workerHealth.style_contract_version!==3){
+        byId('workerHealthLink').href=url+'/health';
+        byId('workerHealthLink').style.display='inline-block';
         throw new Error(
-          'На Cloudflare опубликована старая версия монтажёра. '+
-          'Скопируй свежий cloudflare_launcher.js из GitHub, '+
-          'в Cloudflare нажми Edit code → Deploy. '+
-          'Пока версия не обновлена, видео не загружаю, чтобы не получать неправильный стиль.'
+          'Приложение проверяет адрес '+url+
+          '. Версия сервера: '+(workerHealth.style_contract_version??'старая, без номера')+
+          ', требуется версия 3. Сравни адрес с Cloudflare → Workers & Pages → Visit. '+
+          'Если отличается, замени адрес в поле «Адрес Cloudflare». '+
+          'Если совпадает, проверь публикацию Deploy именно этого Worker.'
         );
       }
       if(!Array.isArray(workerHealth.supported_talk_scenes) &&
