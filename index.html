@@ -912,8 +912,8 @@
     showPreviewPhoto(null);
   });
   byId('replayPreview').addEventListener('click',replaySample);
-  // Presets modify *only* visual typography: no audio, camera, pause, or
-  // semantic editing setting changes when a style is selected.
+  // Presets control the visual aesthetic; the unified sound design is
+  // independent, unless its automatic mode resolves ambience from the style.
   var reelPresets={
     reference_soft:{variant:'reference_soft',big:'old_money',small:'refined',color:'#E8A4B5',scene:'off'},
     pink_tender:{variant:'reference_soft',big:'vintage',small:'refined',color:'#C787A8',scene:'off'},
@@ -932,9 +932,8 @@
       byId('fontSmall').value=cfg.small;
       byId('color').value=cfg.color;
       byId('talkScene').value='off'; // Preserve fullscreen speaker for every preset.
-      // Only choosing the full Vintage preset activates its own film color,
-      // old typewriter accents, and motion engine. Other styles retain user
-      // choices and the same non-destructive subtitle/effect controls.
+      // Each preset chooses matching video colors and semantic animation.
+      // The user-selected sound mode stays unchanged across every aesthetic.
       if(wasVintage && this.value!=='vintage_cinema' &&
          byId('filter').value==='vintage'){
         byId('filter').value='none';
@@ -955,8 +954,8 @@
         byId('motionInserts').checked=true;
         byId('motionFrequency').value='balanced';
       }
-      // Scene and typography never overwrite the user's audio, animation
-      // density, filters, source speed or whether effects are enabled.
+      // Aesthetic choice does not override the unified sound mode, original
+      // voice, source speed or manual subtitle placement.
       // Every curated look uses the same gentle, mixed-size caption renderer.
       byId('subtitleStyle').value='reference_dynamic';
     }
