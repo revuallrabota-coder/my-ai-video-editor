@@ -1041,7 +1041,7 @@
       }
       status.textContent='Проверяю, что Cloudflare поддерживает выбранный стиль…';
       var workerHealth=await request('/health','GET');
-      if(workerHealth.style_contract_version!==2){
+      if(workerHealth.style_contract_version!==3){
         throw new Error(
           'На Cloudflare опубликована старая версия монтажёра. '+
           'Скопируй свежий cloudflare_launcher.js из GitHub, '+
@@ -1095,7 +1095,7 @@
              resumed.input_parts===uploadParts.length &&
              resumed.accepted_talk_scene===settings.talk_scene &&
              resumed.accepted_caption_variant===settings.caption_variant &&
-             resumed.style_contract_version===2){
+             resumed.style_contract_version===3){
             id=old.id;
             parts=resumed.input_parts;
             (resumed.uploaded_parts||[]).forEach(function(i){completed.add(i)});
@@ -1113,7 +1113,7 @@
           assets:assets.map(function(file){return {name:file.name,size:file.size}}),
           size:totalSize,settings:settings
         }),false);
-        if(start.style_contract_version!==2 ||
+        if(start.style_contract_version!==3 ||
            start.accepted_talk_scene!==settings.talk_scene ||
            start.accepted_caption_variant!==settings.caption_variant){
           throw new Error(
