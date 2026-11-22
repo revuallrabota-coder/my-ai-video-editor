@@ -305,7 +305,7 @@ def apply_effects(
     sy=frame_height/1280
     from retro_inserts import choose_retro_cues, make_retro_card, make_retro_sound_track
     from reference_motion_scenes import select_motion_cues, make_motion_assets
-    from studio_kinetic import select_studio_cues, make_studio_card
+    from studio_kinetic import select_studio_cues, make_studio_card, make_studio_keyword_asset
     from semantic_editing import choose_semantic_cues
     semantic_cues=(choose_semantic_cues(
                        words,duration,"subtle" if studio_mode else insert_density
@@ -480,8 +480,41 @@ def apply_effects(
         # Each short animated card contains an authentic frame from the
         # user's clean footage and a word from the approved transcript.
         studio_insert_count = 0
+        kinetic_word_count = 0
         if studio_cues:
-            for i,cue in enumerate(studio_cues):
+            # Large original kinetic word graphics across the live footage,
+            # not a static mini-screenshot at the right edge. Alternate
+            # positions and timing by the real speech, retaining 9:16.
+            for i,cue in enumerate(studio_cues[:10]):
+                headline=folder/f"kinetic_keyword_{i}.png"
+                make_studio_keyword_asset(headline,cue,studio_scene,i)
+                start,end=cue.start,cue.end
+                args.extend(["-loop","1","-framerate","30","-i",str(headline)])
+                glyph=f"[wordmotion{i}]"
+                glyph_w=round(520*sx)
+                glyph_h=round(179*sy)
+                filters.append(
+                    f"[{current_input}:v]scale={glyph_w}:{glyph_h},"
+                    f"format=rgba,fade=t=in:st={start:.3f}:d=0.24:alpha=1,"
+                    f"fade=t=out:st={max(start+.32,end-.26):.3f}:"
+                    f"d=0.22:alpha=1{glyph}"
+                )
+                direction=1 if i%2 else -1
+                word_x=(f"(main_w-overlay_w)/2+{direction*round(55*sx)}*"
+                        f"max(0,1-(t-{start:.3f})*3.2)")
+                word_y=(f"main_h*{.34 if i%2 else .46}-overlay_h/2+"
+                        f"{round(20*sy)}*max(0,1-(t-{start:.3f})*3)")
+                stage=f"[wordstage{i}]"
+                filters.append(
+                    f"{prev}{glyph}overlay=x='{word_x}':y='{word_y}':"
+                    f"enable='between(t,{start:.3f},{end:.3f})':"
+                    f"shortest=1{stage}"
+                )
+                prev=stage
+                current_input+=1
+                kinetic_word_count+=1
+            insert_count+=kinetic_word_count
+            for i,cue in enumerate(studio_cues[:10]):
                 asset=folder/f"editorial_insert_{i}.png"
                 try:
                     make_studio_card(insert_source or source,asset,cue,studio_scene)
@@ -490,8 +523,10 @@ def apply_effects(
                     continue
                 args.extend(["-loop","1","-framerate","30","-i",str(asset)])
                 start,end=cue.start,cue.end
-                width=max(180,round(290*sx))
-                height=max(220,round(356*sy))
+                # No fixed tiny thumbnail: alternate larger left/right
+                # moving footage and variable editorial crop sizes.
+                width=max(185,round((334 if i%2==0 else 284)*sx))
+                height=max(230,round((405 if i%2==0 else 340)*sy))
                 name=f"[kinetic{i}]"
                 filters.append(
                     f"[{current_input}:v]scale={width}:{height},format=rgba,"
@@ -501,8 +536,10 @@ def apply_effects(
                 )
                 stage=f"[kineticstage{i}]"
                 travel=f"{round(75*sx)}*max(0,1-(t-{start:.3f})*3.2)"
-                target_x=f"main_w-overlay_w-{round(22*sx)}"
-                target_y=f"main_h-overlay_h-{round(122*sy)}"
+                right_side=(i%2==0)
+                target_x=(f"main_w-overlay_w-{round(22*sx)}"
+                          if right_side else f"{round(22*sx)}")
+                target_y=f"main_h-overlay_h-{round((125 if i%2==0 else 175)*sy)}"
                 filters.append(
                     f"{prev}{name}overlay=x='{target_x}+{travel}':"
                     f"y='{target_y}+{round(18*sy)}*"
@@ -538,8 +575,8 @@ def apply_effects(
                     f"fade=t=out:st={max(start+.22,end-.23):.3f}:"
                     f"d=0.22:alpha=1{live}"
                 )
-                live_x=(f"main_w-{width}-{round(22*sx)}+{left}+{travel}")
-                live_y=(f"main_h-{height}-{round(122*sy)}+{top}+"
+                live_x=f"({target_x})+{left}+{travel}"
+                live_y=(f"({target_y})+{top}+"
                         f"{round(18*sy)}*max(0,1-(t-{start:.3f})*3.2)")
                 moving_stage=f"[movingstage{i}]"
                 filters.append(
@@ -713,6 +750,7 @@ def apply_effects(
         args.extend(["-t",f"{duration:.3f}","-movflags","+faststart",str(target)])
         execute(args)
         return {"emoji_count":emoji_count, "sfx_count":sfx_count,
+                "kinetic_word_count":kinetic_word_count,
                 "caption_sfx_count":caption_sfx_count,
                 "insert_count":insert_count+scene_count+private_icon_count,
                 "insert_sfx_count":insert_sfx_count,
