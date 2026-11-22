@@ -17,7 +17,7 @@ const CHOICES = {
   mode:"my_style auto captions cuts reference",
   subtitle_style:"reference_dynamic signature contrast classic signature_phrases contrast_phrases classic_phrases",
   camera_style:"cinematic_pan editorial soft_punch enhanced gentle off",
-  video_filter:"none warm soft cool contrast clean film matte old_money vintage street elegant",
+  video_filter:"none warm soft cool contrast clean film matte old_money burgundy pink_tender vintage street elegant",
   caption_position:"top middle bottom",
   font_profile:"elegant clean bold bebas platform bubble script modern old_money vintage street refined roboto open_sans noto_sans ubuntu carlito lato_black modern_condensed",
   audio_profile:"off balanced strong",
