@@ -539,13 +539,17 @@ def main() -> None:
                 )
             # A 40-second speaking Reels with explicitly selected cutaways
             # must not silently export as a static branded template.
+            # No relevant noun or visual concept means a CLEAN talking Reels,
+            # not an export failure. Do not require a made-up animation merely
+            # because the default automatic mode is switched on.
             if (talk_scene!="off" and
                 str(config.get("insert_style","reference_soft"))!="off" and
+                str(config.get("guide_effect","auto")) not in ("auto","off") and
                 len(words)>=10 and float(stats.get("after",0))>=12 and
                 int(stats.get("insert_count",0))<1):
                 raise RuntimeError(
-                    "Ты выбрала анимированные вставки, но рендер их не создал. "
-                    "Отправка статичного шаблона остановлена."
+                    "Ты выбрала конкретный приём, но рендер его не создал. "
+                    "Отправка неполного монтажа остановлена."
                 )
             if (str(config.get("subtitle_sfx","soft"))=="typewriter" and
                 len(words)>=6 and int(stats.get("caption_sfx_count",0))<1):
