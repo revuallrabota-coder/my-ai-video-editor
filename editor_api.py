@@ -160,6 +160,8 @@ def validate_settings(config: dict) -> dict:
     subtitle_sfx=option("subtitle_sfx",{
         "off","soft","tick","typewriter"
     },"soft")
+    from guide18_fx import EFFECTS
+    guide_effect=option("guide_effect",set(EFFECTS)|{"off","auto"},"auto")
     retro_default=caption_variant
     insert_style=option("insert_style",{
         "off","retro","old_money","vintage","elegant","street",
@@ -202,6 +204,7 @@ def validate_settings(config: dict) -> dict:
         "talk_scene":talk_scene,
         "subtitle_sfx":subtitle_sfx,
         "insert_style":insert_style,
+        "guide_effect":guide_effect,
         "insert_density":insert_density,
         "insert_sound":insert_sound,
         "pause_removal":pause_removal,
@@ -299,6 +302,7 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 subtitle_sfx=s["subtitle_sfx"],
                 top_title=s["top_title"],top_title_mode=s["top_title_mode"],
                 insert_style=s["insert_style"],
+                guide_effect=s["guide_effect"],
                 insert_density=s["insert_density"],
                 insert_sound=s["insert_sound"],
                 pause_removal=s["pause_removal"],
@@ -321,6 +325,7 @@ def render(job: Job, words: list[tuple[float, float, str]]) -> None:
                 pause_removal=s["pause_removal"],
                 subject_layout=s["subject_layout"],
                 talk_scene=s["talk_scene"],
+                guide_effect=s["guide_effect"],
             )
         if str(result.get("talk_scene", "off")) != s["talk_scene"]:
             raise RuntimeError(
