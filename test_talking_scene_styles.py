@@ -111,6 +111,15 @@ class TwoTalkingReelsLooks(unittest.TestCase):
         self.assertIn("talk_scene:s.talkScene",html)
         self.assertIn("talk_scene: talkScene",worker)
         self.assertIn('config.get("talk_scene","off")',process)
+        self.assertIn("style_contract_version:2",worker)
+        self.assertIn("accepted_talk_scene:settings.talk_scene",worker)
+        self.assertIn("workerHealth.style_contract_version!==2",html)
+        self.assertIn("start.accepted_talk_scene!==settings.talk_scene",html)
+        renderer=(repo/"reference_editor.py").read_text("utf-8")
+        standard=(repo/"telegram_editor.py").read_text("utf-8")
+        self.assertIn('insert_style="off" if talk_scene!="off"',renderer)
+        self.assertIn('insert_style="off" if talk_scene!="off"',standard)
+        self.assertIn('if insert_style != "off":',renderer)
 
 
 if __name__=="__main__":
