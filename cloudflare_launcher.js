@@ -453,6 +453,9 @@ async function workerUploadRoute(request, env, path) {
       input_assets:(meta.assets||[]).map(f=>({name:f.name,size:f.size})),
       uploaded_parts:[...uploaded].sort((a,b)=>a-b),
       state:meta.state,
+      accepted_talk_scene:meta.settings?.talk_scene??"off",
+      accepted_caption_variant:meta.settings?.caption_variant??"reference_soft",
+      style_contract_version:2,
       stage:latest?.stage??(meta.state==="uploading"?"uploading":
                            meta.state==="done"?"done":"queued"),
       stage_label:latest?.message??(meta.state==="uploading"
@@ -553,7 +556,12 @@ async function workerUploadRoute(request, env, path) {
         created:Date.now(),expires_at:Date.now()+UPLOAD_TTL*1000}),
       {expirationTtl:UPLOAD_TTL}
     );
-    return json({upload_id:id,chunk_size:UPLOAD_PART_BYTES,parts},201);
+    return json({
+      upload_id:id,chunk_size:UPLOAD_PART_BYTES,parts,
+      accepted_talk_scene:settings.talk_scene,
+      accepted_caption_variant:settings.caption_variant,
+      style_contract_version:2
+    },201);
   }
 
   const partPath=path.match(/^\/upload\/([a-f0-9-]{36})\/(\d+)$/);
@@ -637,7 +645,7 @@ export default {
          uploads_300mb_configured: Boolean(env.UPLOADS),
          uploads_500mb_configured: Boolean(env.UPLOADS),
          max_upload_mb: 500,max_files:MAX_UPLOAD_FILES,
-         retention_days:3,status_tracking:true });
+         retention_days:3,status_tracking:true,style_contract_version:2 });
     }
     if (path.startsWith("/internal/upload/")) {
       return workerUploadRoute(request, env, path);
