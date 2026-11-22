@@ -130,118 +130,76 @@ def render_scene(source: Path, output: Path, name: str,
             )
 
 
-def append_scene_ornaments(ass_file: Path,
-                           words: list[tuple[float,float,str]],
-                           name: str) -> None:
-    """Add tasteful fading word-stickers and hand-drawn arcs.
+def append_scene_ornaments(
+    ass_file: Path,
+    words: list[tuple[float, float, str]],
+    name: str,
+) -> int:
+    """Add at most a few *speech-grounded* stickers in the unused top area.
 
-    Sticker labels come solely from the transcript, not generated claims.
-    Pure ASS graphics share the same timeline as existing moving captions.
+    No periodic stickers, random words, fake phone screenshots, big retro cards
+    or icons based on generic job titles. Optional scene embellishments must
+    always have a specific conversational reason. Timings follow approved
+    transcript; no effect is allowed to cover the speaker's arched portrait.
     """
     validate_talk_scene(name)
-    if name=="off" or not words:
-        return
-    script=ass_file.read_text("utf-8")
-    if "[Events]" not in script:
+    if name == "off" or not words:
+        return 0
+    from semantic_editing import choose_semantic_cues
+    duration = max(float(end) for _, end, _ in words)
+    cues = choose_semantic_cues(words, duration, density="subtle")
+    if not cues:
+        return 0
+    script = ass_file.read_text("utf-8")
+    if "\n[Events]" not in script:
         raise ValueError("Нет секции Events в субтитрах.")
-    dark=(name=="cream")
-    ink=ass_color("#171711" if dark else "#FFFFFF")
-    panel=ass_color("#171711" if not dark else "#FFFFFF")
-    panel_text=ass_color("#FFF8D8" if not dark else "#161611")
-    # Add styles before [Events], so stickers work with all existing presets.
-    definition=(
-        f"Style: TalkBadge,Lato,24,{panel_text},{panel_text},"
+    dark = name == "cream"
+    ink = ass_color("#1F2420" if dark else "#FFF6E6")
+    sticker = ass_color("#262F2A" if not dark else "#FDF8E8")
+    letters = ass_color("#FFF6E6" if not dark else "#252520")
+    definition = (
+        f"Style: TalkBadge,Lato,24,{letters},{letters},"
         "&H00000000,&H00000000,1,0,0,0,100,100,"
         "0,0,1,0,0,5,20,20,10,1\n"
         f"Style: TalkDraw,DejaVu Sans,20,{ink},{ink},"
         f"{ink},&H00000000,0,0,0,0,100,100,"
         "0,0,1,0,0,5,0,0,0,1\n"
     )
-    script=script.replace("\n[Events]", "\n"+definition+"\n[Events]",1)
-    groups=phrase_groups(words)
+    script=script.replace("\n[Events]", "\n"+definition+"\n[Events]", 1)
     events=[]
-    for i,group in enumerate(groups):
-        if i%3!=1 or not group:
+    max_badges = 1 if duration < 15 else 2 if duration < 45 else 3
+    last=-100.0
+    for cue in cues:
+        if len(events)//2>=max_badges or cue.start-last<5.0:
             continue
-        start=max(0.0,group[0][0]+.10)
-        end=max(start+.65,min(group[-1][1]+.40,start+2.0))
-        candidate=max(group,key=lambda entry:len(safe_text(entry[2])))
-        word=safe_text(candidate[2]).upper().strip()
-        if not word or len(word)>14:
+        # Label is the *actual spoken word* recognized and checked in Telegram.
+        label=safe_text(cue.label).upper()
+        if not label or len(label)>13:
             continue
-        width=max(95,min(205,round(len(word)*15+37)))
-        x=128 if i%2 else 580
-        y=423 if name=="contour" else 430
-        x0=x-width//2
-        fill=panel
-        alpha=(r"\an7\p1\bord0\blur.4"
-               +rf"\1c{fill}\fad(260,230)"
-               +rf"\move({x0},{y-16},{x0},{y},0,260)")
-        pill=oval_path(width,48)
+        start=max(0.0, cue.start)
+        end=min(duration, start+1.3)
+        if end-start<.45:
+            continue
+        width=max(86,min(183, int(len(label)*13+38)))
+        center_x=139 if len(events)%4==0 else 578
+        y=383
+        x=center_x-width//2
+        pill=oval_path(width,46)
+        capsule=(r"\an7\p1\bord0\blur.4"
+                 +rf"\1c{sticker}\fad(270,220)"
+                 +rf"\move({x},{y+8},{x},{y},0,290)")
         events.append(
             f"Dialogue: 1,{ass_time(start)},{ass_time(end)},"
-            f"TalkDraw,,0,0,0,,{{{alpha}}}{pill}{{\\p0}}\n"
+            f"TalkDraw,,0,0,0,,{{{capsule}}}{pill}{{\\p0}}\n"
         )
-        text_prefix=(
-            r"\an5"+rf"\pos({x},{y+24})"
-            +rf"\fad(280,230)\fs{max(15,24-round(max(0,len(word)-9)*1.5))}"
-            +rf"\c{panel_text}\blur.15"
-        )
+        tag=(rf"\an5\pos({center_x},{y+23})"
+             +rf"\fad(280,240)\fs{21 if len(label)<10 else 17}"
+             +rf"\c{letters}\blur.15")
         events.append(
             f"Dialogue: 2,{ass_time(start)},{ass_time(end)},"
-            f"TalkBadge,,0,0,0,,{{{text_prefix}}}{word}\n"
+            f"TalkBadge,,0,0,0,,{{{tag}}}{label}\n"
         )
-        # Hand-drawn accent: one gently animated curved stroke, not a
-        # constantly flashing graphic or a giant opaque rectangle.
-        if i%2==1:
-            path="m 0 16 b 29 -6 63 -3 91 16 b 108 29 133 22 155 2"
-            cx=425 if dark else 380
-            stroke=(r"\an7\p1\1a&HFF&\bord2.6"
-                    +rf"\3c{ink}\blur.6"
-                    +rf"\move({cx-7},363,{cx},360,0,320)"
-                    +r"\fad(270,280)")
-            events.append(
-                f"Dialogue: 1,{ass_time(start)},{ass_time(end)},"
-                f"TalkDraw,,0,0,0,,{{{stroke}}}{path}{{\\p0}}\n"
-            )
-    if name=="cream":
-        # An original stylized mini-interface, not a screenshot of a third-party
-        # app. It appears only if the actual speech mentions an app, bot,
-        # video, upload or subtitles. No misleading random insert cards.
-        shown=0
-        for group in groups:
-            if shown>=2:break
-            matched=next((
-                safe_text(raw).upper() for _,_,raw in group
-                if any(stem in safe_text(raw).lower() for stem in
-                       ("бот","монтаж","видео","прилож","загруз","субтитр"))
-            ),None)
-            if not matched or len(matched)>13:
-                continue
-            start=max(0.,float(group[0][0]))
-            end=min(start+2.3,max(start+1.1,float(group[-1][1])+.55))
-            origin_x,origin_y=504,465
-            bg=(r"\an7\p1\bord1\blur1"
-                +r"\1c&H00F9F7F2&\3c&H00B9B5A5&"
-                +r"\fad(320,280)"
-                +rf"\move({origin_x+15},{origin_y+12},{origin_x},{origin_y},0,360)")
-            events.append(
-                f"Dialogue: 3,{ass_time(start)},{ass_time(end)},"
-                f"TalkDraw,,0,0,0,,{{{bg}}}{oval_path(172,215)}{{\\p0}}\n"
-            )
-            text_tag=(r"\an5\c&H00282317&\b1\fs19"
-                      +rf"\pos({origin_x+86},{origin_y+61})\fad(380,280)")
-            events.append(
-                f"Dialogue: 4,{ass_time(start)},{ass_time(end)},"
-                f"TalkBadge,,0,0,0,,{{{text_tag}}}{matched}\n"
-            )
-            # Simple animated pink action bar in the mockup.
-            btn=(r"\an7\p1\bord0"
-                 +r"\1c&H00712BCD&\fad(430,330)"
-                 +rf"\pos({origin_x+20},{origin_y+140})")
-            events.append(
-                f"Dialogue: 4,{ass_time(start)},{ass_time(end)},"
-                f"TalkDraw,,0,0,0,,{{{btn}}}{oval_path(132,29)}{{\\p0}}\n"
-            )
-            shown+=1
-    ass_file.write_text(script+"".join(events),encoding="utf-8")
+        last=start
+    if events:
+        ass_file.write_text(script+"".join(events), encoding="utf-8")
+    return len(events)//2
