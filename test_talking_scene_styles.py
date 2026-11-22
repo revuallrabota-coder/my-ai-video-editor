@@ -170,7 +170,7 @@ class FourTalkingReelsLooks(unittest.TestCase):
         self.assertIn('config.get("talk_scene","off")',process)
         self.assertIn("style_contract_version:CONTRACT",worker)
         self.assertIn("accepted_talk_scene:settings.talk_scene",worker)
-        self.assertIn("workerHealth.style_contract_version!==3",html)
+        self.assertIn("workerHealth.style_contract_version!==4",html)
         self.assertIn("start.accepted_talk_scene!==settings.talk_scene",html)
         renderer=(repo/"reference_editor.py").read_text("utf-8")
         standard=(repo/"telegram_editor.py").read_text("utf-8")
