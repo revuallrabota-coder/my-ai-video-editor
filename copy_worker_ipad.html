@@ -62,10 +62,10 @@ fetch("./cloudflare_launcher.js?copy="+Date.now(),{cache:"no-store"})
   return response.text();
 })
 .then(function(code){
-  if(!code.includes("style_contract_version:2") ||
+  if(!code.includes("style_contract_version:CONTRACT") ||
      !code.includes("pistachio") ||
      !code.includes("burgundy_brown") ||
-     !code.includes("export default")){
+     !code.includes("export default") || !code.includes("const CONTRACT = 2")){
     throw new Error("Получена устаревшая или неполная версия кода");
   }
   fullCode=code;
