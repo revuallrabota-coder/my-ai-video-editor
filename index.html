@@ -965,6 +965,16 @@
         if(!response.ok)throw new Error(data.error||('Cloudflare ответил HTTP '+response.status));
         return data;
       }
+      status.textContent='Проверяю, что Cloudflare поддерживает выбранный стиль…';
+      var workerHealth=await request('/health','GET');
+      if(workerHealth.style_contract_version!==2){
+        throw new Error(
+          'На Cloudflare опубликована старая версия монтажёра. '+
+          'Скопируй свежий cloudflare_launcher.js из GitHub, '+
+          'в Cloudflare нажми Edit code → Deploy. '+
+          'Пока версия не обновлена, видео не загружаю, чтобы не получать неправильный стиль.'
+        );
+      }
       status.textContent='Подготавливаю проект: '+videos.length+' видео, '+fmtBytes(totalSize)+'…';
       // Each file starts a fresh 4MB-chunk sequence. Flat chunk IDs
       // preserve the user's exact clip order without bundling 500MB in RAM.
@@ -997,7 +1007,10 @@
         try{
           var resumed=await request('/upload/'+old.id+'/status','GET');
           if(resumed.input_size===totalSize && resumed.state==='uploading' &&
-             resumed.input_parts===uploadParts.length){
+             resumed.input_parts===uploadParts.length &&
+             resumed.accepted_talk_scene===settings.talk_scene &&
+             resumed.accepted_caption_variant===settings.caption_variant &&
+             resumed.style_contract_version===2){
             id=old.id;
             parts=resumed.input_parts;
             (resumed.uploaded_parts||[]).forEach(function(i){completed.add(i)});
@@ -1015,6 +1028,14 @@
           assets:assets.map(function(file){return {name:file.name,size:file.size}}),
           size:totalSize,settings:settings
         }),false);
+        if(start.style_contract_version!==2 ||
+           start.accepted_talk_scene!==settings.talk_scene ||
+           start.accepted_caption_variant!==settings.caption_variant){
+          throw new Error(
+            'Сервер не подтвердил выбранное оформление. '+
+            'Монтаж остановлен до передачи видео. Проверь обновление Cloudflare Worker.'
+          );
+        }
         id=start.upload_id;
         partSize=start.chunk_size;
         parts=start.parts;
@@ -1065,7 +1086,10 @@
           await new Promise(function(resolve){setTimeout(resolve,Math.min(12000,2000*(retries+1)))});
         }
       }
-      status.textContent='✅ Загружено '+videos.length+' видео ('+
+      status.textContent='✅ Выбран стиль '+(
+        settings.talk_scene==='contour'?'Contour Talk':
+        settings.talk_scene==='cream'?'Cream Talk':'обычный кадр'
+      )+'. Загружено '+videos.length+' видео ('+
         Math.round(totalSize/1000000)+' МБ). GitHub объединит их в один Reels. '+
         'Открой Telegram-бота, проверь общий текст и ответь /ok. '+
         'Если готовый MP4 больше лимита Telegram, скачай его здесь.';
