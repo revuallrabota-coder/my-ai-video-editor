@@ -118,6 +118,27 @@ class FourTalkingReelsLooks(unittest.TestCase):
                 v=next(s for s in streams if s["codec_type"]=="video")
                 self.assertEqual((v["width"],v["height"]),(720,1280))
 
+    def test_upper_heading_contrasts_with_studio_background(self):
+        from top_video_title import append_top_title
+        from signature_captions import ass_color
+        words=[(.2,.5,"Это"),(.6,.9,"пример")]
+        for profile,ink in (
+            ("pistachio_talk","#294C35"),
+            ("burgundy_brown_talk","#F5DCD0"),
+        ):
+            ass,_=build_reference_cascade_ass(
+                words,caption_position="studio",caption_variant=profile)
+            titled=append_top_title(
+                ass,"Проверка текста","always",3.0,
+                color=ink,studio_scene=True,
+            )
+            self.assertIn("Style: CustomTopTitle",titled)
+            self.assertIn(ass_color(ink),titled)
+        default=append_top_title(
+            ass,"Проверка текста","always",3.0,color="#294C35"
+        )
+        self.assertIn("&H00FFFFFF",default)
+
     def test_full_settings_chain_has_talking_scene(self):
         repo=Path(__file__).parent
         html=(repo/"index.html").read_text("utf-8")
@@ -130,6 +151,16 @@ class FourTalkingReelsLooks(unittest.TestCase):
         self.assertIn('option value="pistachio"',html)
         self.assertIn('option value="burgundy_brown"',html)
         self.assertIn('"pistachio","burgundy_brown"',worker)
+        self.assertIn("8 готовых стилей",html)
+        self.assertIn("pistachio_talk:",html)
+        self.assertIn("burgundy_brown_talk:",html)
+        self.assertIn("scene==='pistachio'",html)
+        self.assertIn("scene==='burgundy_brown'",html)
+        self.assertIn("studio_scene=(caption_position==\"studio\")",
+                      (repo/"telegram_editor.py").read_text("utf-8"))
+        caption_palettes=(repo/"reference_dynamic_captions.py").read_text("utf-8")
+        self.assertIn('"pistachio_talk":',caption_palettes)
+        self.assertIn('"burgundy_brown_talk":',caption_palettes)
         self.assertIn("talk_scene:s.talkScene",html)
         self.assertIn("talk_scene: talkScene",worker)
         self.assertIn('config.get("talk_scene","off")',process)
