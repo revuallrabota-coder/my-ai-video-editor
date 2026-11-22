@@ -375,6 +375,9 @@
       <option value="clean">Чистая студия</option>
       <option value="film">Мягкий плёночный свет</option>
       <option value="vintage">🎞 Винтаж: зерно киноплёнки, сепия, затемнение углов</option>
+      <option value="old_money">🤎 Old Money: кремово-кофейный мягкий фильтр</option>
+      <option value="burgundy">🍷 Бургунди: глубокий винный свет</option>
+      <option value="pink_tender">🎀 Розовая нежность: пудровый мягкий свет</option>
     </select>
     <p class="note">Винтаж добавляет настоящее плёночное зерно и затемнение углов к исходному видео. При выборе пресета «Винтажное кино» редактор автоматически подбирает архивные сцены, исходя только из произнесённых слов. Первые секунды остаются чистыми; новые сцены не перекрывают разговорную речь.</p>
     <p class="note">Для маникюра, где важен точный оттенок гель-лака, выбирай «Без фильтра» или Clean Studio.</p>
@@ -790,6 +793,8 @@
       film:'sepia(.10) contrast(1.09) saturate(.92)',
       matte:'contrast(.91) saturate(.90) brightness(1.04)',
       old_money:'sepia(.14) contrast(.95) saturate(.83) brightness(1.045)',
+      burgundy:'sepia(.04) contrast(1.045) saturate(.94) brightness(.99)',
+      pink_tender:'sepia(.025) contrast(.97) saturate(.985) brightness(1.045)',
       vintage:'sepia(.35) contrast(1.08) saturate(.73) brightness(.95)',
       street:'contrast(1.17) saturate(1.17)',
       elegant:'contrast(1.035) saturate(.985) brightness(1.01)'
@@ -895,6 +900,7 @@
         if(byId('subtitleSfx').value==='off')byId('subtitleSfx').value='soft';
       }
       if(this.value==='pink_tender' || this.value==='burgundy_brown_talk'){
+        byId('filter').value=this.value==='pink_tender'?'pink_tender':'burgundy';
         byId('motionInserts').checked=true;
         byId('assetSfx').checked=true;
         byId('guideEffect').value='off';
