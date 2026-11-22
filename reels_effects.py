@@ -629,7 +629,22 @@ def apply_effects(
             pattern,count=render_guide(
                 guide_source,folder,cue,i,words,
                 palette=studio_scene,
-                photos=(private_assets.photos if private_assets is not None else [])
+                # Auto mode never pours unrelated decorative PNGs into a
+                # generic collage. Manual photo collage may use provided
+                # client imagery; ordinary word-based props use separate cues.
+                photos=([p for p in private_assets.photos
+                         if p.name.startswith("photo_sticker_")]
+                        if private_assets is not None and
+                        guide_effect in ("image_cluster_reel",
+                                         "cutout_grid_reel",
+                                         "pov_carousel_spin",
+                                         "split_reel") else []),
+                background_path=(
+                    private_assets.backgrounds.get(
+                        "grid_blue" if studio_scene=="pistachio"
+                        else "grid_white")
+                    if private_assets is not None else None
+                )
             )
             args.extend(["-framerate","15","-start_number","0",
                          "-i",pattern])
