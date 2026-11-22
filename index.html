@@ -616,6 +616,7 @@
     };
     var scene=byId('talkScene').value;
     var box=byId('previewBox');
+    box.querySelector('.caption-bg').style.opacity=scene==='off'?'.2':'0';
     box.style.background=scene==='contour'
       ?'repeating-radial-gradient(ellipse at 40% 55%, #243e35 0 2px, #1b3029 4px 11px, #355749 12px 13px, #1b3029 14px 22px)'
       :scene==='cream'?'#FFF0BF':
@@ -634,6 +635,12 @@
     titleNode.hidden=mode==='off'||(!title&&mode!=='auto');
     titleNode.textContent=title.toUpperCase()||
       (mode==='auto'?'НАЗВАНИЕ ИЗ РЕЧИ':'');
+    titleNode.style.color=scene==='pistachio'?'#294C35':
+      scene==='cream'?'#191710':
+      scene==='burgundy_brown'?'#F5DCD0':
+      scene==='contour'?'#F6EDD6':'#FFFFFF';
+    titleNode.style.textShadow=scene==='pistachio'||scene==='cream'
+      ?'0 1px 2px #FFFFFF33':'0 1px 5px #160d1b65';
     titleNode.style.fontFamily=bigFont.family;
     titleNode.style.fontStyle=bigFont.italic?'italic':'normal';
     titleNode.style.fontWeight=bigFont.weight;
