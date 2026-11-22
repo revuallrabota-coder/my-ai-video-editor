@@ -734,7 +734,11 @@ def apply_effects(
 
         # Private animated icon MOV, matched to the actual spoken topic.
         private_icon_count=0
-        if private_assets is not None and insert_style=="reference_soft" and not guide_cues:
+        # Uploaded MOV icons are not yet silhouette-masked: never insert
+        # them in automatic mode, where they could obscure the speaker.
+        # The protected speech-matched PNG path above is the safe default.
+        if (private_assets is not None and insert_style=="reference_soft"
+                and guide_effect=="off" and not guide_cues):
             for cue in semantic_cues:
                 if private_icon_count>=6:
                     break
