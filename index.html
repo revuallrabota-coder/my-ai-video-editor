@@ -851,8 +851,8 @@
   var launcherInput=byId('launcherBase');
   try{launcherInput.value=localStorage.getItem('personalEditorLauncher')||''}catch(ignore){}
   function connectedWorkerURL(){
-    var url=launcherInput.value.trim().replace(/\\/+$/,'');
-    if(!/^https:\\/\\/[a-z0-9.-]+\\.workers\\.dev$/i.test(url)){
+    var url=launcherInput.value.trim().replace(/\/+$/,'');
+    if(!/^https:\/\/[a-z0-9.-]+\.workers\.dev$/i.test(url)){
       throw new Error('Впиши настоящий адрес Worker из Cloudflare → Visit, без /health.');
     }
     return url;
