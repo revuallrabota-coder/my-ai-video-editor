@@ -147,13 +147,13 @@ def validate_settings(config: dict) -> dict:
     },"refined")
     choose_font(small_font)
     caption_variant=option("caption_variant",{
-        "reference_soft","editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant","contour_talk","cream_talk"
+        "reference_soft","editorial","luxe","minimal","neon","pop","old_money","vintage","street","elegant","contour_talk","cream_talk","pistachio_talk","burgundy_brown_talk"
     },"reference_soft")
     background_style=option("background_style",{
         "off","occasional","frequent","always"
     },"occasional")
     subject_layout=option("subject_layout",{"standard","behind","beside"},"standard")
-    talk_scene=option("talk_scene",{"off","contour","cream"},"off")
+    talk_scene=option("talk_scene",{"off","contour","cream","pistachio","burgundy_brown"},"off")
     animation_style=option("animation_style",{
         "float","pop","slide"
     },"float")
