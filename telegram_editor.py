@@ -603,7 +603,7 @@ def edit_video(
                 subject_side=subject_side,
             )
             if subtitle_events:
-                if talk_scene!="off":
+                if talk_scene!="off" and insert_style!="off":
                     append_scene_ornaments(ass, words, talk_scene)
                 burn_subtitles(video_for_titles, ass, staged, quality=quality)
                 if talk_scene=="off" and subject_layout != "standard":
@@ -624,9 +624,13 @@ def edit_video(
             caption_position="top" if talk_scene!="off" else caption_position,
             quality=quality,
             caption_sound=subtitle_sfx,
-            insert_style=insert_style, insert_density=insert_density,
+            # Studio scenes already include their own tightly themed visual
+            # language. Do not stack giant legacy cards and full-frame inserts
+            # over the portrait and its deliberately reserved caption area.
+            insert_style="off" if talk_scene!="off" else insert_style,
+            insert_density=insert_density,
             insert_sound=insert_sound,
-            private_assets=private_assets,
+            private_assets=None if talk_scene!="off" else private_assets,
             font_profile=font_profile, small_font_profile=small_font_profile,
             animation_style=animation_style,
         )
