@@ -156,6 +156,7 @@
     <label class="field" for="reelsPreset">Готовый стиль Reels</label>
     <select id="reelsPreset">
       <option value="reference_soft" selected>🌸 Нежный референс — розовый акцент</option>
+      <option value="pink_tender">🎀 Розовая нежность — банты, цветы, жемчуг и лёгкие переходы</option>
       <option value="old_money">🤎 Old Money — кремовый и антиква</option>
       <option value="vintage_cinema">🎞️ Винтажное кино — плёнка, архив, ретро-звук и перебивки</option>
       <option value="editorial">🎬 Editorial — контрастный гротеск</option>
@@ -858,6 +859,7 @@
   // semantic editing setting changes when a style is selected.
   var reelPresets={
     reference_soft:{variant:'reference_soft',big:'old_money',small:'refined',color:'#E8A4B5',scene:'off'},
+    pink_tender:{variant:'reference_soft',big:'vintage',small:'refined',color:'#C787A8',scene:'off'},
     old_money:{variant:'old_money',big:'vintage',small:'old_money',color:'#CEB68A',scene:'off'},
     vintage_cinema:{variant:'vintage',big:'vintage',small:'old_money',color:'#D8BC91',scene:'off'},
     editorial:{variant:'editorial',big:'bold',small:'modern',color:'#F0443E',scene:'off'},
@@ -890,6 +892,13 @@
         byId('assetSfx').checked=true;
         byId('guideEffect').value='off';
         byId('motionFrequency').value='subtle';
+        if(byId('subtitleSfx').value==='off')byId('subtitleSfx').value='soft';
+      }
+      if(this.value==='pink_tender' || this.value==='burgundy_brown_talk'){
+        byId('motionInserts').checked=true;
+        byId('assetSfx').checked=true;
+        byId('guideEffect').value='off';
+        byId('motionFrequency').value='balanced';
         if(byId('subtitleSfx').value==='off')byId('subtitleSfx').value='soft';
       }
       if(this.value==='vintage_cinema'){
@@ -1212,13 +1221,13 @@
       }
       status.textContent='Проверяю, что Cloudflare поддерживает выбранный стиль…';
       var workerHealth=await request('/health','GET');
-      if(workerHealth.style_contract_version!==4){
+      if(workerHealth.style_contract_version!==5){
         byId('workerHealthLink').href=url+'/health';
         byId('workerHealthLink').style.display='inline-block';
         throw new Error(
           'Приложение проверяет адрес '+url+
           '. Версия сервера: '+(workerHealth.style_contract_version??'старая, без номера')+
-          ', требуется версия 4. Сравни адрес с Cloudflare → Workers & Pages → Visit. '+
+          ', требуется версия 5. Сравни адрес с Cloudflare → Workers & Pages → Visit. '+
           'Если отличается, замени адрес в поле «Адрес Cloudflare». '+
           'Если совпадает, проверь публикацию Deploy именно этого Worker.'
         );
@@ -1270,7 +1279,8 @@
              resumed.accepted_talk_scene===settings.talk_scene &&
              resumed.accepted_caption_variant===settings.caption_variant &&
              resumed.accepted_guide_effect===settings.guide_effect &&
-             resumed.style_contract_version===4){
+             resumed.style_contract_version===5 &&
+              resumed.accepted_insert_style===settings.insert_style){
             id=old.id;
             parts=resumed.input_parts;
             (resumed.uploaded_parts||[]).forEach(function(i){completed.add(i)});
@@ -1288,7 +1298,8 @@
           assets:assets.map(function(file){return {name:file.name,size:file.size}}),
           size:totalSize,settings:settings
         }),false);
-        if(start.style_contract_version!==4 ||
+        if(start.style_contract_version!==5 ||
+            start.accepted_insert_style!==settings.insert_style ||
            start.accepted_talk_scene!==settings.talk_scene ||
            start.accepted_caption_variant!==settings.caption_variant ||
            start.accepted_guide_effect!==settings.guide_effect){
@@ -1466,7 +1477,7 @@
       subtitle_delay:s.subtitleDelay,
       sound_effects:s.soundEffects,
       emoji_mode:s.emoji?'on':'off',
-      insert_style:s.motionInserts?(s.captionVariant==='vintage'?'vintage':s.captionVariant==='old_money'?'old_money':'reference_soft'):'off',
+      insert_style:s.motionInserts?(s.reelsPreset==='pink_tender'?'pink_tender':s.reelsPreset==='burgundy_brown_talk'?'burgundy':s.reelsPreset==='old_money'?'old_money':s.captionVariant==='vintage'?'vintage':s.captionVariant==='old_money'?'old_money':s.captionVariant==='burgundy_brown_talk'?'burgundy':'reference_soft'):'off',
       guide_effect:s.motionInserts?s.guideEffect:'off',
       insert_density:s.motionDensity,
       insert_sound:s.assetSound?'on':'off',
