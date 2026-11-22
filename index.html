@@ -931,9 +931,9 @@
    'topTitleText','topTitleMode','previewKeyword'
   ].forEach(function(id){
     byId(id).addEventListener('input',function(){
-      // Пользователь изменил готовый набор: его выбор не перезаписываем.
-      if(['color','fontBig','fontSmall','captionVariant','captionBackground',
-          'captionAnimation'].includes(id))byId('reelsPreset').value='custom';
+      // A typography override must NOT silently erase the chosen aesthetic.
+      // Burgundy/Pink/Vintage/Old Money retain their transitions and audio pack.
+      // "Мои настройки" is an explicit preset choice, not a side-effect.
       updateSample();
     });
   });
