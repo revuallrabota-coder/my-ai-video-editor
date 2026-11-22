@@ -1,0 +1,31 @@
+name: Smart semantic montage checks
+
+on:
+  push:
+    paths:
+      - "guide18_fx.py"
+      - "reels_effects.py"
+      - "process_uploaded_video.py"
+      - "index.html"
+      - "cloudflare_launcher.js"
+      - "cloudflare_launcher_ipad.txt"
+      - "test_smart_semantic_montage.py"
+      - "test_aesthetic_packs.py"
+      - ".github/workflows/smart-montage-checks.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install unit-test image dependency
+        run: python -m pip install "Pillow>=10,<12"
+      - name: Compile changed Python modules
+        run: python -m py_compile guide18_fx.py reels_effects.py process_uploaded_video.py old_money_fx.py aesthetic_fx.py reference_editor.py
+      - name: Verify smart decisions, style packs and effect registry
+        run: python -m unittest -v test_smart_semantic_montage.py test_aesthetic_packs.py test_guide18_fx.py
