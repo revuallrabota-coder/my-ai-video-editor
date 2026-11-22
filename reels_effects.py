@@ -256,6 +256,8 @@ def apply_effects(
     animation_style: str = "float",
     private_assets = None,
     studio_mode: bool = False,
+    studio_scene: str = "off",
+    insert_source: Path | None = None,
 ) -> dict:
     """Тематические винтажные cutaway, эмодзи, звук, без изменения речи."""
     from telegram_editor import duration_and_audio, media_info, execute
@@ -286,15 +288,18 @@ def apply_effects(
     sy=frame_height/1280
     from retro_inserts import choose_retro_cues, make_retro_card, make_retro_sound_track
     from reference_motion_scenes import select_motion_cues, make_motion_assets
+    from studio_kinetic import select_studio_cues, make_studio_card
     from semantic_editing import choose_semantic_cues
     semantic_cues=(choose_semantic_cues(
                        words,duration,"subtle" if studio_mode else insert_density
                    ) if (insert_style=="reference_soft" or
                          studio_mode and emoji=="on") else [])
     motion_cues=(select_motion_cues(words,duration,insert_density)
-                 if insert_style=="reference_soft" else [])
+                 if insert_style=="reference_soft" and not studio_mode else [])
+    studio_cues=(select_studio_cues(words,duration,insert_density)
+                 if studio_mode and insert_style!="off" else [])
     retro=(choose_retro_cues(words,duration,density=insert_density)
-           if insert_style not in ("off","reference_soft") else [])
+           if insert_style not in ("off","reference_soft") and not studio_mode else [])
     semantic_emojis={
         "error":"❌","inspect":"🔎","success":"✅","compare":"↔️",
         "time":"⏱️","speech":"💬","camera":"🎥",
@@ -304,8 +309,10 @@ def apply_effects(
     cues=([(c.start,semantic_emojis.get(c.kind)) for c in semantic_cues]
           if studio_mode or insert_style=="reference_soft"
           else pick_cues(words,duration))
-    caption_cues = (pick_caption_cues(words,duration,style=caption_sound)
-                    if caption_sound != "off" else [])
+    caption_cues = (pick_caption_cues(
+                        words,duration,
+                        style="tick" if caption_sound=="typewriter" else caption_sound
+                    ) if caption_sound != "off" else [])
     # Обычные смайлы не перекрывают большую иллюстрированную карточку.
     from reference_dynamic_captions import phrase_emoji_anchors
     geometry=phrase_emoji_anchors(words, caption_position,
@@ -333,7 +340,7 @@ def apply_effects(
                     used_phrases.add(k)
                     break
     if (sound == "off" and not visual and not caption_cues
-            and not retro and not motion_cues
+            and not retro and not motion_cues and not studio_cues
             and not (private_assets and any(
                 c.kind in private_assets.icons for c in semantic_cues))):
         source.replace(target)
@@ -451,6 +458,45 @@ def apply_effects(
                 prev=stage
                 current_input+=1
             scene_count+=1
+
+        # Full-height editorial video stays visible behind every insert.
+        # Each short animated card contains an authentic frame from the
+        # user's clean footage and a word from the approved transcript.
+        studio_insert_count = 0
+        if studio_cues:
+            for i,cue in enumerate(studio_cues):
+                asset=folder/f"editorial_insert_{i}.png"
+                try:
+                    make_studio_card(insert_source or source,asset,cue,studio_scene)
+                except Exception as error:
+                    LOG.warning("Не удалось подготовить анимированную вставку: %s",error)
+                    continue
+                args.extend(["-loop","1","-framerate","30","-i",str(asset)])
+                start,end=cue.start,cue.end
+                width=max(180,round(290*sx))
+                height=max(220,round(356*sy))
+                name=f"[kinetic{i}]"
+                filters.append(
+                    f"[{current_input}:v]scale={width}:{height},format=rgba,"
+                    f"fade=t=in:st={start:.3f}:d=0.30:alpha=1,"
+                    f"fade=t=out:st={max(start+.4,end-.30):.3f}:d=0.27:"
+                    f"alpha=1{name}"
+                )
+                stage=f"[kineticstage{i}]"
+                travel=f"{round(75*sx)}*max(0,1-(t-{start:.3f})*3.2)"
+                target_x=f"main_w-overlay_w-{round(22*sx)}"
+                target_y=f"main_h-overlay_h-{round(122*sy)}"
+                filters.append(
+                    f"{prev}{name}overlay=x='{target_x}+{travel}':"
+                    f"y='{target_y}+{round(18*sy)}*"
+                    f"max(0,1-(t-{start:.3f})*3.2)':"
+                    f"enable='between(t,{start:.3f},{end:.3f})':"
+                    f"shortest=1{stage}"
+                )
+                prev=stage
+                current_input+=1
+                studio_insert_count+=1
+            insert_count+=studio_insert_count
 
         # Private animated icon MOV, matched to the actual spoken topic.
         private_icon_count=0
