@@ -7,6 +7,7 @@ text messages are sent by process_uploaded_video, independently of this.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import time
 import requests
@@ -32,6 +33,9 @@ def publish_progress(
     url=f"{worker_url.rstrip('/')}/internal/upload/{upload_id}/progress"
     headers={"Authorization":"Bearer "+bot_token}
     payload={"stage":stage,"message":str(message)[:180]}
+    run_id=os.environ.get("GITHUB_RUN_ID","").strip()
+    if re.fullmatch(r"[0-9]{1,20}",run_id):
+        payload["github_run_id"]=run_id
     for attempt in range(2):
         try:
             response=requests.post(url,json=payload,headers=headers,timeout=6)
