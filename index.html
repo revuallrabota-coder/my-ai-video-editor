@@ -273,7 +273,7 @@
     <input id="assetPacks" type="file" accept=".zip,application/zip" multiple>
     <p class="note">Можно прикрепить 4 приватных ZIP-пакета суммарно до 100 МБ. Для эффектов из PDF можно добавить JPG/PNG/WebP в ZIP, чтобы карусели, коллажи и сетки показывали именно твои фотографии. Без них используем кадры видео. MOV/WAV тоже поддерживаются. Adobe .mogrt/.ffx не запускаются в FFmpeg. Эти файлы не публикуются в GitHub.</p>
     <div class="mini" id="assetPacksInfo">Наборы не выбраны: будут использоваться встроенные смысловые графические сцены.</div>
-    <label class="option"><input id="assetSfx" type="checkbox" checked> 🔈 Звуки выбранной эстетики и мои WAV из ZIP</label>
+    
     <label class="field" for="smartFxMode">🎬 Как монтажёр выбирает анимации</label>
     <select id="smartFxMode">
       <option value="auto" selected>✨ Умный монтаж: ИИ выбирает эффект по смыслу речи</option>
@@ -299,20 +299,34 @@
     <select id="motionFrequency"><option value="subtle">Редко: только самые важные слова</option><option value="balanced" selected>Аккуратно: небольшие акценты по смыслу</option><option value="dynamic">Чаще: короткие, но небольшие вставки</option></select>
     <p class="note">Эстетика задаёт оформление, а смысл речи — выбор приёма: разные задачи не перемешиваются. Для новых каруселей используются только твои материалы или реальные кадры твоего видео.</p>
     <p class="note">Эмодзи появляются плавно только возле смысловых фраз. Большие иллюстрированные карточки больше не добавляются автоматически.</p>
-    <label class="field" for="soundfx">🔊 Звуковые акценты на ключевых словах</label>
-    <select id="soundfx">
-      <option value="soft" selected>Тихие мягкие акценты</option>
-      <option value="punch">Чуть выразительнее</option>
-      <option value="whoosh">Воздушный whoosh</option>
-      <option value="off">Без акцентов</option>
+    <label class="field" for="soundDesign">🔊 Звуковое оформление Reels</label>
+    <select id="soundDesign">
+      <option value="auto" selected>✨ Автоматически — под слова, движение и выбранный стиль</option>
+      <option value="delicate">🌸 Очень деликатно — немного звуков и мягкие титры</option>
+      <option value="expressive">🎬 Выразительнее — больше акцентов в важных местах</option>
+      <option value="off">🔇 Без добавленных звуков — только моя исходная речь</option>
+      <option value="custom">🎛 Настроить звуки отдельно</option>
     </select>
-    <label class="field" for="subtitleSfx">🎵 Звук появления субтитров</label>
-    <select id="subtitleSfx">
-      <option value="soft">Нежный тихий Pop</option>
-      <option value="tick">Короткий мягкий Tick</option>
-      <option value="typewriter" selected>⌨️ Печатающая машинка: серия лёгких щелчков</option>
-      <option value="off">Без звука</option>
-    </select>
+    <p class="note" id="soundDesignHint">Редактор автоматически ставит тихие звуки только вместе с реальными смысловыми анимациями, подбирая их под Vintage, Old Money, Burgundy или розовую эстетику. Не озвучивает каждое слово и не заменяет твой голос.</p>
+    <details id="soundDesignDetails" hidden>
+      <summary style="font-weight:700;margin:12px 0">Раздельная настройка звуков</summary>
+      <label class="field" for="soundfx">Звуковые акценты на ключевых словах</label>
+      <select id="soundfx">
+        <option value="off" selected>Без дополнительных щелчков на словах</option>
+        <option value="soft">Мягкий акцент</option>
+        <option value="punch">Выразительный акцент</option>
+        <option value="whoosh">Лёгкий воздушный переход</option>
+      </select>
+      <label class="field" for="subtitleSfx">Звук появления субтитров</label>
+      <select id="subtitleSfx">
+        <option value="off" selected>Только текст, без звука</option>
+        <option value="soft">Тихий Pop на отдельных фразах</option>
+        <option value="tick">Нежный Tick на отдельных фразах</option>
+        <option value="typewriter">Звук печатной машинки на фразах</option>
+      </select>
+      <label class="option"><input id="assetSfx" type="checkbox" checked> Звуки смысловых вставок, переходов и WAV из моего ZIP</label>
+      <p class="note">Каждый тип эффекта звучит по-разному. Звуки титров и слов необязательны: вместе со звуками вставок их может оказаться слишком много.</p>
+    </details>
     <label class="field" for="topTitleText">🪧 Что написать вверху видео</label>
     <input id="topTitleText" type="text" maxlength="70" placeholder="Например: РАЗБОР КОШМАРНОГО МАНИКЮРА">
     <label class="field" for="topTitleMode">Когда показывать это название</label>
@@ -482,11 +496,40 @@
     node.addEventListener('change',refreshSmartFx);
   });
   refreshSmartFx();
+  // One high-level decision, three independent backend channels.
+  // Technical selects are available only in Custom and never silently
+  // override the user's previous manual setup after switching presets.
+  function resolvedSoundSettings(){
+    var mode=byId('soundDesign').value;
+    if(mode==='auto')return {keywords:'off',captions:'off',inserts:true};
+    if(mode==='delicate')return {keywords:'off',captions:'soft',inserts:true};
+    if(mode==='expressive')return {keywords:'soft',captions:'tick',inserts:true};
+    if(mode==='off')return {keywords:'off',captions:'off',inserts:false};
+    return {keywords:byId('soundfx').value,
+            captions:byId('subtitleSfx').value,
+            inserts:byId('assetSfx').checked};
+  }
+  function updateSoundDesign(){
+    var mode=byId('soundDesign').value;
+    var custom=mode==='custom';
+    byId('soundDesignDetails').hidden=!custom;
+    if(custom)byId('soundDesignDetails').open=true;
+    var captions={
+      auto:'Звуки появляются только вместе с подходящими по смыслу вставками. Характер звука определяет выбранная эстетика: плёнка, бумага, ткань или нежные акценты.',
+      delicate:'Смысловые вставки звучат тихо; только отдельные субтитры получают мягкий акцент.',
+      expressive:'Акцентных звуков больше, но голос остаётся главным. При слишком насыщенном монтаже выбери автоматический режим.',
+      off:'Дополнительные звуки отключены. Исходная речь и её собственная аудиодорожка сохраняются.',
+      custom:'Вручную включи только нужные категории. При отключении всех трёх дополнительных звуков не будет.'
+    };
+    byId('soundDesignHint').textContent=captions[mode]||captions.auto;
+  }
+  byId('soundDesign').addEventListener('change',updateSoundDesign);
+  updateSoundDesign();
   function getSettings(){
     return {
       videoFiles:selectedClips.map(function(f){return {name:f.name,sizeBytes:f.size}}),
       effectPacks:selectedAssetPacks.map(function(f){return {name:f.name,sizeBytes:f.size}}),
-      assetSound:byId('assetSfx').checked,
+      assetSound:resolvedSoundSettings().inserts,
       referenceVideo:byId('referenceVideo').files[0] ? byId('referenceVideo').files[0].name : null,
       photos:Array.from(photoInput.files).map(function(f){return f.name}),
       ratio:ratio,
@@ -500,7 +543,7 @@
       captionVariant:byId('captionVariant').value,
       captionAnimation:byId('captionAnimation').value,
       captionBackground:byId('captionBackground').value,
-      subtitleSfx:byId('subtitleSfx').value,
+      subtitleSfx:resolvedSoundSettings().captions,
       customFont:null,
       captionPosition:byId('position').value,
       subjectLayout:byId('subjectLayout').value,
@@ -510,7 +553,7 @@
       motionInserts:byId('motionInserts').checked,
       guideEffect:configuredGuideEffect(),
       motionDensity:byId('motionFrequency').value,
-      soundEffects:byId('soundfx').value,
+      soundEffects:resolvedSoundSettings().keywords,
       topTitle:byId('topTitleText').value.trim(),
       topTitleMode:byId('topTitleMode').value,
       hook:byId('hook').checked,
@@ -546,7 +589,7 @@
     byId('next').hidden=current===3;
     if(current===3){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Текст относительно человека',s.subjectLayout==='behind'?'за человеком':s.subjectLayout==='beside'?'рядом с человеком':'обычно'],['Готовый стиль',selectedText('reelsPreset')],['Выбор эффектов',s.guideEffect==='auto'?'Автоматически по смыслу':s.guideEffect==='off'?'Без дополнительных приёмов':s.guideEffect.startsWith('multi:')?'Мои '+s.guideEffect.slice(6).split(',').length+' приёмов':'Ручная настройка'],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Текст относительно человека',s.subjectLayout==='behind'?'за человеком':s.subjectLayout==='beside'?'рядом с человеком':'обычно'],['Готовый стиль',selectedText('reelsPreset')],['Звуковое оформление',selectedText('soundDesign')],['Выбор эффектов',s.guideEffect==='auto'?'Автоматически по смыслу':s.guideEffect==='off'?'Без дополнительных приёмов':s.guideEffect.startsWith('multi:')?'Мои '+s.guideEffect.slice(6).split(',').length+' приёмов':'Ручная настройка'],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -900,22 +943,16 @@
       if(this.value==='old_money'){
         byId('filter').value='old_money';
         byId('motionInserts').checked=true;
-        byId('assetSfx').checked=true;
         byId('motionFrequency').value='subtle';
-        if(byId('subtitleSfx').value==='off')byId('subtitleSfx').value='soft';
       }
       if(this.value==='pink_tender' || this.value==='burgundy_brown_talk'){
         byId('filter').value=this.value==='pink_tender'?'pink_tender':'burgundy';
         byId('motionInserts').checked=true;
-        byId('assetSfx').checked=true;
         byId('motionFrequency').value='balanced';
-        if(byId('subtitleSfx').value==='off')byId('subtitleSfx').value='soft';
       }
       if(this.value==='vintage_cinema'){
         byId('filter').value='vintage';
-        byId('subtitleSfx').value='typewriter';
         byId('motionInserts').checked=true;
-        byId('assetSfx').checked=true;
         byId('motionFrequency').value='balanced';
       }
       // Scene and typography never overwrite the user's audio, animation
