@@ -64,7 +64,7 @@ class SmartSemanticMontageTests(unittest.TestCase):
                          effect="match_cut",clips=clips,
                          palette="burgundy")
         self.assertIsNotNone(
-            ImageChops.difference(a,b).getbbox())
+            ImageChops.difference(a,b).convert('RGB').getbbox())
         self.assertEqual(a.size,(720,1280))
         self.assertEqual(a.getpixel((0,0))[3],0)
 
