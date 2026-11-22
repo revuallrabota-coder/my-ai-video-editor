@@ -417,7 +417,8 @@ def montage_by_reference(
             )
             render_scene(clean_camera, studio_clean, talk_scene, quality=quality)
             if count:
-                append_scene_ornaments(subtitles,words,talk_scene)
+                if insert_style != "off":
+                    append_scene_ornaments(subtitles, words, talk_scene)
                 burn_subtitles(studio_clean, subtitles, dynamic, quality=quality)
             else:
                 studio_clean.replace(dynamic)
@@ -446,9 +447,13 @@ def montage_by_reference(
             caption_position="top" if talk_scene!="off" else caption_position,
             quality=quality,
             caption_sound=subtitle_sfx,
-            insert_style=insert_style, insert_density=insert_density,
+            # Studio scenes already include their own tightly themed visual
+            # language. Do not stack giant legacy cards and full-frame inserts
+            # over the portrait and its deliberately reserved caption area.
+            insert_style="off" if talk_scene!="off" else insert_style,
+            insert_density=insert_density,
             insert_sound=insert_sound,
-            private_assets=private_assets,
+            private_assets=None if talk_scene!="off" else private_assets,
             font_profile=font_profile, small_font_profile=small_font_profile,
             animation_style=animation_style,
         )
