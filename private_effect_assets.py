@@ -20,6 +20,15 @@ MAX_EXTRACT_BYTES=105_000_000
 MAX_FILE_BYTES=18_000_000
 
 OPTIONAL_SOUNDS={"error":"0026_slam 4.wav", "compare":"0026_sweeping slam 1.wav"}
+# Flexible names for user-owned effects, including Russian and English WAVs.
+# Only these broad categories have deterministic timing in the Reels timeline.
+SOUND_KEYWORDS={
+    "typewriter":("typewriter","typing","keyboard","typewriter","печать",
+                  "печатн","клавиат","машинк"),
+    "whoosh":("whoosh","swoosh","sweep","swish","transition","переход",
+              "пролёт","пролет","вжух"),
+    "pop":("pop","bubble","click","tick","щелч","хлоп"),
+}
 ALLOWED_EXT={".mov",".wav"}
 
 
@@ -59,7 +68,14 @@ def prepare_private_effect_assets(
                 if filename.endswith((".ffx",".mogrt",".aep")):
                     result.ignored_adobe_presets+=1
                     continue
-                if filename not in required_icons and filename not in required_sounds:
+                sound_kind=next(
+                    (kind for kind,words in SOUND_KEYWORDS.items()
+                     if filename.lower().endswith(".wav") and any(
+                         token in filename.casefold() for token in words)),
+                    None
+                )
+                if (filename not in required_icons and
+                    filename not in required_sounds and not sound_kind):
                     continue
                 if member.file_size>MAX_FILE_BYTES or member.file_size>remaining:
                     continue
@@ -84,4 +100,6 @@ def prepare_private_effect_assets(
                 for kind,name in OPTIONAL_SOUNDS.items():
                     if name==filename:
                         result.sounds[kind]=dest
+                if sound_kind and sound_kind not in result.sounds:
+                    result.sounds[sound_kind]=dest
     return result
