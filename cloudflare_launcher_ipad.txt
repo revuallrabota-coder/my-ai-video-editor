@@ -8,7 +8,7 @@ const CHUNK = 4000000;
 const MAX_VIDEO = 500000000;
 const MAX_ASSETS = 100000000;
 const TTL = 259200;
-const CONTRACT = 2;
+const CONTRACT = 3;
 const STAGES = {
   queued:35, downloading:42, joining:53, transcribing:63, review:72,
   planning:78, rendering:86, publishing:94, done:100, failed:100
@@ -29,7 +29,7 @@ const CHOICES = {
   talk_scene:"off contour cream pistachio burgundy_brown",
   top_title_mode:"auto off intro always",
   animation_style:"float pop slide",
-  subtitle_sfx:"off soft tick",
+  subtitle_sfx:"off soft tick typewriter",
   insert_style:"off reference_soft retro old_money vintage elegant street editorial minimal neon pop luxe",
   insert_density:"subtle balanced dynamic",
   insert_sound:"off on"
@@ -76,7 +76,7 @@ function parseSettings(s) {
   const emoji=String(s.emoji_mode ?? "on");
   const quality=String(s.export_quality ?? "high");
   const delay=Number(s.subtitle_delay ?? 0);
-  if (!["off","soft","punch"].includes(sound) ||
+  if (!["off","soft","punch","whoosh"].includes(sound) ||
       !["off","on"].includes(emoji) ||
       !["high","balanced"].includes(quality) ||
       !Number.isFinite(delay) || delay<-.5 || delay>1.5) {
