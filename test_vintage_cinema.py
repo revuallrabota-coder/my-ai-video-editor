@@ -51,6 +51,18 @@ class VintageCinemaTests(unittest.TestCase):
             self.assertEqual(middle.getpixel((360,600))[3],255)
             self.assertNotEqual(middle.getpixel((100,300)),middle.getpixel((360,600)))
 
+    def test_vintage_cannot_be_skipped_when_other_sounds_are_disabled(self):
+        renderer=(Path(__file__).parent/"reels_effects.py").read_text("utf-8")
+        self.assertIn("and not retro and not vintage_cues and not motion_cues",renderer)
+        self.assertIn('cues=([] if insert_style=="vintage" else',renderer)
+
+    def test_all_archive_themes_have_original_drawn_props(self):
+        from vintage_cinema import _scene_image, THEMES
+        for theme,_ in THEMES:
+            frame=_scene_image(VintageCue(6.,8.,"настоящая фраза",theme,0),4,0)
+            self.assertEqual(frame.size,(720,1280))
+            self.assertNotEqual(frame.getpixel((360,375)),frame.getpixel((30,375)))
+
     def test_ui_and_renderer_use_the_same_vintage_contract(self):
         root=Path(__file__).parent
         html=(root/"index.html").read_text("utf-8")
