@@ -39,6 +39,10 @@ assert.match(html,/id="workerHealthLink"/);
 assert.match(html,/function connectedWorkerURL\(\)/);
 assert.match(html,/async function checkWorkerConnection\(\)/);
 assert.match(html,/workerHealth.style_contract_version!==4/);
+assert.match(html,/id="guideEffect"/);
+assert.match(html,/guideEffect:byId\('guideEffect'\).value/);
+assert.match(html,/guide_effect:s.motionInserts\?s.guideEffect:'off'/);
+assert.match(html,/start.accepted_guide_effect!==settings.guide_effect/);
 assert.match(html,/Приложение проверяет адрес/);
 const presets=html.slice(html.indexOf("var reelPresets={"),
                           html.indexOf("byId('reelsPreset').addEventListener"));
