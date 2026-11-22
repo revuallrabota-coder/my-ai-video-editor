@@ -174,9 +174,18 @@ class FourTalkingReelsLooks(unittest.TestCase):
         self.assertIn("start.accepted_talk_scene!==settings.talk_scene",html)
         renderer=(repo/"reference_editor.py").read_text("utf-8")
         standard=(repo/"telegram_editor.py").read_text("utf-8")
-        self.assertIn('insert_style="off" if talk_scene!="off"',renderer)
-        self.assertIn('insert_style="off" if talk_scene!="off"',standard)
+        self.assertIn('insert_style=insert_style',renderer)
+        self.assertIn('insert_style=insert_style',standard)
+        self.assertIn('private_assets=private_assets',renderer)
+        self.assertIn('private_assets=private_assets',standard)
+        self.assertIn('studio_scene=talk_scene',renderer)
+        self.assertIn('studio_scene=talk_scene',standard)
         self.assertIn('if insert_style != "off":',renderer)
+        effects=(repo/"reels_effects.py").read_text("utf-8")
+        self.assertIn("studio_cues=(select_studio_cues",effects)
+        self.assertIn("moving_source=insert_source or source",effects)
+        self.assertIn("live=f\"[liveclip{i}]\"",effects)
+        self.assertIn("shortest=0:eof_action=pass:repeatlast=0",effects)
 
 
 if __name__=="__main__":
