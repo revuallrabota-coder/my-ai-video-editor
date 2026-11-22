@@ -41,7 +41,10 @@ class GuideFxTests(unittest.TestCase):
                 b=_draw(effect,.82,"МАНИКЮР",other,frames,4,mask,WORDS,0,"cream")
                 self.assertEqual(a.size,(360,640))
                 self.assertEqual(a.mode,"RGBA")
-                self.assertIsNotNone(ImageChops.difference(a,b).getbbox(),
+                difference=ImageChops.difference(a,b)
+                self.assertTrue(
+                    difference.convert("RGB").getbbox() or
+                    ImageChops.difference(a.getchannel("A"),b.getchannel("A")).getbbox(),
                     "Motion must visibly change instead of freezing a screenshot")
 
     def test_auto_scenes_are_semantic_and_never_overlap(self):
@@ -93,7 +96,7 @@ class GuideFxTests(unittest.TestCase):
             from PIL import Image
             a=Image.open(pattern.replace("%03d","000")).convert("RGBA")
             b=Image.open(pattern.replace("%03d",str(count//2).zfill(3))).convert("RGBA")
-            self.assertIsNotNone(ImageChops.difference(a,b).getbbox())
+            self.assertIsNotNone(ImageChops.difference(a,b).convert("RGB").getbbox())
 
 if __name__=="__main__":
     unittest.main()
