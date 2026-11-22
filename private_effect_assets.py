@@ -30,6 +30,17 @@ SOUND_KEYWORDS={
     "pop":("pop","bubble","click","tick","щелч","хлоп"),
 }
 ALLOWED_EXT={".mov",".wav"}
+ICON_KEYWORDS={
+    "error":("error","wrong","cross","ошиб","крест"),
+    "inspect":("magnif","search","glass","лупа","поиск"),
+    "success":("check","success","tick","галоч","верно"),
+    "compare":("compare","versus","leftright","сравн","туда-сюда"),
+    "time":("clock","timer","time","час","время"),
+    "speech":("speech","talk","bubble","чат","речь"),
+    "camera":("camera","video","record","камер","съём"),
+    "phone":("smartphone","iphone","phone","телефон"),
+    "next":("arrow right","arrow_right","next","вперёд","стрел"),
+}
 
 
 @dataclass
@@ -74,15 +85,20 @@ def prepare_private_effect_assets(
                          token in filename.casefold() for token in words)),
                     None
                 )
-                if (filename not in required_icons and
-                    filename not in required_sounds and not sound_kind):
+                is_mov=filename.lower().endswith(".mov")
+                icon_kind=next((
+                    kind for kind,words in ICON_KEYWORDS.items()
+                    if is_mov and any(w in filename.casefold() for w in words)
+                ),None)
+                is_icon=filename in required_icons or bool(icon_kind)
+                if not is_icon and filename not in required_sounds and not sound_kind:
                     continue
                 if member.file_size>MAX_FILE_BYTES or member.file_size>remaining:
                     continue
                 if member.compress_size<128 or member.file_size>member.compress_size*500:
                     continue
                 # Do not extract archive paths; use canonical generated basename.
-                dest=directory/(("icon_" if filename in required_icons else "sound_")+
+                dest=directory/(("icon_" if is_icon else "sound_")+
                                 filename.replace(" ","_"))
                 if dest.is_file():
                     continue
@@ -97,6 +113,8 @@ def prepare_private_effect_assets(
                 for kind,name in ICON_NAME.items():
                     if name==filename:
                         result.icons[kind]=dest
+                if icon_kind and icon_kind not in result.icons:
+                    result.icons[icon_kind]=dest
                 for kind,name in OPTIONAL_SOUNDS.items():
                     if name==filename:
                         result.sounds[kind]=dest
