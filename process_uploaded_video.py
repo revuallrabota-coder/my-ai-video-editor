@@ -340,7 +340,12 @@ def main() -> None:
                 )
                 send_text(token,owner,
                     "🎨 Приватные наборы проверены: "+str(private_assets.selected_files)+
-                    " подходящих MOV/WAV, шаблоны Adobe не используются напрямую.")
+                    " файлов, предметных PNG: "+str(
+                        sum(len(v) for v in __import__("semantic_object_overlays").inventory(
+                            private_assets.photos).values())
+                    )+", анимированных фонов: "+str(
+                        len(private_assets.backgrounds)
+                    )+". Они применяются по смыслу речи, а не случайно.")
             from clip_montage import join_clips
             stage("joining","🎞️ Склеиваю выбранные фрагменты в порядке загрузки.")
             seconds,audio=join_clips(
@@ -497,6 +502,7 @@ def main() -> None:
                 + " · 🎞 графика/вставки: " + str(stats.get("insert_count", 0))
                 + " · 🔠 крупные анимированные слова: " + str(stats.get("kinetic_word_count", 0))
                 + " · 🎨 фильтр видео: " + str(stats.get("filter_applied", "none"))
+                + " · 🎁 предметы из твоего ZIP: " + str(stats.get("speech_object_count", 0))
                 + " · ✨ Приёмы из гайда: " + str(stats.get("guide_effect_count", 0))
                 + " (" + ", ".join(stats.get("guide_effects_rendered",[])[:5]) + ")"
                 + " · 🎨 иконки из ZIP: " + str(stats.get("private_asset_count", 0))
