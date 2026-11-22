@@ -246,5 +246,5 @@ for (const required of ["previewPhoto","previewPhotoImage","fontBig",
 const presets=html.match(/<select id="reelsPreset">([\s\S]*?)<\/select>/)?.[1];
 assert.ok(presets,"Visual presets missing");
 const styles=[...presets.matchAll(/value="([^"]+)"/g)].map(m=>m[1]);
-assert.deepEqual(styles,["reference_soft","old_money","editorial","minimal","custom"]);
+assert.deepEqual(styles,["reference_soft","pink_tender","old_money","vintage_cinema","editorial","contour_talk","burgundy_brown_talk","custom"]);
 console.log("✓ 500MB / 72h auto expiration / durable progress / secure private MP4 / paged source cleanup");
