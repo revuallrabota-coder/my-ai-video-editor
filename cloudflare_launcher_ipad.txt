@@ -251,6 +251,7 @@ async function uploadStart(request,env) {
   return response({upload_id:id,chunk_size:CHUNK,parts:offset,
     accepted_talk_scene:settings.talk_scene,
     accepted_caption_variant:settings.caption_variant,
+    accepted_guide_effect:settings.guide_effect,
     style_contract_version:CONTRACT},201);
 }
 async function uploadChunk(request,env,id,index) {
@@ -305,6 +306,7 @@ async function status(env,id) {
     state:meta.state,stage:phase,
     accepted_talk_scene:meta.settings?.talk_scene??"off",
     accepted_caption_variant:meta.settings?.caption_variant??"reference_soft",
+    accepted_guide_effect:meta.settings?.guide_effect??"off",
     style_contract_version:CONTRACT,
     stage_label:latest?.message ?? phase,
     progress_percent:latest?.percent ??
