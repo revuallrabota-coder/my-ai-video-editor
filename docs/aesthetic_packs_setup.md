@@ -59,7 +59,7 @@ Each semantic theme may contain an MP4, a WAV, both or neither. No downloaded us
 - Vintage Cinema: [catalog](vintage_asset_sources.md)
 
 ## iPad deployment
-The Mini App is served from GitHub Pages and should update with published `main`. The Cloudflare Worker is independent and MUST be manually redeployed from `cloudflare_launcher_ipad.txt` (or identical `cloudflare_launcher.js`). Worker `/health` must show **style_contract_version = 5**. The frontend checks v5 and confirms the accepted `insert_style` before uploading media. This prevents outdated Workers from silently substituting an old template.
+The Mini App is served from GitHub Pages and should update with published `main`. The Cloudflare Worker is independent and MUST be manually redeployed from `cloudflare_launcher_ipad.txt` (or identical `cloudflare_launcher.js`). Worker `/health` must show **style_contract_version = 6**. The frontend checks v6 and confirms the accepted `insert_style` before uploading media. This prevents outdated Workers from silently substituting an old template.
 
 Code is in `aesthetic_fx.py`, `old_money_fx.py`, `retro_inserts.py`, `reels_effects.py`, `index.html`, `cloudflare_launcher.js`. `test_aesthetic_packs.py` contains regression checks.
 
