@@ -442,7 +442,9 @@ def apply_effects(
 
     with tempfile.TemporaryDirectory(prefix="reels_effects_") as tmp:
         folder = Path(tmp)
-        args = ["ffmpeg","-hide_banner","-loglevel","error","-y","-i",str(source)]
+        args = ["ffmpeg","-hide_banner","-loglevel","error",
+                "-filter_complex_threads","2","-filter_threads","2",
+                "-y","-i",str(source)]
         filters: list[str] = []
         prev = "[0:v]"
         current_input = 1
@@ -1042,7 +1044,8 @@ def apply_effects(
 
         if emoji_count or insert_count or scene_count or private_icon_count or object_count:
             args.extend(["-filter_complex",";".join(filters),"-map",prev,
-                         "-c:v","libx264","-preset",export.preset,"-crf",str(export.crf)])
+                         "-c:v","libx264","-preset",export.preset,
+                         "-threads","2","-crf",str(export.crf)])
         elif sfx_count or caption_sfx_count or insert_sfx_count:
             args.extend(["-filter_complex",";".join(filters),"-map","0:v:0",
                          "-c:v","copy"])
