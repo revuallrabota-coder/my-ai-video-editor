@@ -164,15 +164,10 @@
       <option value="burgundy_brown_talk">🍷 Бургунди + шоколад — роскошный тёмный</option>
       <option value="custom">⚙️ Мои настройки — вручную</option>
     </select>
-    <label class="field" for="talkScene">🎭 Композиция разговорного Reels</label>
-    <select id="talkScene">
-      <option value="off" selected>Обычное видео на весь экран</option>
-      <option value="contour">Contour Talk — видео на весь экран + тёмные акценты</option>
-      <option value="cream">Cream Talk — видео на весь экран + кремовые акценты</option>
-      <option value="pistachio">Фисташковый Talk — видео на весь экран + зелёные акценты</option>
-      <option value="burgundy_brown">Бургунди + шоколад — видео на весь экран + бордовые акценты</option>
-    </select>
-    <p class="note">Можно выбрать любой из 8 готовых стилей. Композиция кадра, шрифт, цвет и анимация меняются отдельно. В студийных форматах человек остаётся на полноценном вертикальном видео 9:16. Плавный текст, цветная прозрачная графика и короткие вставки накладываются на оригинальный кадр.</p>
+    <!-- Legacy API requires talkScene, but this control is deliberately hidden.
+         All style-specific visual overlays now follow the selected Reels preset. -->
+    <input type="hidden" id="talkScene" value="off">
+    <p class="note">Человек остаётся на исходном вертикальном видео 9:16. Анимации, переходы и стикеры автоматически подстраиваются под выбранную эстетику.</p>
     <label class="field" for="previewPhoto">📷 Фото для примерки оформления</label>
     <input id="previewPhoto" type="file" accept="image/*">
     <p class="note">Прикрепи любой кадр или фотографию: здесь сразу увидишь шрифт, размер, положение, цвет и овальную тень. Фото останется на iPad и не отправится для монтажа.</p>
@@ -484,7 +479,7 @@
       largeFont:byId('fontBig').value,
       smallFont:byId('fontSmall').value,
       reelsPreset:byId('reelsPreset').value,
-      talkScene:byId('talkScene').value,
+      talkScene:'off',
       captionVariant:byId('captionVariant').value,
       captionAnimation:byId('captionAnimation').value,
       captionBackground:byId('captionBackground').value,
@@ -534,7 +529,7 @@
     byId('next').hidden=current===3;
     if(current===3){
       var s=getSettings();var summary=byId('summary');summary.replaceChildren();
-      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Текст относительно человека',s.subjectLayout==='behind'?'за человеком':s.subjectLayout==='beside'?'рядом с человеком':'обычно'],['Композиция',s.talkScene==='contour'?'Contour Talk':s.talkScene==='cream'?'Cream Talk':s.talkScene==='pistachio'?'Фисташковый Talk':s.talkScene==='burgundy_brown'?'Бургунди + шоколад':'обычный кадр'],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
+      [['Исходники',s.videoFiles.length?(s.videoFiles.length+' шт. · '+fmtBytes(s.videoFiles.reduce(function(n,f){return n+f.sizeBytes},0))):'не выбраны'],['Название сверху',s.topTitleMode==='off'?'нет':s.topTitle|| (s.topTitleMode==='auto'?'автоматически':'не указано')],['ZIP-эффекты',s.effectPacks.length+' пакета'] ,['Формат',s.ratio],['Режим',s.mode],['Стиль субтитров',s.subtitleStyle==='reference_dynamic'?'Референс: живые слова':s.subtitleStyle==='signature'?'Розовый':s.subtitleStyle==='contrast'?'Красный контраст':'Классический'],['Шрифт',s.largeFont+' / '+s.smallFont],['Цвет',s.subtitleColor],['Положение',s.captionPosition],['Текст относительно человека',s.subjectLayout==='behind'?'за человеком':s.subjectLayout==='beside'?'рядом с человеком':'обычно'],['Готовый стиль',selectedText('reelsPreset')],['Камера',s.camera],['Звук',s.audio],['Фильтр',s.filter],['Скорость','×'+s.speed],['Удаление пауз',s.pauseRemoval],['Качество',s.exportQuality==='high'?'Full HD 1080×1920':'720×1280']].forEach(function(item){summary.append(row(item[0],item[1]))});
     }
     window.scrollTo({top:0,behavior:'instant'});
   }
@@ -876,7 +871,7 @@
       byId('fontBig').value=cfg.big;
       byId('fontSmall').value=cfg.small;
       byId('color').value=cfg.color;
-      byId('talkScene').value=cfg.scene;
+      byId('talkScene').value='off'; // Preserve fullscreen speaker for every preset.
       // Only choosing the full Vintage preset activates its own film color,
       // old typewriter accents, and motion engine. Other styles retain user
       // choices and the same non-destructive subtitle/effect controls.
@@ -918,28 +913,13 @@
   });
   ['color','fontBig','fontSmall','captionVariant','captionBackground',
    'motionInserts','motionFrequency','assetSfx','subtitleSfx',
-   'captionAnimation','position','subjectLayout','talkScene','outline','shadow','hookText','subtitleStyle','filter',
+   'captionAnimation','position','subjectLayout','outline','shadow','hookText','subtitleStyle','filter',
    'topTitleText','topTitleMode','previewKeyword'
   ].forEach(function(id){
     byId(id).addEventListener('input',function(){
-      if(id==='talkScene'){
-        // A manually selected canvas must automatically get readable
-        // contrasting captions, otherwise burgundy becomes black-on-black.
-        // Subsequent color/font edits are still fully independent.
-        var contrast={
-          contour:{variant:'contour_talk',color:'#F6EDD6'},
-          cream:{variant:'cream_talk',color:'#191710'},
-          pistachio:{variant:'pistachio_talk',color:'#294C35'},
-          burgundy_brown:{variant:'burgundy_brown_talk',color:'#F5DCD0'}
-        }[this.value];
-        if(contrast){
-          byId('captionVariant').value=contrast.variant;
-          byId('color').value=contrast.color;
-        }
-      }
       // Пользователь изменил готовый набор: его выбор не перезаписываем.
       if(['color','fontBig','fontSmall','captionVariant','captionBackground',
-          'captionAnimation','talkScene'].includes(id))byId('reelsPreset').value='custom';
+          'captionAnimation'].includes(id))byId('reelsPreset').value='custom';
       updateSample();
     });
   });
@@ -1358,12 +1338,12 @@
           await new Promise(function(resolve){setTimeout(resolve,Math.min(12000,2000*(retries+1)))});
         }
       }
-      status.textContent='✅ Выбран стиль '+(
-        settings.talk_scene==='contour'?'Contour Talk':
-        settings.talk_scene==='cream'?'Cream Talk':
-        settings.talk_scene==='pistachio'?'Фисташковый Talk':
-        settings.talk_scene==='burgundy_brown'?'Бургунди + шоколад':'обычный кадр'
-      )+'. Загружено '+videos.length+' видео ('+
+      var styleLabel={
+        pink_tender:'Розовая нежность',old_money:'Old Money',
+        burgundy:'Бургунди + шоколад',vintage:'Винтажное кино',
+        reference_soft:'Нежный референс'
+      }[settings.insert_style]||'Мои настройки';
+      status.textContent='✅ Выбран стиль '+styleLabel+'. Загружено '+videos.length+' видео ('+
         Math.round(totalSize/1000000)+' МБ). GitHub объединит их в один Reels. '+
         'Открой Telegram-бота, проверь общий текст и ответь /ok. '+
         'Если готовый MP4 больше лимита Telegram, скачай его здесь.';
