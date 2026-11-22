@@ -18,6 +18,8 @@ FILTERS: dict[str,str] = {
     "film": "eq=contrast=1.075:saturation=0.89:gamma=0.995,colorbalance=rs=0.035:bs=-0.025",
     "matte": "eq=contrast=0.92:saturation=0.88:gamma=1.055",
     "old_money": "eq=contrast=0.965:saturation=0.83:gamma=1.035,colorbalance=rs=0.045:bs=-0.035",
+    "burgundy": "eq=contrast=1.045:saturation=0.94:gamma=0.995,colorbalance=rs=0.045:gs=-0.017:bs=-0.022",
+    "pink_tender": "eq=contrast=0.970:saturation=0.985:gamma=1.045,colorbalance=rs=0.020:gs=0.004:bs=0.008",
     # True old-film texture, not a barely visible sepia preset. Rendered BEFORE captions.
     # Fine temporal grain and vignette are intentionally contained to Vintage.
     "vintage": "eq=contrast=1.070:saturation=0.72:gamma=0.94,colorbalance=rs=0.075:gs=0.018:bs=-0.052,noise=alls=9:allf=t+u,vignette=PI/7.8",
