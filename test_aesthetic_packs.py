@@ -66,7 +66,7 @@ class AestheticPacksTest(unittest.TestCase):
         self.assertIn('value="pink_tender"',html)
         self.assertIn("s.reelsPreset==='burgundy_brown_talk'?'burgundy'",html)
         self.assertIn("s.reelsPreset==='pink_tender'?'pink_tender'",html)
-        self.assertIn("const CONTRACT = 5;",worker)
+        self.assertIn("const CONTRACT = 6;",worker)
         self.assertEqual(worker,ipad)
         self.assertIn('accepted_insert_style:settings.insert_style',worker)
         self.assertIn("select_mood_cues",effects)
