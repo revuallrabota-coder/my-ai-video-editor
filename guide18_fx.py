@@ -65,7 +65,11 @@ def _clean(s: str) -> str:
 def _label(words: Sequence[Word], t: float, limit: int = 22) -> str:
     local=[_clean(str(w)) for st,en,w in words
            if st<=t+2.8 and en>=t-.3 and len(_clean(str(w)))>=3]
-    return (max(local,key=len) if local else "АКЦЕНТ").upper()[:limit]
+    priorities=("ошиб","результ","важн","салон","кисть","паста",
+                "сравн","гель","толщин","скорост","обучен","время")
+    featured=next((word for word in local
+                   if any(root in word.lower() for root in priorities)),None)
+    return (featured or max(local,key=len) if local else "").upper()[:limit]
 
 
 def plan(words: Sequence[Word], duration: float, choice: str,
@@ -455,10 +459,14 @@ def sound_track(path:Path,events:Sequence[GuideCue],duration:float,rate:int=4800
     """
     total=max(1,int(duration*rate))
     track=array("h",[0])*total
+    previous=-1
     for index,event in enumerate(events):
         family=index%3
         if event.effect in ("screen_push_digital","match_cut","zoom_through_text"):
             family=(index+1)%3
+        if family==previous:
+            family=(family+1)%3
+        previous=family
         start=max(0,int(event.start*rate))
         length=min(total-start,int((.25,.4,.19)[family]*rate))
         for i in range(max(0,length)):
