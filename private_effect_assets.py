@@ -29,7 +29,8 @@ SOUND_KEYWORDS={
               "пролёт","пролет","вжух"),
     "pop":("pop","bubble","click","tick","щелч","хлоп"),
 }
-ALLOWED_EXT={".mov",".wav"}
+AUDIO_EXT={".wav",".mp3",".ogg",".m4a"}
+ALLOWED_EXT={".mov",*AUDIO_EXT}
 ICON_KEYWORDS={
     "error":("error","wrong","cross","ошиб","крест"),
     "inspect":("magnif","search","glass","лупа","поиск"),
@@ -81,7 +82,7 @@ def prepare_private_effect_assets(
                     continue
                 sound_kind=next(
                     (kind for kind,words in SOUND_KEYWORDS.items()
-                     if filename.lower().endswith(".wav") and any(
+                     if Path(filename).suffix.lower() in AUDIO_EXT and any(
                          token in filename.casefold() for token in words)),
                     None
                 )
