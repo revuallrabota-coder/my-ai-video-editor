@@ -49,7 +49,13 @@ class TelegramDeliveryTests(unittest.TestCase):
     def test_sendvideo_is_primary_method_with_document_fallback(self):
         with tempfile.TemporaryDirectory() as t:
             file=Path(t)/"reels.mp4"
-            file.write_bytes(b"video data"*700)
+            subprocess.run([
+                "ffmpeg","-hide_banner","-loglevel","error","-y",
+                "-f","lavfi","-i","testsrc2=size=360x640:rate=15:duration=2",
+                "-f","lavfi","-i","sine=frequency=440:duration=2",
+                "-c:v","libx264","-preset","ultrafast",
+                "-c:a","aac","-shortest",str(file),
+            ],capture_output=True,check=True,timeout=50)
             class Reply:
                 def __init__(self,ok):
                     self.ok=ok
@@ -61,6 +67,14 @@ class TelegramDeliveryTests(unittest.TestCase):
                        side_effect=[Reply(False),Reply(True)]) as mocked:
                 send_video_to_telegram("TOKEN",1234,file,"Готовый ролик")
             self.assertTrue(mocked.call_args_list[0].args[0].endswith("/sendVideo"))
+            sent=mocked.call_args_list[0].kwargs
+            self.assertEqual(sent["data"]["width"],"360")
+            self.assertEqual(sent["data"]["height"],"640")
+            self.assertEqual(sent["data"]["duration"],"2")
+            self.assertEqual(sent["data"]["supports_streaming"],"true")
+            # A portrait thumbnail is generated for iOS clients that might
+            # otherwise make the chat player a square.
+            self.assertIn("thumbnail",sent["files"])
             self.assertTrue(mocked.call_args_list[1].args[0].endswith("/sendDocument"))
 
     def test_oversized_document_is_rejected_before_network(self):
