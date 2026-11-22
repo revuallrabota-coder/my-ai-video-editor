@@ -34,6 +34,7 @@ li{margin:9px 0;line-height:1.4}
 <div class="status" id="status" aria-live="polite">Загружаю полный код из нашего GitHub…</div>
 <button class="primary" id="copy" type="button" disabled>📋 Скопировать весь код</button>
 <button class="secondary" id="download" type="button" disabled>⬇️ Скачать файл worker.js</button>
+<button class="secondary" id="zip" type="button" disabled>📦 Скачать ZIP с кодом</button>
 <a class="link" href="https://dash.cloudflare.com/" target="_blank" rel="noopener">Открыть Cloudflare</a>
 <details>
 <summary>Если кнопка копирования не сработала</summary>
@@ -49,6 +50,7 @@ var source=document.getElementById("source");
 var message=document.getElementById("status");
 var copy=document.getElementById("copy");
 var download=document.getElementById("download");
+var zip=document.getElementById("zip");
 var fullCode="";
 function update(text,kind){
   message.textContent=text;
@@ -70,6 +72,7 @@ fetch("./cloudflare_launcher.js?copy="+Date.now(),{cache:"no-store"})
   source.value=code;
   copy.disabled=false;
   download.disabled=false;
+  zip.disabled=false;
   update("✅ Последняя версия получена. "+code.split("\n").length+
     " строк. Можно копировать весь файл одной кнопкой.","good");
 }).catch(function(error){
@@ -115,6 +118,50 @@ download.addEventListener("click",function(){
   a.remove();
   setTimeout(function(){URL.revokeObjectURL(url)},30000);
   update("⬇️ Подготовлен файл worker.js. Найди его в загрузках Safari.","good");
+});
+function makeZip(filename,contents){
+  // Single-file ZIP with STORED data; works without external libraries,
+  // internet connections or a third-party compression service.
+  var utf8=new TextEncoder();
+  var file=utf8.encode(contents), name=utf8.encode(filename);
+  var local=30+name.length+file.length;
+  var central=46+name.length;
+  var output=new Uint8Array(local+central+22);
+  var view=new DataView(output.buffer);
+  var crc=0xFFFFFFFF;
+  for(var i=0;i<file.length;i++){
+    crc^=file[i];
+    for(var bit=0;bit<8;bit++)crc=(crc>>>1)^((crc&1)?0xEDB88320:0);
+  }
+  crc=(crc^0xFFFFFFFF)>>>0;
+  var p=0;
+  function w16(v){view.setUint16(p,v,true);p+=2}
+  function w32(v){view.setUint32(p,v>>>0,true);p+=4}
+  w32(0x04034b50);w16(20);w16(0);w16(0);w16(0);w16(33);
+  w32(crc);w32(file.length);w32(file.length);
+  w16(name.length);w16(0);
+  output.set(name,p);p+=name.length;
+  output.set(file,p);p+=file.length;
+  var centralOffset=p;
+  w32(0x02014b50);w16(20);w16(20);w16(0);w16(0);
+  w16(0);w16(33);w32(crc);w32(file.length);w32(file.length);
+  w16(name.length);w16(0);w16(0);w16(0);w16(0);
+  w32(0);w32(0);
+  output.set(name,p);p+=name.length;
+  var centralSize=p-centralOffset;
+  w32(0x06054b50);w16(0);w16(0);w16(1);w16(1);
+  w32(centralSize);w32(centralOffset);w16(0);
+  return new Blob([output],{type:"application/zip"});
+}
+zip.addEventListener("click",function(){
+  if(!fullCode)return;
+  var blob=makeZip("worker.js",fullCode);
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url;a.download="cloudflare_worker_ipad.zip";
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url)},30000);
+  update("📦 ZIP с полным кодом готов. Открой его в Файлах iPad.","good");
 });
 })();
 </script>
