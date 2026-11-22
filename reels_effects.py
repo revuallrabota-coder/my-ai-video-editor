@@ -337,10 +337,10 @@ def apply_effects(
                                   animation_style)
     if studio_mode:
         # The studio subtitle layout is moved 143 ASS units upward to stay
-        # outside the speaker's arched video. Move emoji anchors equally,
-        # otherwise they float far below the spoken phrase.
+        # The dynamic studio caption panel uses a 48px upper offset.
+        # Keep emojis attached to their actual moving phrase coordinates.
         geometry=[
-            (start,end,x0,y0-143,x1,y1-143)
+            (start,end,x0,y0-48,x1,y1-48)
             for start,end,x0,y0,x1,y1 in geometry
         ]
     # Attach emoji to the emphasized phrase line, rather than the screen edge.
