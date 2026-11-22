@@ -255,6 +255,7 @@ def apply_effects(
     small_font_profile: str = "modern",
     animation_style: str = "float",
     private_assets = None,
+    studio_mode: bool = False,
 ) -> dict:
     """Тематические винтажные cutaway, эмодзи, звук, без изменения речи."""
     from telegram_editor import duration_and_audio, media_info, execute
@@ -286,8 +287,10 @@ def apply_effects(
     from retro_inserts import choose_retro_cues, make_retro_card, make_retro_sound_track
     from reference_motion_scenes import select_motion_cues, make_motion_assets
     from semantic_editing import choose_semantic_cues
-    semantic_cues=(choose_semantic_cues(words,duration,insert_density)
-                   if insert_style=="reference_soft" else [])
+    semantic_cues=(choose_semantic_cues(
+                       words,duration,"subtle" if studio_mode else insert_density
+                   ) if (insert_style=="reference_soft" or
+                         studio_mode and emoji=="on") else [])
     motion_cues=(select_motion_cues(words,duration,insert_density)
                  if insert_style=="reference_soft" else [])
     retro=(choose_retro_cues(words,duration,density=insert_density)
@@ -299,7 +302,8 @@ def apply_effects(
     }
     # No stickers merely for saying a generic "маникюр" or "видео".
     cues=([(c.start,semantic_emojis.get(c.kind)) for c in semantic_cues]
-          if insert_style=="reference_soft" else pick_cues(words,duration))
+          if studio_mode or insert_style=="reference_soft"
+          else pick_cues(words,duration))
     caption_cues = (pick_caption_cues(words,duration,style=caption_sound)
                     if caption_sound != "off" else [])
     # Обычные смайлы не перекрывают большую иллюстрированную карточку.
