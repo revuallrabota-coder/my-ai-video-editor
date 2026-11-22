@@ -925,7 +925,7 @@ def apply_effects(
                 *[GuideCue("notification_stack",o.start,o.end,o.concept)
                   for o in rendered_object_cues]
             ],key=lambda item:item.start)
-            guide_audio(audio,soundtrack_events,duration)
+            guide_audio(audio,soundtrack_events,duration,style=insert_style)
             args.extend(["-i",str(audio)])
             track_inputs.append(f"[{current_input}:a:0]")
             current_input+=1
