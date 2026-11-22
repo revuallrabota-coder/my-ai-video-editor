@@ -475,6 +475,12 @@ def main() -> None:
                     quality,delay,
                     **caption_extras,
                 )
+            if str(stats.get("filter_applied","none"))!=str(
+                config.get("video_filter","none")
+            ):
+                raise RuntimeError(
+                    "Выбранный фильтр не был передан в реальный рендер."
+                )
             if str(stats.get("talk_scene","off"))!=talk_scene:
                 raise RuntimeError(
                     "Сервер применил не тот стиль. "
@@ -488,6 +494,8 @@ def main() -> None:
                 + " · 🎵 звуки титров: " + str(stats.get("caption_sfx_count", 0))
                 + " · 🧠 смысловые акценты: " + str(stats.get("semantic_cue_count", 0))
                 + " · 🎞 графика/вставки: " + str(stats.get("insert_count", 0))
+                + " · 🔠 крупные анимированные слова: " + str(stats.get("kinetic_word_count", 0))
+                + " · 🎨 фильтр видео: " + str(stats.get("filter_applied", "none"))
                 + " · 🎨 иконки из ZIP: " + str(stats.get("private_asset_count", 0))
                 + " · 🔔 звуки вставок: " + str(stats.get("insert_sfx_count", 0))
             )
