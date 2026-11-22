@@ -31,7 +31,7 @@ SOUND_KEYWORDS={
 }
 AUDIO_EXT={".wav",".mp3",".ogg",".m4a"}
 PHOTO_EXT={".png",".jpg",".jpeg",".webp"}
-ALLOWED_EXT={".mov",*AUDIO_EXT,*PHOTO_EXT}
+ALLOWED_EXT={".mov",".mp4",*AUDIO_EXT,*PHOTO_EXT}
 ICON_KEYWORDS={
     "error":("error","wrong","cross","ошиб","крест"),
     "inspect":("magnif","search","glass","лупа","поиск"),
@@ -50,6 +50,7 @@ class PrivateAssets:
     icons: dict[str,Path]=field(default_factory=dict)
     sounds: dict[str,Path]=field(default_factory=dict)
     photos: list[Path]=field(default_factory=list)
+    backgrounds: dict[str,Path]=field(default_factory=dict)
     ignored_adobe_presets: int=0
     selected_files: int=0
 
@@ -89,14 +90,17 @@ def prepare_private_effect_assets(
                     None
                 )
                 photo_kind=(Path(filename).suffix.lower() in PHOTO_EXT
-                            and len(result.photos)<24)
+                            and len(result.photos)<64)
+                bg_kind=(Path(filename).suffix.lower()==".mp4"
+                         and filename.lower().startswith("background_grid_")
+                         and len(result.backgrounds)<3)
                 is_mov=filename.lower().endswith(".mov")
                 icon_kind=next((
                     kind for kind,words in ICON_KEYWORDS.items()
                     if is_mov and any(w in filename.casefold() for w in words)
                 ),None)
                 is_icon=filename in required_icons or bool(icon_kind)
-                if not is_icon and filename not in required_sounds and not sound_kind and not photo_kind:
+                if not is_icon and filename not in required_sounds and not sound_kind and not photo_kind and not bg_kind:
                     continue
                 if member.file_size>MAX_FILE_BYTES or member.file_size>remaining:
                     continue
@@ -104,7 +108,8 @@ def prepare_private_effect_assets(
                     continue
                 # Do not extract archive paths; use canonical generated basename.
                 kind_prefix=("icon_" if is_icon else
-                             "photo_" if photo_kind else "sound_")
+                             "photo_" if photo_kind else
+                             "background_" if bg_kind else "sound_")
                 dest=directory/(kind_prefix+filename.replace(" ","_"))
                 if dest.is_file():
                     continue
@@ -114,6 +119,11 @@ def prepare_private_effect_assets(
                 if dest.stat().st_size!=member.file_size:
                     dest.unlink(missing_ok=True)
                     continue
+                if bg_kind:
+                    # Separate source-neutral background loops from the talking
+                    # head; no imported video is pasted over a real person by
+                    # default. The user explicitly opts in via a scene style.
+                    result.backgrounds[filename.lower().removeprefix("background_").removesuffix(".mp4")]=dest
                 if photo_kind:
                     # Image asset is untrusted ZIP content, never a script.
                     # Check its format and reject unsafe decompression sizes.
