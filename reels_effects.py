@@ -626,8 +626,9 @@ def apply_effects(
             from guide18_fx import SUBJECT_FX
             guide_source=(source if cue.effect in SUBJECT_FX
                           else insert_source or source)
-            pattern,count=render_guide(
-                guide_source,folder,cue,i,words,
+            try:
+                pattern,count=render_guide(
+                    guide_source,folder,cue,i,words,
                 palette=studio_scene,
                 # Auto mode never pours unrelated decorative PNGs into a
                 # generic collage. Manual photo collage may use provided
@@ -645,7 +646,14 @@ def apply_effects(
                         else "grid_white")
                     if private_assets is not None else None
                 )
-            )
+                )
+            except Exception as exc:
+                # An automatic accent is optional: if we cannot identify and
+                # protect a person, SKIP instead of obscuring them or losing MP4.
+                if cue.compact:
+                    LOG.warning("Safe small animation skipped: %s",exc)
+                    continue
+                raise
             args.extend(["-framerate","15","-start_number","0",
                          "-i",pattern])
             fx=f"[guideclip{i}]"
@@ -665,35 +673,30 @@ def apply_effects(
             guide_count+=1
         insert_count+=guide_count
 
-        # Client-supplied transparent illustrated objects are speech-matched.
-        # Each has a separate non-overlapping time slot, gentle movement,
-        # 9:16-safe edge positioning and a synchronized quiet accent.
+        # Uploaded PNGs are never stretched into giant 400px cards.
+        # Render each as a small, precise RGBA overlay with dynamic
+        # silhouette protection and a verified clear side of the video.
+        from semantic_object_overlays import render_safe_object
         object_count=0
         for i,cue in enumerate(object_cues):
-            if not cue.path.is_file():
-                continue
             start,end=cue.start,cue.end
-            args.extend(["-loop","1","-framerate","30","-i",str(cue.path)])
-            width=max(105,round(255*sx))
-            height=max(135,round(275*sy))
+            try:
+                pattern,count=render_safe_object(
+                    insert_source or source,folder,cue,i
+                )
+            except Exception as exc:
+                LOG.warning("Skipping unsafe/unreadable user PNG: %s",exc)
+                continue
+            args.extend(["-framerate","15","-start_number","0","-i",pattern])
             layer=f"[spokenobject{i}]"
             filters.append(
-                f"[{current_input}:v]scale={width}:{height}:"
-                f"force_original_aspect_ratio=decrease:flags=lanczos,"
-                f"format=rgba,setpts=PTS-STARTPTS+{start:.3f}/TB,"
-                f"fade=t=in:st={start:.3f}:d=0.22:alpha=1,"
-                f"fade=t=out:st={max(start+.27,end-.22):.3f}:"
-                f"d=0.20:alpha=1{layer}"
+                f"[{current_input}:v]fps=30,scale={frame_width}:{frame_height}:"
+                f"flags=lanczos,format=rgba,"
+                f"setpts=PTS-STARTPTS+{start:.3f}/TB{layer}"
             )
-            left=(i%2==1)
-            x=(f"{round(30*sx)}+{round(16*sx)}*"
-               f"max(0,1-(t-{start:.3f})*2.7)" if left else
-               f"main_w-overlay_w-{round(30*sx)}-"
-               f"{round(16*sx)}*max(0,1-(t-{start:.3f})*2.7)")
-            y=f"main_h*{0.27 if i%2==0 else 0.39}-overlay_h/2"
             stage=f"[spokenobjectstage{i}]"
             filters.append(
-                f"{prev}{layer}overlay=x='{x}':y='{y}':"
+                f"{prev}{layer}overlay=x=0:y=0:"
                 f"enable='between(t,{start:.3f},{end:.3f})':"
                 f"shortest=0:eof_action=pass:repeatlast=0{stage}"
             )
