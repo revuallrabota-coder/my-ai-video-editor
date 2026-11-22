@@ -19,6 +19,10 @@ CONCEPTS = (
     ("pearl", ("жемчуг","бусин","украшен","pearl","jewel"), "soft_bell"),
     ("architecture", ("архитект","особняк","дворец","колонн","здани","palace","building"), "soft_bell"),
     ("ribbon", ("бант","лента","шёлк","шелк","атлас","ribbon","silk"), "paper"),
+    ("typewriter", ("печат","машинк","typewriter","typing"), "tick"),
+    ("documents", ("документ","архив","досье","папк","document","archive"), "paper"),
+    ("keyhole", ("ключ","секрет","доступ","разгад","keyhole","secret"), "stamp"),
+    ("door", ("двер","откры","вход","door","entrance"), "paper"),
 )
 
 def select_old_money_cues(words: Sequence[tuple[float,float,str]], duration: float,
@@ -94,6 +98,26 @@ def _draw_prop(d: ImageDraw.ImageDraw, theme: str, ink, gold) -> None:
         for dx in (-78,-26,26,78):
             d.rectangle((x+dx-10,y-51,x+dx+10,y+69),outline=ink,width=4)
         d.line((x-115,y+76,x+115,y+76),fill=gold,width=8)
+    elif theme=="typewriter":
+        d.rounded_rectangle((x-115,y-38,x+115,y+97),radius=15,outline=ink,width=8)
+        for row in range(3):
+            for col in range(7):
+                xx=x-83+27*col;yy=y-8+27*row
+                d.ellipse((xx-9,yy-9,xx+9,yy+9),outline=gold,width=3)
+        d.rectangle((x-73,y-90,x+73,y-38),outline=gold,width=4)
+    elif theme=="documents":
+        for dx,dy in ((-18,-12),(10,12)):
+            d.rectangle((x-91+dx,y-102+dy,x+83+dx,y+92+dy),outline=ink,width=5)
+            for k in range(4):
+                yy=y-61+dy+24*k
+                d.line((x-65+dx,yy,x+48+dx,yy),fill=gold,width=3)
+    elif theme=="keyhole":
+        d.ellipse((x-54,y-84,x+54,y+24),outline=gold,width=8)
+        d.polygon([(x-20,y+5),(x+20,y+5),(x+35,y+88),(x-35,y+88)],fill=ink)
+    elif theme=="door":
+        d.rectangle((x-92,y-112,x+92,y+110),outline=ink,width=8)
+        d.rectangle((x-69,y-87,x+69,y+83),outline=gold,width=3)
+        d.ellipse((x+35,y+5,x+53,y+22),fill=ink)
     elif theme=="ribbon":
         d.polygon([(x,y),(x-112,y-69),(x-105,y+53)],outline=ink)
         d.polygon([(x,y),(x+112,y-69),(x+105,y+53)],outline=ink)
