@@ -318,6 +318,17 @@ def main() -> None:
             )
             config=metadata.get("settings") or {}
             mode=config.get("mode","my_style")
+            talk_scene=str(config.get("talk_scene","off"))
+            if talk_scene not in ("off","contour","cream"):
+                raise ValueError("Недопустимый формат разговорного Reels.")
+            scene_name={
+                "off":"Обычное видео","contour":"Contour Talk",
+                "cream":"Cream Talk",
+            }[talk_scene]
+            send_text(token,owner,
+                "🎨 Подтверждённый стиль монтажа: "+scene_name+". "
+                "Расположение текста, графика и композиция взяты из этого проекта.")
+
             asset_packs=sorted((root/"source_clips").glob("asset_*.zip"))
             private_assets=None
             if asset_packs:
@@ -352,7 +363,13 @@ def main() -> None:
                 stage("planning","🧠 Подбираю смысловые вставки по тексту.")
                 # Explain WHY an illustration appears, never hide arbitrary
                 # decorative insert choices from the author of the Reels.
-                if config.get("insert_style","reference_soft")=="reference_soft":
+                if talk_scene!="off":
+                    send_text(token,owner,
+                        "✨ В студийном стиле оставляю только редкие "
+                        "небольшие акценты, подтверждённые речью. "
+                        "Огромные старые карточки и случайные картинки выключены.")
+                if (talk_scene=="off" and
+                    config.get("insert_style","reference_soft")=="reference_soft"):
                     from semantic_editing import choose_semantic_cues
                     plan=choose_semantic_cues(
                         words,seconds,str(config.get("insert_density","subtle"))
@@ -450,6 +467,11 @@ def main() -> None:
                     quality,delay,
                     **caption_extras,
                 )
+            if str(stats.get("talk_scene","off"))!=talk_scene:
+                raise RuntimeError(
+                    "Сервер применил не тот стиль. "
+                    "Готовое видео не отправляю как правильное."
+                )
             # Сохраняем фактические результаты наложения, а не обещаем
             # эмодзи и звук, если они не были добавлены рендерером.
             effect_report = (
@@ -479,7 +501,7 @@ def main() -> None:
                     "для отправки прямо в Telegram. Исходный мастер не заменяю.")
             telegram_file=telegram_copy(out,root/"telegram-reels.mp4")
             caption=(
-                "🎬 Готовый смонтированный Reels! "
+                "🎬 Готовый Reels · "+scene_name+"! "
                 "Видео воспроизводится прямо в Telegram.\n"
                 "🎞 Убраны паузы; скорость и субтитры синхронизированы."
                 +effect_report
