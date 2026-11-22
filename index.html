@@ -66,7 +66,17 @@
     .sample.reveal .big {animation:captionReveal .54s ease-out .16s both}
     .sample.reveal .small.after {animation:captionReveal .56s ease-out .35s both}
     .caption-bg {position:absolute;inset:0;opacity:.2;background:radial-gradient(circle at 50% 30%,#fdbfcf,transparent 50%)}
-    .previewbox video {width:100%;height:100%;max-height:none;object-fit:contain;background:#171022;position:absolute;inset:0}
+    .previewbox video {width:100%;height:100%;max-height:none;object-fit:cover;background:#171022;position:absolute;inset:0}
+    .studio-film-overlay {position:absolute;z-index:2;inset:0;pointer-events:none;opacity:0;
+      transition:opacity .22s ease;background:linear-gradient(to bottom,#502039ec 0%,#502039c0 24%,transparent 48%)}
+    .studio-preview-insert {position:absolute;z-index:5;right:5%;bottom:8%;width:37%;
+      border:2px solid #f8e9d9;border-radius:14px;overflow:hidden;background:#2c2026;
+      box-shadow:0 6px 14px #0008;pointer-events:none;animation:studioInsert 3.7s ease-in-out infinite}
+    .studio-preview-insert img {width:100%;height:auto;display:block;aspect-ratio:4/3;object-fit:cover}
+    .studio-preview-insert span {display:block;font-size:11px;padding:5px;color:#f8ebdb}
+    @keyframes studioInsert {0%,12%{opacity:0;transform:translate(30px,10px) scale(.9)}
+      22%,68%{opacity:1;transform:translate(0,0) scale(1)}
+      85%,100%{opacity:0;transform:translate(-12px,-9px) scale(.98)}}
     .footer {position:fixed;bottom:0;left:0;right:0;background:#fffefbeE;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #efdfef;backdrop-filter:blur(10px)}
     .footer-inner {max-width:570px;margin:auto;display:flex;gap:10px}
     .btn {border:0;border-radius:26px;padding:15px 20px;font-weight:800;font-size:16px}
@@ -147,12 +157,12 @@
     <label class="field" for="talkScene">🎭 Композиция разговорного Reels</label>
     <select id="talkScene">
       <option value="off" selected>Обычное видео на весь экран</option>
-      <option value="contour">Contour Talk — дизайнерский тёмный фон + арка</option>
-      <option value="cream">Cream Talk — светлый фон + арка и акценты</option>
-      <option value="pistachio">Фисташковый Talk — нежно-зелёный фон + арка</option>
-      <option value="burgundy_brown">Бургунди + шоколад — винно-коричневый фон + арка</option>
+      <option value="contour">Contour Talk — видео на весь экран + тёмные акценты</option>
+      <option value="cream">Cream Talk — видео на весь экран + кремовые акценты</option>
+      <option value="pistachio">Фисташковый Talk — видео на весь экран + зелёные акценты</option>
+      <option value="burgundy_brown">Бургунди + шоколад — видео на весь экран + бордовые акценты</option>
     </select>
-    <p class="note">Можно выбрать любой из 8 готовых стилей. Композиция кадра, шрифт, цвет и анимация меняются отдельно. В студийных форматах титры располагаются над аркой с говорящим человеком.</p>
+    <p class="note">Можно выбрать любой из 8 готовых стилей. Композиция кадра, шрифт, цвет и анимация меняются отдельно. В студийных форматах человек остаётся на полноценном вертикальном видео 9:16. Плавный текст, цветная прозрачная графика и короткие вставки накладываются на оригинальный кадр.</p>
     <label class="field" for="previewPhoto">📷 Фото для примерки оформления</label>
     <input id="previewPhoto" type="file" accept="image/*">
     <p class="note">Прикрепи любой кадр или фотографию: здесь сразу увидишь шрифт, размер, положение, цвет и овальную тень. Фото останется на iPad и не отправится для монтажа.</p>
@@ -165,6 +175,10 @@
       <img id="previewPhotoImage" class="preview-photo" alt="Фото для примерки оформления" hidden>
       <div id="topTitlePreview" style="position:absolute;top:10%;left:10%;right:10%;z-index:3;color:#fff;font-weight:800;font-size:clamp(15px,3.5vw,22px);letter-spacing:.25px;text-align:center;text-shadow:0 1px 5px #241a22c4;pointer-events:none" hidden></div>
       <video id="captionVideo" muted loop playsinline hidden></video>
+      <div class="studio-film-overlay" id="studioFilmOverlay"></div>
+      <div class="studio-preview-insert" id="studioPreviewInsert" hidden>
+        <img id="studioInsertImage" alt="" hidden><span>🎞 ФРАГМЕНТ ВИДЕО</span>
+      </div>
       <div class="sample reveal" id="sample">
         <span class="small before" id="sampleBefore">посмотри на</span>
         <span class="big" id="sampleBig">ОШИБКУ</span>
@@ -253,13 +267,14 @@
     <div class="mini" id="assetPacksInfo">Наборы не выбраны: будут использоваться встроенные смысловые графические сцены.</div>
     <label class="option"><input id="assetSfx" type="checkbox" checked> 🔈 Звуки появления анимированных вставок (Whoosh) и мои WAV из ZIP</label>
     <label class="field" for="motionFrequency">Как часто добавлять большие вставки</label>
-    <select id="motionFrequency"><option value="subtle" selected>Умно и редко: только когда есть подходящий смысл</option><option value="balanced">Умеренно: смысловые вставки с паузами</option><option value="dynamic">Активнее: но тоже только по теме речи</option></select>
-    <p class="note">Редактор сначала читает распознанную речь: «найди ошибку» → лупа или крестик; «результат» → галочка; «секунды» → часы; «сравним» → фотоколлаж; «монтаж» → графическая сцена. Без смыслового совпадения вставка не появится. В одном видео могут вообще не понадобиться большие вставки.</p>
+    <select id="motionFrequency"><option value="subtle">Редко: крупные акценты по смыслу</option><option value="balanced" selected>Умеренно: вставки каждые несколько фраз</option><option value="dynamic">Динамично: больше коротких вставок и переходов</option></select>
+    <p class="note">Редактор сначала читает распознанную речь: «найди ошибку» → лупа или крестик; «результат» → галочка; «секунды» → часы; «сравним» → фотоколлаж; «монтаж» → графическая сцена. В разговорных стилях дополнительно создаются короткие анимированные фотокарточки из твоего собственного видео на границах фраз, чтобы монтаж не превращался в неподвижный шаблон.</p>
     <p class="note">Эмодзи появляются плавно только возле смысловых фраз. Большие иллюстрированные карточки больше не добавляются автоматически.</p>
     <label class="field" for="soundfx">🔊 Звуковые акценты на ключевых словах</label>
     <select id="soundfx">
       <option value="soft" selected>Тихие мягкие акценты</option>
       <option value="punch">Чуть выразительнее</option>
+      <option value="whoosh">Воздушный whoosh</option>
       <option value="off">Без акцентов</option>
     </select>
     <label class="field" for="subtitleSfx">🎵 Звук появления субтитров</label>
