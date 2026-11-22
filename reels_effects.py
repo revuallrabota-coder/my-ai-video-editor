@@ -567,25 +567,59 @@ def apply_effects(
             current_input += 1
             sfx_count = len(cues)
         if caption_sound != "off" and has_audio and caption_cues:
-            track = folder/"subtitle_pops.wav"
-            intensity = ("caption_typewriter" if caption_sound=="typewriter" else
-                         "caption_soft" if caption_sound=="soft" else "caption_tick")
-            make_sfx_track(track,caption_cues,duration,intensity)
-            args.extend(["-i",str(track)])
-            track_inputs.append(f"[{current_input}:a:0]")
-            current_input += 1
-            caption_sfx_count = len(caption_cues)
+            private_typewriter=(private_assets.sounds.get("typewriter")
+                                if private_assets is not None and
+                                caption_sound=="typewriter" else None)
+            if private_typewriter and private_typewriter.is_file():
+                # An uploaded real typewriter is preferred to a synthesized
+                # substitute. Each key phrase gets a short copy, never louder
+                # than the original speech.
+                for i,(t,_) in enumerate(caption_cues[:18]):
+                    args.extend(["-i",str(private_typewriter)])
+                    label=f"[private_typing{i}]"
+                    filters.append(
+                        f"[{current_input}:a:0]atrim=duration=0.55,"
+                        f"asetpts=PTS-STARTPTS,aresample=48000,"
+                        f"volume=0.13,adelay={int(t*1000)}:all=1{label}"
+                    )
+                    track_inputs.append(label)
+                    current_input+=1
+                    caption_sfx_count+=1
+            else:
+                track = folder/"subtitle_pops.wav"
+                intensity = ("caption_typewriter" if caption_sound=="typewriter" else
+                             "caption_soft" if caption_sound=="soft" else "caption_tick")
+                make_sfx_track(track,caption_cues,duration,intensity)
+                args.extend(["-i",str(track)])
+                track_inputs.append(f"[{current_input}:a:0]")
+                current_input += 1
+                caption_sfx_count = len(caption_cues)
         if insert_sound=="on" and has_audio and studio_insert_count:
-            # A quiet original whoosh at EACH actual selected moving insert.
-            track=folder/"animated_inserts_whoosh.wav"
-            make_sfx_track(
-                track,[(c.start,None) for c in studio_cues[:studio_insert_count]],
-                duration,"whoosh"
-            )
-            args.extend(["-i",str(track)])
-            track_inputs.append(f"[{current_input}:a:0]")
-            current_input+=1
-            insert_sfx_count+=studio_insert_count
+            uploaded_whoosh=(private_assets.sounds.get("whoosh")
+                             if private_assets is not None else None)
+            if uploaded_whoosh and uploaded_whoosh.is_file():
+                for i,cue in enumerate(studio_cues[:studio_insert_count]):
+                    args.extend(["-i",str(uploaded_whoosh)])
+                    label=f"[user_whoosh{i}]"
+                    filters.append(
+                        f"[{current_input}:a:0]atrim=duration=0.56,"
+                        f"asetpts=PTS-STARTPTS,aresample=48000,"
+                        f"volume=0.095,adelay={int(cue.start*1000)}:all=1{label}"
+                    )
+                    track_inputs.append(label)
+                    current_input+=1
+                    insert_sfx_count+=1
+            else:
+                # An original synthesized whoosh on every actual moving insert.
+                track=folder/"animated_inserts_whoosh.wav"
+                make_sfx_track(
+                    track,[(c.start,None) for c in studio_cues[:studio_insert_count]],
+                    duration,"whoosh"
+                )
+                args.extend(["-i",str(track)])
+                track_inputs.append(f"[{current_input}:a:0]")
+                current_input+=1
+                insert_sfx_count+=studio_insert_count
         if insert_sound=="on" and has_audio and rendered_retro:
             cue_track=folder/"retro_insert_accents.wav"
             make_retro_sound_track(cue_track, rendered_retro, duration,
