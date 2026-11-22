@@ -625,16 +625,18 @@ def edit_video(
             caption_position="top" if talk_scene!="off" else caption_position,
             quality=quality,
             caption_sound=subtitle_sfx,
-            # Studio scenes already include their own tightly themed visual
-            # language. Do not stack giant legacy cards and full-frame inserts
-            # over the portrait and its deliberately reserved caption area.
-            insert_style="off" if talk_scene!="off" else insert_style,
+            # Studio styles use their own floating picture inserts from real
+            # footage, rather than giant white legacy full-screen cards.
+            # Respect the user's explicit insert switch in every style.
+            insert_style=insert_style,
             insert_density=insert_density,
             insert_sound=insert_sound,
-            private_assets=None if talk_scene!="off" else private_assets,
+            private_assets=private_assets,
             font_profile=font_profile, small_font_profile=small_font_profile,
             animation_style=animation_style,
             studio_mode=(talk_scene!="off"),
+            studio_scene=talk_scene,
+            insert_source=(work if talk_scene!="off" else None),
         )
     return {
         "before": round(duration, 1),
