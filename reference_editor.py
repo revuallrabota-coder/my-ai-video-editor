@@ -462,6 +462,7 @@ def montage_by_reference(
         "after": round(sum(s.end - s.start for s in kept) / speed, 1),
         "subtitle_events": count,
         "subtitle_delay": round(subtitle_delay, 2),
+        "talk_scene": talk_scene,
         **effect_stats,
         "reference_scene_changes": profile.scene_changes,
         "reference_pace_seconds": profile.seconds_per_change,
