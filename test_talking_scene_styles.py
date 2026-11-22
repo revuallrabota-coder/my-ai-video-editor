@@ -45,10 +45,36 @@ class TwoTalkingReelsLooks(unittest.TestCase):
                 self.assertIn("\\fad(",script)
                 ass=Path(temp)/(style+".ass")
                 ass.write_text(script,"utf-8")
-                append_scene_ornaments(ass,words,style)
+                badges=append_scene_ornaments(ass,words,style)
                 enhanced=ass.read_text("utf-8")
-                self.assertIn("Style: TalkBadge",enhanced)
+                # Generic speech shorter than 4 seconds must NOT generate
+                # arbitrary cards, even in a graphics-forward preset.
+                self.assertEqual(badges,0)
+                self.assertNotIn("Style: TalkBadge",enhanced)
                 self.assertIn("Dialogue: 2",enhanced)
+
+    def test_stickers_only_when_approved_speech_explicitly_justifies_them(self):
+        words=[
+            (.0,.6,"давайте"),(.7,1.2,"посмотрим"),
+            (2.8,3.2,"найди"),(3.3,3.9,"ошибку"),
+            (4.0,4.6,"в"),(4.7,5.3,"маникюре"),
+            (6.0,7.1,"объясняю"),(7.2,8.0,"почему"),
+            (8.1,9.0,"так"),(9.1,10.0,"случилось")
+        ]
+        from reference_cascade_captions import build_reference_cascade_ass
+        for style in ("contour","cream"):
+            ass_text,_=build_reference_cascade_ass(
+                words,caption_position="studio",
+                caption_variant="contour_talk" if style=="contour" else "cream_talk"
+            )
+            with tempfile.TemporaryDirectory() as tmp:
+                ass=Path(tmp)/"subtitles.ass"
+                ass.write_text(ass_text,"utf-8")
+                badges=append_scene_ornaments(ass,words,style)
+                self.assertLessEqual(badges,1)
+                self.assertNotIn("МАСТЕР",ass.read_text("utf-8"))
+                if badges:
+                    self.assertIn("ОШИБКУ",ass.read_text("utf-8"))
 
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"),
                          "FFmpeg is not installed")
