@@ -120,14 +120,15 @@ def choose_object_cues(
 
 
 def render_safe_object(source: Path, folder: Path,
-                       cue: ObjectCue, index: int) -> tuple[str, int]:
+                       cue: ObjectCue, index: int,
+                       caption_position: str="middle") -> tuple[str, int]:
     """Render a small, speech-matched RGBA illustration without covering anyone.
 
     The chosen stationary position must remain free over the entire cue;
     a dilated per-frame silhouette also cuts out any residual overlap. The
     caller should simply skip the decoration if segmentation is unavailable.
     """
-    from PIL import Image, ImageChops, ImageFilter
+    from PIL import Image, ImageChops, ImageFilter, ImageDraw
     from guide18_fx import FPS, _read_video, _mask_frames
 
     duration = cue.end - cue.start
@@ -146,11 +147,21 @@ def render_safe_object(source: Path, folder: Path,
         raise ValueError("В PNG нет пригодного изображения.")
     # Do not upscale a tiny JPEG/PNG into a fuzzy sticker.
     w, h = art.size
-    expanded_masks = [
-        mask.filter(ImageFilter.MaxFilter(47)).resize(
-            (width, height), Image.Resampling.BILINEAR
-        ) for mask in masks
-    ]
+    protected_bands={
+        "top":(190,655),
+        "middle":(445,980),
+        "bottom":(640,1165),
+    }
+    if caption_position not in protected_bands:
+        raise ValueError("Недопустимое положение субтитров.")
+    top,bottom=protected_bands[caption_position]
+    expanded_masks=[]
+    for mask in masks:
+        expanded=mask.filter(ImageFilter.MaxFilter(47)).resize(
+            (width,height),Image.Resampling.BILINEAR
+        )
+        ImageDraw.Draw(expanded).rectangle((65,top,655,bottom),fill=255)
+        expanded_masks.append(expanded)
     positions = (
         (34, 280), (width-w-34, 280),
         (34, 480), (width-w-34, 480),
