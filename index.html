@@ -633,6 +633,19 @@
     var scene=byId('talkScene').value;
     var box=byId('previewBox');
     box.querySelector('.caption-bg').style.opacity=scene==='off'?'.2':'0';
+    var film=byId('studioFilmOverlay');
+    var pigment={
+      contour:'#243b32',cream:'#fff0c5',
+      pistachio:'#dce7c5',burgundy_brown:'#502039'
+    }[scene]||'#502039';
+    film.style.opacity=scene==='off'?'0':'1';
+    film.style.background='linear-gradient(to bottom,'+
+      pigment+'ee 0%,'+pigment+'c0 24%,'+pigment+'00 48%)';
+    byId('studioPreviewInsert').hidden=scene==='off'||!byId('motionInserts').checked;
+    byId('studioPreviewInsert').style.background=pigment;
+    var existingPhoto=byId('previewPhotoImage');
+    byId('studioInsertImage').hidden=existingPhoto.hidden;
+    if(!existingPhoto.hidden)byId('studioInsertImage').src=existingPhoto.src;
     box.style.background=scene==='contour'
       ?'repeating-radial-gradient(ellipse at 40% 55%, #243e35 0 2px, #1b3029 4px 11px, #355749 12px 13px, #1b3029 14px 22px)'
       :scene==='cream'?'#FFF0BF':
@@ -684,10 +697,10 @@
     sample.style.top=scene!=='off'?'17%':spots[byId('position').value]||'56%';
     var media=[byId('previewPhotoImage'),byId('captionVideo')];
     media.forEach(function(node){
-      node.style.top=scene!=='off'?'37%':'0';
-      node.style.height=scene!=='off'?'63%':'100%';
+      node.style.top='0';
+      node.style.height='100%';
       node.style.width='100%';
-      node.style.borderRadius=scene!=='off'?'50% 50% 0 0 / 14% 14% 0 0':'0';
+      node.style.borderRadius='0';
       node.style.objectFit='cover';
     });
     var layout=byId('subjectLayout').value;
@@ -759,17 +772,30 @@
       byId('fontSmall').value=cfg.small;
       byId('color').value=cfg.color;
       byId('talkScene').value=cfg.scene;
+      if(cfg.scene!=='off'){
+        byId('motionInserts').checked=true;
+        byId('motionFrequency').value='dynamic';
+        byId('assetSfx').checked=true;
+        byId('subtitleSfx').value='typewriter';
+      }
       // Every curated look uses the same gentle, mixed-size caption renderer.
       byId('subtitleStyle').value='reference_dynamic';
     }
     updateSample();
   });
   ['color','fontBig','fontSmall','captionVariant','captionBackground',
+   'motionInserts','motionFrequency','assetSfx','subtitleSfx',
    'captionAnimation','position','subjectLayout','talkScene','outline','shadow','hookText','subtitleStyle','filter',
    'topTitleText','topTitleMode','previewKeyword'
   ].forEach(function(id){
     byId(id).addEventListener('input',function(){
       if(id==='talkScene'){
+        if(this.value!=='off'){
+          byId('motionInserts').checked=true;
+          byId('assetSfx').checked=true;
+          if(byId('subtitleSfx').value==='soft')
+            byId('subtitleSfx').value='typewriter';
+        }
         // A manually selected canvas must automatically get readable
         // contrasting captions, otherwise burgundy becomes black-on-black.
         // Subsequent color/font edits are still fully independent.
