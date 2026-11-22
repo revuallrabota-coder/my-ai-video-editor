@@ -274,37 +274,30 @@
     <p class="note">Можно прикрепить 4 приватных ZIP-пакета суммарно до 100 МБ. Для эффектов из PDF можно добавить JPG/PNG/WebP в ZIP, чтобы карусели, коллажи и сетки показывали именно твои фотографии. Без них используем кадры видео. MOV/WAV тоже поддерживаются. Adobe .mogrt/.ffx не запускаются в FFmpeg. Эти файлы не публикуются в GitHub.</p>
     <div class="mini" id="assetPacksInfo">Наборы не выбраны: будут использоваться встроенные смысловые графические сцены.</div>
     <label class="option"><input id="assetSfx" type="checkbox" checked> 🔈 Звуки появления анимированных вставок (Whoosh) и мои WAV из ZIP</label>
-    <label class="field" for="guideEffect">🎬 12 эффектов + 6 стилей из твоего PDF</label>
-    <select id="guideEffect">
-      <option value="auto" selected>✨ Небольшие акценты по смыслу речи, без огромных заставок</option>
-      <option value="off">Без приёмов из PDF, только стандартные титры</option>
-      <optgroup label="12 отдельных эффектов">
-        <option value="pov_carousel_spin">1. Карусель карточек вокруг человека *</option>
-        <option value="liquid_glass_graph">2. Жидкое стекло и анимированный график</option>
-        <option value="match_cut">3. Match cut на главном слове</option>
-        <option value="screen_push_digital">4. Пиксельные слова с RGB-сдвигом</option>
-        <option value="apple_ui_toggles">5. Анимированные переключатели iOS</option>
-        <option value="over_shoulder_zoom">6. Наезд камеры и карточки-доказательства</option>
-        <option value="text_behind_me">7. Огромное слово за человеком *</option>
-        <option value="notification_stack">8. Стопка уведомлений над головой</option>
-        <option value="phone_3d_float">9. Видео в парящем 3D-телефоне</option>
-        <option value="split_clones">10. Три копии со сдвигом времени</option>
-        <option value="sticker_cutout">11. Я как стикер *</option>
-        <option value="zoom_through_text">12. Пролёт сквозь большую букву</option>
-      </optgroup>
-      <optgroup label="6 дополнительных стилей">
-        <option value="glass_explainer_reel">13. Объяснялка со стеклянными карточками</option>
-        <option value="cinematic_type_reel">14. Кинотипографика с перебивкой</option>
-        <option value="image_cluster_reel">15. Картинки над головой</option>
-        <option value="cutout_grid_reel">16. Человек поверх сетки 2×2 *</option>
-        <option value="depth_ui_reel">17. Интерфейс за спиной *</option>
-        <option value="split_reel">18. Разделённый экран с VS</option>
-      </optgroup>
+    <label class="field" for="smartFxMode">🎬 Как монтажёр выбирает анимации</label>
+    <select id="smartFxMode">
+      <option value="auto" selected>✨ Умный монтаж: ИИ выбирает эффект по смыслу речи</option>
+      <option value="favorites">🎛 Выбрать несколько любимых приёмов</option>
+      <option value="off">Без дополнительных анимационных приёмов</option>
     </select>
-    <p class="note">Автоматический режим сохраняет первые 4 секунды чистыми: только твоё видео и плавные субтитры. Затем показывает лишь маленькие визуальные акценты, если их смысл подтверждён произнесёнными словами. Текстовые вставки не должны перекрывать человека или субтитры. Полноэкранные спецэффекты доступны только при отдельном ручном выборе. Для выделения фигуры используется сегментация.</p>
+    <input id="guideEffect" type="hidden" value="auto">
+    <details id="fxFavorites" hidden>
+      <summary style="font-weight:700;margin:12px 0">Любимые приёмы: можно отметить несколько</summary>
+      <div class="mini">Монтажёр применит только выбранные приёмы и только когда они подходят под произнесённые слова. Он не обязан использовать все варианты.</div>
+      <label class="option"><input type="checkbox" name="preferredGuideFx" value="pov_carousel_spin"> 🖼 Перечисление, много вариантов → небольшая карусель</label>
+      <label class="option"><input type="checkbox" name="preferredGuideFx" value="match_cut"> ⭐ Главное, важный момент → выделить ключевое слово</label>
+      <label class="option"><input type="checkbox" name="preferredGuideFx" value="split_reel"> ⚖️ Сравнение, разница → два кадра рядом</label>
+      <label class="option"><input type="checkbox" name="preferredGuideFx" value="glass_explainer_reel"> 💡 Почему, причина → пояснение</label>
+      <label class="option"><input type="checkbox" name="preferredGuideFx" value="apple_ui_toggles"> ✅ Шаги, этапы → последовательная анимация</label>
+      <label class="option"><input type="checkbox" name="preferredGuideFx" value="image_cluster_reel"> 📷 Пример, фотография → кадры из видео или свои фото</label>
+      <label class="option"><input type="checkbox" name="preferredGuideFx" value="liquid_glass_graph"> 📈 Результат, прогресс → анимированная линия</label>
+      <label class="option"><input type="checkbox" name="preferredGuideFx" value="notification_stack"> 💬 Внимание, совет → компактная карточка</label>
+      <p class="note" id="chosenFxHint" aria-live="polite">Отметь один или несколько приёмов.</p>
+    </details>
+    <p class="note">Автоматический режим сохраняет первые 4 секунды чистыми. Потом анализирует речь и выбирает ровно тот приём, который помогает объяснить сказанное. Для списка — карусель, для сравнения — два кадра, для главной мысли — выделение. Эффекты не накладываются друг на друга и не закрывают человека или субтитры. Если подходящего смысла нет, анимация пропускается.</p>
     <label class="field" for="motionFrequency">Как часто добавлять небольшие смысловые вставки</label>
     <select id="motionFrequency"><option value="subtle">Редко: только самые важные слова</option><option value="balanced" selected>Аккуратно: небольшие акценты по смыслу</option><option value="dynamic">Чаще: короткие, но небольшие вставки</option></select>
-    <p class="note">Редактор сначала читает распознанную речь: «найди ошибку» → лупа или крестик; «результат» → галочка; «секунды» → часы; «сравним» → фотоколлаж; «монтаж» → графическая сцена. В разговорных стилях дополнительно создаются короткие анимированные фотокарточки из твоего собственного видео на границах фраз, чтобы монтаж не превращался в неподвижный шаблон.</p>
+    <p class="note">Эстетика задаёт оформление, а смысл речи — выбор приёма: разные задачи не перемешиваются. Для новых каруселей используются только твои материалы или реальные кадры твоего видео.</p>
     <p class="note">Эмодзи появляются плавно только возле смысловых фраз. Большие иллюстрированные карточки больше не добавляются автоматически.</p>
     <label class="field" for="soundfx">🔊 Звуковые акценты на ключевых словах</label>
     <select id="soundfx">
@@ -465,6 +458,30 @@
   var photoInput=byId('photos');
   function fmtBytes(n){return n>=1000000000?(n/1000000000).toFixed(2)+' ГБ':(n/1000000).toFixed(1)+' МБ'}
   function selectedText(id){return byId(id).options[byId(id).selectedIndex].text}
+  function configuredGuideEffect(){
+    var mode=byId('smartFxMode').value;
+    var selected=Array.from(document.querySelectorAll('input[name="preferredGuideFx"]:checked'))
+      .map(function(node){return node.value});
+    var guide=(mode==='auto'?'auto':mode==='favorites'&&selected.length
+      ?'multi:'+selected.join(','):'off');
+    byId('guideEffect').value=guide;
+    return guide;
+  }
+  function refreshSmartFx(){
+    var manual=byId('smartFxMode').value==='favorites';
+    byId('fxFavorites').hidden=!manual;
+    if(manual)byId('fxFavorites').open=true;
+    var chosen=document.querySelectorAll('input[name="preferredGuideFx"]:checked').length;
+    byId('chosenFxHint').textContent=chosen
+      ?'Выбрано '+chosen+' приёмов. Монтажёр применит только уместные по речи.'
+      :'Отметь один или несколько приёмов. Пока ничего не выбрано, дополнительные приёмы отключены.';
+    configuredGuideEffect();
+  }
+  byId('smartFxMode').addEventListener('change',refreshSmartFx);
+  document.querySelectorAll('input[name="preferredGuideFx"]').forEach(function(node){
+    node.addEventListener('change',refreshSmartFx);
+  });
+  refreshSmartFx();
   function getSettings(){
     return {
       videoFiles:selectedClips.map(function(f){return {name:f.name,sizeBytes:f.size}}),
@@ -491,7 +508,7 @@
       shadow:Number(byId('shadow').value),
       emoji:byId('emoji').checked,
       motionInserts:byId('motionInserts').checked,
-      guideEffect:byId('guideEffect').value,
+      guideEffect:configuredGuideEffect(),
       motionDensity:byId('motionFrequency').value,
       soundEffects:byId('soundfx').value,
       topTitle:byId('topTitleText').value.trim(),
@@ -884,7 +901,6 @@
         byId('filter').value='old_money';
         byId('motionInserts').checked=true;
         byId('assetSfx').checked=true;
-        byId('guideEffect').value='off';
         byId('motionFrequency').value='subtle';
         if(byId('subtitleSfx').value==='off')byId('subtitleSfx').value='soft';
       }
@@ -892,7 +908,6 @@
         byId('filter').value=this.value==='pink_tender'?'pink_tender':'burgundy';
         byId('motionInserts').checked=true;
         byId('assetSfx').checked=true;
-        byId('guideEffect').value='off';
         byId('motionFrequency').value='balanced';
         if(byId('subtitleSfx').value==='off')byId('subtitleSfx').value='soft';
       }
@@ -901,7 +916,6 @@
         byId('subtitleSfx').value='typewriter';
         byId('motionInserts').checked=true;
         byId('assetSfx').checked=true;
-        byId('guideEffect').value='auto';
         byId('motionFrequency').value='balanced';
       }
       // Scene and typography never overwrite the user's audio, animation
