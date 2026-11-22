@@ -23,6 +23,12 @@ These are different layers. Autumn props are not universal vintage stickers for 
 - Pixabay small projector sound: https://pixabay.com/sound-effects/technology-small-film-projector-26188/
 - Pixabay 8mm film sound: https://pixabay.com/sound-effects/technology-008222-8mm-film-projector-61319/
 - Freesound film-projector recording (CC BY, attribution required): https://freesound.org/people/Metzik/sounds/393408/
+- Freesound CC0 24-bit 48 kHz source: https://freesound.org/people/AudioWay/sounds/487806/ (login required for original WAV)
+- Freesound CC0 32-bit 96 kHz 16mm source: https://freesound.org/people/Oldome/sounds/864881/ (login required for original WAV)
+- BigSoundBank real Magnon Duomatic DX87 8mm projector, CC0, original 48 kHz 24-bit mono: https://bigsoundbank.com/8mm-projector-2-s2824.html
+- BigSoundBank real 35mm Kinoton FP30 projector, CC0, original 48 kHz 24-bit mono: https://bigsoundbank.com/35mm-cinema-projector-4-s0068.html
+- Original downloadable recordings were NOT mirrored or committed in this implementation: this environment cannot reach original audio download hosts. The shipping soundtrack is locally synthesized by vintage_cinema.py. Do not label it a recovered archival recording.
+
 - Mixkit old film stock clips: https://mixkit.co/free-stock-video/old-film/
 - Mixkit Sound Effects Free License: https://mixkit.co/license/modal/sfxFree/
 - Pexels license: https://www.pexels.com/legal-pages/license/
