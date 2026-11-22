@@ -8,7 +8,7 @@ const CHUNK = 4000000;
 const MAX_VIDEO = 500000000;
 const MAX_ASSETS = 100000000;
 const TTL = 259200;
-const CONTRACT = 2;
+const CONTRACT = 3;
 const STAGES = {
   queued:35, downloading:42, joining:53, transcribing:63, review:72,
   planning:78, rendering:86, publishing:94, done:100, failed:100
@@ -76,7 +76,7 @@ function parseSettings(s) {
   const emoji=String(s.emoji_mode ?? "on");
   const quality=String(s.export_quality ?? "high");
   const delay=Number(s.subtitle_delay ?? 0);
-  if (!["off","soft","punch"].includes(sound) ||
+  if (!["off","soft","punch","whoosh"].includes(sound) ||
       !["off","on"].includes(emoji) ||
       !["high","balanced"].includes(quality) ||
       !Number.isFinite(delay) || delay<-.5 || delay>1.5) {
