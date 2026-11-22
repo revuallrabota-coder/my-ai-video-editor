@@ -432,6 +432,7 @@ def main() -> None:
                 top_title=str(config.get("top_title","")),
                 top_title_mode=str(config.get("top_title_mode","auto")),
                 # Small emoji never enable oversized themed cards.
+                guide_effect=str(config.get("guide_effect","auto")),
                 insert_style=str(config.get("insert_style","reference_soft")),
                 insert_density=str(config.get(
                     "insert_density",
@@ -496,6 +497,7 @@ def main() -> None:
                 + " · 🎞 графика/вставки: " + str(stats.get("insert_count", 0))
                 + " · 🔠 крупные анимированные слова: " + str(stats.get("kinetic_word_count", 0))
                 + " · 🎨 фильтр видео: " + str(stats.get("filter_applied", "none"))
+                + " · ✨ Приёмы из гайда: " + str(stats.get("guide_effect_count", 0))
                 + " · 🎨 иконки из ZIP: " + str(stats.get("private_asset_count", 0))
                 + " · 🔔 звуки вставок: " + str(stats.get("insert_sfx_count", 0))
             )
