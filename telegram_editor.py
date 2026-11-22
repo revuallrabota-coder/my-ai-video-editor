@@ -14,8 +14,10 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -37,14 +39,65 @@ class Segment:
     end: float
 
 
+def _safe_process_memory(pid: int) -> str:
+    """Best-effort ffmpeg resource counters without filenames or private inputs."""
+    try:
+        status=Path(f"/proc/{pid}/status").read_text(errors="replace")
+        used=next((line.split(":")[1].strip() for line in status.splitlines()
+                   if line.startswith("VmRSS:")),"?")
+        with open("/proc/meminfo",encoding="ascii") as handle:
+            avail=next((line.split(":")[1].strip() for line in handle
+                        if line.startswith("MemAvailable:")),"?")
+        disk=shutil.disk_usage(tempfile.gettempdir())
+        return f"rss={used},mem_available={avail},disk_free_mb={disk.free//1048576}"
+    except (OSError,ValueError):
+        return "resource counters unavailable"
+
+
 def execute(command: Sequence[str], *, allow_failure: bool = False) -> subprocess.CompletedProcess:
-    process = subprocess.run(
-        list(command), capture_output=True, text=True, encoding="utf-8", errors="replace"
+    """Report FFmpeg liveness to GitHub every 30 seconds.
+
+    Previously subprocess.run(capture_output=True) could be silent for tens of
+    minutes. A killed GitHub runner then left absolutely no diagnostic trace.
+    Do not log command arguments or local user-file paths.
+    """
+    cmd=list(command)
+    name=Path(cmd[0]).name if cmd else "subprocess"
+    started=time.monotonic()
+    process=subprocess.Popen(
+        cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+        text=True,encoding="utf-8",errors="replace",
     )
-    if process.returncode != 0 and not allow_failure:
-        # Не показываем пользователю внутренние аргументы команд или секреты.
-        raise RuntimeError("Не удалось обработать видеодорожку. Подробности есть в журнале задания.")
-    return process
+    while True:
+        try:
+            stdout,stderr=process.communicate(timeout=30)
+            break
+        except subprocess.TimeoutExpired:
+            elapsed=round(time.monotonic()-started)
+            LOG.warning("Media process still active: %s after %ss (%s)",
+                        name,elapsed,_safe_process_memory(process.pid))
+            # A single stuck encoding pass should never consume the entire
+            # GitHub Actions 90-minute limit without an actionable error.
+            if elapsed>25*60:
+                process.kill()
+                process.communicate()
+                raise TimeoutError(
+                    f"{name}: одна операция длится более 25 минут; "
+                    "смотри последние замеры памяти и диска в журнале GitHub."
+                )
+    result=subprocess.CompletedProcess(cmd,process.returncode,stdout,stderr)
+    if result.returncode != 0 and not allow_failure:
+        # FFmpeg stderr can explain codec/filter/OOM errors. It never includes
+        # environment secrets because arguments are deliberately not logged.
+        tail=(stderr or "").strip()[-1400:]
+        LOG.error("Media process %s exited %s after %.1fs: %s",
+                  name,result.returncode,time.monotonic()-started,tail)
+        raise RuntimeError(
+            "Не удалось обработать видео: ошибка "+name+
+            f" (код {result.returncode}). Проверь последние строки журнала."
+        )
+    LOG.info("Media process %s completed in %.1fs",name,time.monotonic()-started)
+    return result
 
 
 def media_info(path: Path) -> dict:
