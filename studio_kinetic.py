@@ -14,7 +14,6 @@ from typing import Sequence
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from reference_dynamic_captions import phrase_groups
-from reference_motion_scenes import _frame
 
 Word = tuple[float, float, str]
 PALETTES = {
@@ -78,7 +77,7 @@ def _font(size: int, bold: bool=True):
 def make_studio_card(
     video: Path, output: Path, cue: KineticCue, scene: str,
 ) -> None:
-    """An animated video-frame cutaway card: theme + real still + spoken word."""
+    """Transparent editorial frame for the live moving-video cutaway."""
     if scene not in PALETTES:
         raise ValueError("Неизвестный формат графики.")
     bg, ink, accent=PALETTES[scene]
@@ -87,11 +86,11 @@ def make_studio_card(
     draw=ImageDraw.Draw(card)
     draw.rounded_rectangle((6,6,w-7,h-7),radius=25,fill=(*bg,248),
                            outline=(*accent,255),width=3)
-    photo=_frame(video,cue.start+.12,320,286).convert("RGBA")
-    mask=Image.new("L",photo.size,0)
-    ImageDraw.Draw(mask).rounded_rectangle((0,0,319,285),radius=17,fill=255)
-    card.paste(photo,(15,15),mask)
-    draw=ImageDraw.Draw(card)
+    # Leave a clean moving-video aperture. The FFmpeg renderer places a
+    # live excerpt inside it on the exact speaking timeline. No baked-in
+    # screenshot or frozen preview frame is used as a fake animation.
+    draw.rounded_rectangle((14,14,336,303),radius=18,
+                           fill=(*bg,65),outline=(*accent,235),width=3)
     draw.rounded_rectangle((18,325,w-18,398),radius=15,
                            fill=(*bg,255),outline=(*accent,150),width=1)
     size=34
