@@ -47,4 +47,26 @@ jobs:
           OWNER_TELEGRAM_ID: ${{ secrets.OWNER_TELEGRAM_ID }}
           UPLOAD_ID: ${{ inputs.upload_id }}
           UPLOAD_WORKER_URL: ${{ inputs.worker_url }}
-        run: python process_uploaded_video.py
+          PYTHONUNBUFFERED: "1"
+          OMP_NUM_THREADS: "2"
+          OPENBLAS_NUM_THREADS: "2"
+        run: |
+          set -euo pipefail
+          echo "::notice::Render diagnostics enabled: host resource samples every 60 sec"
+          (
+            while true; do
+              echo "[RESOURCE $(date -u +%FT%TZ)]"
+              free -m | head -n 3
+              df -m /tmp | tail -n 1
+              if [ -r /sys/fs/cgroup/memory.events ]; then
+                echo "[CGROUP MEMORY EVENTS]"
+                cat /sys/fs/cgroup/memory.events
+              fi
+              echo "[TOP PROCESSES BY RESIDENT MEMORY]"
+              ps -eo comm,rss,pcpu --sort=-rss | head -n 9
+              sleep 60
+            done
+          ) &
+          resource_monitor_pid=$!
+          trap 'kill "$resource_monitor_pid" 2>/dev/null || true' EXIT
+          python -u process_uploaded_video.py
