@@ -309,6 +309,11 @@ def apply_effects(
     from studio_kinetic import select_studio_cues, make_studio_card, make_studio_keyword_asset
     from guide18_fx import plan as plan_guide, render as render_guide, sound_track as guide_audio
     from semantic_editing import choose_semantic_cues
+    from semantic_object_overlays import choose_object_cues
+    # PNG props only appear at a genuinely spoken matching noun.
+    object_cues=(choose_object_cues(
+        words,duration,private_assets.photos,insert_density
+    ) if insert_style!="off" and private_assets is not None else [])
     semantic_cues=(choose_semantic_cues(
                        words,duration,"subtle" if studio_mode else insert_density
                    ) if (insert_style=="reference_soft" or
@@ -323,7 +328,20 @@ def apply_effects(
     # may overlap it. Exactly one primary animation owns this time window.
     guide_cues=(plan_guide(words,duration,guide_effect,insert_density)
                 if insert_style!="off" and guide_effect!="off" else [])
-    if guide_cues:
+    if object_cues and guide_cues:
+        overlap=lambda a,b: (a.start < b.end+.35 and a.end > b.start-.35)
+        if guide_effect=="auto":
+            # Concrete spoken objects outrank an auto-generated generic
+            # graphic; never show both simultaneously.
+            guide_cues=[g for g in guide_cues
+                        if not any(overlap(g,o) for o in object_cues)]
+        else:
+            # A manually chosen full-screen effect is always intentional.
+            object_cues=[o for o in object_cues
+                         if not any(overlap(o,g) for g in guide_cues)]
+    if guide_cues or object_cues:
+        # Eliminate secondary large cards rather than accidentally mixing
+        # animations from different independent planners.
         retro=[]
         motion_cues=[]
         studio_cues=[]
@@ -369,7 +387,7 @@ def apply_effects(
                     break
     if (sound == "off" and not visual and not caption_cues
             and not retro and not motion_cues and not studio_cues
-            and not guide_cues and not (private_assets and any(
+            and not guide_cues and not object_cues and not (private_assets and any(
                 c.kind in private_assets.icons for c in semantic_cues))):
         source.replace(target)
         return {"emoji_count": 0, "sfx_count": 0, "caption_sfx_count": 0,
@@ -632,6 +650,43 @@ def apply_effects(
             guide_count+=1
         insert_count+=guide_count
 
+        # Client-supplied transparent illustrated objects are speech-matched.
+        # Each has a separate non-overlapping time slot, gentle movement,
+        # 9:16-safe edge positioning and a synchronized quiet accent.
+        object_count=0
+        for i,cue in enumerate(object_cues):
+            if not cue.path.is_file():
+                continue
+            start,end=cue.start,cue.end
+            args.extend(["-loop","1","-framerate","30","-i",str(cue.path)])
+            width=max(105,round(255*sx))
+            height=max(135,round(275*sy))
+            layer=f"[spokenobject{i}]"
+            filters.append(
+                f"[{current_input}:v]scale={width}:{height}:"
+                f"force_original_aspect_ratio=decrease:flags=lanczos,"
+                f"format=rgba,setpts=PTS-STARTPTS+{start:.3f}/TB,"
+                f"fade=t=in:st={start:.3f}:d=0.22:alpha=1,"
+                f"fade=t=out:st={max(start+.27,end-.22):.3f}:"
+                f"d=0.20:alpha=1{layer}"
+            )
+            left=(i%2==1)
+            x=(f"{round(30*sx)}+{round(16*sx)}*"
+               f"max(0,1-(t-{start:.3f})*2.7)" if left else
+               f"main_w-overlay_w-{round(30*sx)}-"
+               f"{round(16*sx)}*max(0,1-(t-{start:.3f})*2.7)")
+            y=f"main_h*{0.27 if i%2==0 else 0.39}-overlay_h/2"
+            stage=f"[spokenobjectstage{i}]"
+            filters.append(
+                f"{prev}{layer}overlay=x='{x}':y='{y}':"
+                f"enable='between(t,{start:.3f},{end:.3f})':"
+                f"shortest=0:eof_action=pass:repeatlast=0{stage}"
+            )
+            prev=stage
+            current_input+=1
+            object_count+=1
+        insert_count+=object_count
+
         # Private animated icon MOV, matched to the actual spoken topic.
         private_icon_count=0
         if private_assets is not None and insert_style=="reference_soft" and not guide_cues:
@@ -712,13 +767,19 @@ def apply_effects(
                 track_inputs.append(f"[{current_input}:a:0]")
                 current_input += 1
                 caption_sfx_count = len(caption_cues)
-        if insert_sound=="on" and has_audio and guide_count:
+        if insert_sound=="on" and has_audio and (guide_count or object_count):
+            from guide18_fx import GuideCue
             audio=folder/"guide_varied_sfx.wav"
-            guide_audio(audio,guide_cues,duration)
+            soundtrack_events=sorted([
+                *guide_cues,
+                *[GuideCue("notification_stack",o.start,o.end,o.concept)
+                  for o in object_cues]
+            ],key=lambda item:item.start)
+            guide_audio(audio,soundtrack_events,duration)
             args.extend(["-i",str(audio)])
             track_inputs.append(f"[{current_input}:a:0]")
             current_input+=1
-            insert_sfx_count+=guide_count
+            insert_sfx_count+=guide_count+object_count
         if insert_sound=="on" and has_audio and studio_insert_count:
             uploaded_whoosh=(private_assets.sounds.get("whoosh")
                              if private_assets is not None else None)
@@ -783,7 +844,7 @@ def apply_effects(
             )
             sound_output = "[mixed]"
 
-        if emoji_count or insert_count or scene_count or private_icon_count:
+        if emoji_count or insert_count or scene_count or private_icon_count or object_count:
             args.extend(["-filter_complex",";".join(filters),"-map",prev,
                          "-c:v","libx264","-preset",export.preset,"-crf",str(export.crf)])
         elif sfx_count or caption_sfx_count or insert_sfx_count:
@@ -801,6 +862,7 @@ def apply_effects(
         execute(args)
         return {"emoji_count":emoji_count, "sfx_count":sfx_count,
                 "guide_effect_count":guide_count,
+                "speech_object_count":object_count,
                 "guide_effects_rendered":[cue.effect for cue in guide_cues],
                 "kinetic_word_count":kinetic_word_count,
                 "caption_sfx_count":caption_sfx_count,
