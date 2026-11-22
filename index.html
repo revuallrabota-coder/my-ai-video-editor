@@ -877,8 +877,8 @@
     out.style.whiteSpace='pre-line';
     if(version!==3){
       out.textContent='⚠️ Приложение проверяет: '+url+
-        '\\nВерсия по этому адресу: '+(version==null?'старая, без номера':version)+
-        '. Нужна версия 3.\\nСравни этот адрес с Cloudflare → Workers & Pages → Visit. '+
+        '\nВерсия по этому адресу: '+(version==null?'старая, без номера':version)+
+        '. Нужна версия 3.\nСравни этот адрес с Cloudflare → Workers & Pages → Visit. '+
         'Если отличаются, вставь адрес обновлённого Worker. '+
         'Если совпадают, обновление не опубликовано на этом адресе.';
       return false;
@@ -889,8 +889,8 @@
       return false;
     }
     try{localStorage.setItem('personalEditorLauncher',url)}catch(ignore){}
-    out.textContent='✅ Подключение правильное!\\nWorker: '+url+
-      '\\nВерсия: 3 · загрузка до 500 МБ настроена. Можно монтировать.';
+    out.textContent='✅ Подключение правильное!\nWorker: '+url+
+      '\nВерсия: 3 · загрузка до 500 МБ настроена. Можно монтировать.';
     return true;
   }
   byId('checkWorkerConnection').addEventListener('click',async function(){
