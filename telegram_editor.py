@@ -644,6 +644,7 @@ def edit_video(
         "subtitle_events": subtitle_events,
         "subtitle_delay": round(subtitle_delay, 2),
         "talk_scene": talk_scene,
+        "filter_applied": filter_style,
         **effect_stats,
     }
 
