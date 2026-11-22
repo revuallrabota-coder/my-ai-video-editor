@@ -1,4 +1,4 @@
-"""Regression checks for two fully rendered talking-head compositions."""
+"""Regression checks for four independently selectable talking-head compositions."""
 import json
 import shutil
 import subprocess
@@ -13,16 +13,25 @@ from talking_scene_styles import (
 from reference_cascade_captions import build_reference_cascade_ass
 
 
-class TwoTalkingReelsLooks(unittest.TestCase):
+class FourTalkingReelsLooks(unittest.TestCase):
     def test_presets_are_distinct(self):
         self.assertEqual(validate_talk_scene("contour"),"contour")
         self.assertEqual(validate_talk_scene("cream"),"cream")
+        self.assertEqual(validate_talk_scene("pistachio"),"pistachio")
+        self.assertEqual(validate_talk_scene("burgundy_brown"),"burgundy_brown")
         self.assertEqual(validate_talk_scene("off"),"off")
         with self.assertRaises(ValueError):
             validate_talk_scene("reels_line_logo")
         a=_background("contour",(360,640))
         b=_background("cream",(360,640))
-        self.assertNotEqual(a.getpixel((10,10)),b.getpixel((10,10)))
+        p=_background("pistachio",(360,640))
+        v=_background("burgundy_brown",(360,640))
+        # Each selection must create a visibly distinct scene, not merely
+        # relabel the same cream background.
+        backgrounds=[im.getpixel((180,128)) for im in (a,b,p,v)]
+        self.assertEqual(len(set(backgrounds)),4)
+        self.assertGreater(p.getpixel((180,128))[1],p.getpixel((180,128))[0])
+        self.assertGreater(v.getpixel((180,128))[0],v.getpixel((180,128))[1])
         mask=_arch_mask((360,390))
         self.assertEqual(mask.getpixel((180,370)),255)
         self.assertEqual(mask.getpixel((0,0)),0)
@@ -33,11 +42,15 @@ class TwoTalkingReelsLooks(unittest.TestCase):
             (1.2,1.5,"видео"),(1.5,1.85,"всё"),(1.85,2.3,"показывает"),
         ]
         with tempfile.TemporaryDirectory() as temp:
-            for style in ("contour","cream"):
+            for style in ("contour","cream","pistachio","burgundy_brown"):
                 script,count=build_reference_cascade_ass(
                     words,color="auto",caption_position="studio",
                     font_profile="bold",small_font_profile="modern",
-                    caption_variant="contour_talk" if style=="contour" else "cream_talk",
+                    caption_variant={
+                        "contour":"contour_talk","cream":"cream_talk",
+                        "pistachio":"pistachio_talk",
+                        "burgundy_brown":"burgundy_brown_talk"
+                    }[style],
                     background_style="off",animation_style="float",
                 )
                 self.assertGreater(count,2)
@@ -62,10 +75,14 @@ class TwoTalkingReelsLooks(unittest.TestCase):
             (8.1,9.0,"так"),(9.1,10.0,"случилось")
         ]
         from reference_cascade_captions import build_reference_cascade_ass
-        for style in ("contour","cream"):
+        for style in ("contour","cream","pistachio","burgundy_brown"):
             ass_text,_=build_reference_cascade_ass(
                 words,caption_position="studio",
-                caption_variant="contour_talk" if style=="contour" else "cream_talk"
+                caption_variant={
+                    "contour":"contour_talk","cream":"cream_talk",
+                    "pistachio":"pistachio_talk",
+                    "burgundy_brown":"burgundy_brown_talk"
+                }[style]
             )
             with tempfile.TemporaryDirectory() as tmp:
                 ass=Path(tmp)/"subtitles.ass"
@@ -88,7 +105,7 @@ class TwoTalkingReelsLooks(unittest.TestCase):
                  "-c:v","libx264","-preset","ultrafast","-c:a","aac",
                  "-shortest",str(original)]
             subprocess.run(cmd,check=True,capture_output=True,timeout=25)
-            for style in ("contour","cream"):
+            for style in ("contour","cream","pistachio","burgundy_brown"):
                 dest=root/(style+".mp4")
                 render_scene(original,dest,style,quality="balanced")
                 self.assertTrue(dest.is_file() and dest.stat().st_size>1000)
@@ -108,6 +125,11 @@ class TwoTalkingReelsLooks(unittest.TestCase):
         process=(repo/"process_uploaded_video.py").read_text("utf-8")
         self.assertIn('option value="contour_talk"',html)
         self.assertIn('option value="cream_talk"',html)
+        self.assertIn('option value="pistachio_talk"',html)
+        self.assertIn('option value="burgundy_brown_talk"',html)
+        self.assertIn('option value="pistachio"',html)
+        self.assertIn('option value="burgundy_brown"',html)
+        self.assertIn('"pistachio","burgundy_brown"',worker)
         self.assertIn("talk_scene:s.talkScene",html)
         self.assertIn("talk_scene: talkScene",worker)
         self.assertIn('config.get("talk_scene","off")',process)
