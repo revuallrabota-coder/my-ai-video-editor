@@ -275,6 +275,7 @@ def apply_effects(
     studio_mode: bool = False,
     studio_scene: str = "off",
     insert_source: Path | None = None,
+    guide_effect: str = "off",
 ) -> dict:
     """Тематические винтажные cutaway, эмодзи, звук, без изменения речи."""
     from telegram_editor import duration_and_audio, media_info, execute
@@ -306,6 +307,7 @@ def apply_effects(
     from retro_inserts import choose_retro_cues, make_retro_card, make_retro_sound_track
     from reference_motion_scenes import select_motion_cues, make_motion_assets
     from studio_kinetic import select_studio_cues, make_studio_card, make_studio_keyword_asset
+    from guide18_fx import plan as plan_guide, render as render_guide, sound_track as guide_audio
     from semantic_editing import choose_semantic_cues
     semantic_cues=(choose_semantic_cues(
                        words,duration,"subtle" if studio_mode else insert_density
@@ -317,6 +319,15 @@ def apply_effects(
                  if studio_mode and insert_style!="off" else [])
     retro=(choose_retro_cues(words,duration,density=insert_density)
            if insert_style not in ("off","reference_soft") and not studio_mode else [])
+    # In a guide scene, no second independent studio card / kinetic headline
+    # may overlap it. Exactly one primary animation owns this time window.
+    guide_cues=(plan_guide(words,duration,guide_effect,insert_density)
+                if insert_style!="off" and guide_effect!="off" else [])
+    if guide_cues:
+        retro=[]
+        motion_cues=[]
+        studio_cues=[]
+        semantic_cues=[]
     semantic_emojis={
         "error":"❌","inspect":"🔎","success":"✅","compare":"↔️",
         "time":"⏱️","speech":"💬","camera":"🎥",
@@ -358,7 +369,7 @@ def apply_effects(
                     break
     if (sound == "off" and not visual and not caption_cues
             and not retro and not motion_cues and not studio_cues
-            and not (private_assets and any(
+            and not guide_cues and not (private_assets and any(
                 c.kind in private_assets.icons for c in semantic_cues))):
         source.replace(target)
         return {"emoji_count": 0, "sfx_count": 0, "caption_sfx_count": 0,
@@ -589,9 +600,36 @@ def apply_effects(
                 studio_insert_count+=1
             insert_count+=studio_insert_count
 
+        # The guide's 18 styles are rendered as genuine changing RGBA video
+        # frame sequences. None is a static screenshot or another unplanned
+        # floating card. They retain the original speech on audio input 0.
+        guide_count=0
+        for i,cue in enumerate(guide_cues):
+            pattern,count=render_guide(
+                insert_source or source,folder,cue,i,words,
+                palette=studio_scene
+            )
+            args.extend(["-framerate","15","-start_number","0",
+                         "-i",pattern])
+            fx=f"[guideclip{i}]"
+            filters.append(
+                f"[{current_input}:v]fps=30,format=rgba,"
+                f"setpts=PTS-STARTPTS+{cue.start:.3f}/TB{fx}"
+            )
+            stage=f"[guidestage{i}]"
+            filters.append(
+                f"{prev}{fx}overlay=x=0:y=0:"
+                f"enable='between(t,{cue.start:.3f},{cue.end:.3f})':"
+                f"shortest=0:eof_action=pass:repeatlast=0{stage}"
+            )
+            current_input+=1
+            prev=stage
+            guide_count+=1
+        insert_count+=guide_count
+
         # Private animated icon MOV, matched to the actual spoken topic.
         private_icon_count=0
-        if private_assets is not None and insert_style=="reference_soft":
+        if private_assets is not None and insert_style=="reference_soft" and not guide_cues:
             for cue in semantic_cues:
                 if private_icon_count>=6:
                     break
@@ -669,6 +707,13 @@ def apply_effects(
                 track_inputs.append(f"[{current_input}:a:0]")
                 current_input += 1
                 caption_sfx_count = len(caption_cues)
+        if insert_sound=="on" and has_audio and guide_count:
+            audio=folder/"guide_varied_sfx.wav"
+            guide_audio(audio,guide_cues,duration)
+            args.extend(["-i",str(audio)])
+            track_inputs.append(f"[{current_input}:a:0]")
+            current_input+=1
+            insert_sfx_count+=guide_count
         if insert_sound=="on" and has_audio and studio_insert_count:
             uploaded_whoosh=(private_assets.sounds.get("whoosh")
                              if private_assets is not None else None)
@@ -750,6 +795,8 @@ def apply_effects(
         args.extend(["-t",f"{duration:.3f}","-movflags","+faststart",str(target)])
         execute(args)
         return {"emoji_count":emoji_count, "sfx_count":sfx_count,
+                "guide_effect_count":guide_count,
+                "guide_effects_rendered":[cue.effect for cue in guide_cues],
                 "kinetic_word_count":kinetic_word_count,
                 "caption_sfx_count":caption_sfx_count,
                 "insert_count":insert_count+scene_count+private_icon_count,
