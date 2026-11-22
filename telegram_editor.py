@@ -639,6 +639,7 @@ def edit_video(
         "after": round(sum(s.end-s.start for s in ranges) / speed, 1),
         "subtitle_events": subtitle_events,
         "subtitle_delay": round(subtitle_delay, 2),
+        "talk_scene": talk_scene,
         **effect_stats,
     }
 
