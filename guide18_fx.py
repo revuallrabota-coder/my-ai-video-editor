@@ -216,7 +216,8 @@ def _pct(words:Sequence[Word],start:float):
 def _draw(effect: str, p: float, label: str,
           video: Image.Image, frames: list[Image.Image], frame_index: int,
           mask: Image.Image | None, words: Sequence[Word], start:float,
-          palette: str, photos: Sequence[Image.Image] | None = None) -> Image.Image:
+          palette: str, photos: Sequence[Image.Image] | None = None,
+          background_video: Image.Image | None = None) -> Image.Image:
     """Build one animated RGBA scene frame. All visual branches are distinct."""
     bg=(78,34,51) if palette=="burgundy_brown" else (
        (219,231,198) if palette=="pistachio" else (248,236,214))
@@ -264,7 +265,12 @@ def _draw(effect: str, p: float, label: str,
         _rect(d,(24,284,336,364),(190,57,42),3)
         _text(d,(180,324),label,48,cream,maxw=298)
     elif effect=="screen_push_digital":
-        d.rectangle((0,0,360,640),fill=(9,11,16,255))
+        if background_video is not None:
+            img=background_video.convert("RGBA")
+            d=ImageDraw.Draw(img,"RGBA")
+            d.rectangle((0,0,360,640),fill=(9,11,16,58))
+        else:
+            d.rectangle((0,0,360,640),fill=(9,11,16,255))
         for j in range(0,640,5):
             d.line((0,j,360,j),fill=(70,64,83,47))
         word=label[:18]
@@ -434,7 +440,8 @@ def _draw(effect: str, p: float, label: str,
 
 def render(source: Path, folder: Path, cue:GuideCue, index:int,
            words:Sequence[Word],palette:str="burgundy_brown",
-           photos:Sequence[Path] | None = None) -> tuple[str,int]:
+           photos:Sequence[Path] | None = None,
+           background_path:Path | None = None) -> tuple[str,int]:
     """Return image2 input path and frame count for one verified 3-second cue."""
     if cue.effect not in EFFECTS:
         raise ValueError("Эффект не поддерживается.")
@@ -456,13 +463,18 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
                     original_photos.append(picture)
             except (OSError,ValueError):
                 continue
+    grid_frames=[]
+    if cue.effect=="screen_push_digital" and background_path is not None:
+        if background_path.is_file():
+            grid_frames=_read_video(background_path,0,cue.end-cue.start)
     target=folder/f"guide_fx_{index:02d}"
     target.mkdir(parents=True,exist_ok=True)
     for i in range(count):
         current=raw[min(i,len(raw)-1)]
         mask=masks[min(i,len(masks)-1)] if masks else None
         frame=_draw(cue.effect,i/max(1,count-1),cue.label,current,raw,
-                    i,mask,words,cue.start,palette,original_photos)
+                    i,mask,words,cue.start,palette,original_photos,
+                    grid_frames[min(i,len(grid_frames)-1)] if grid_frames else None)
         frame.save(target/f"frame_{i:03d}.png",compress_level=2)
     return str(target/"frame_%03d.png"),count
 
