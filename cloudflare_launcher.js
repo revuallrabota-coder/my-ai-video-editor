@@ -8,7 +8,7 @@ const CHUNK = 4000000;
 const MAX_VIDEO = 500000000;
 const MAX_ASSETS = 100000000;
 const TTL = 259200;
-const CONTRACT = 5;
+const CONTRACT = 6;
 const STAGES = {
   queued:35, downloading:42, joining:53, transcribing:63, review:72,
   planning:78, rendering:86, publishing:94, done:100, failed:100
@@ -56,6 +56,26 @@ function option(key, value, fallback) {
   }
   return result;
 }
+const SMART_FX = new Set([
+  "pov_carousel_spin","match_cut","split_reel","glass_explainer_reel",
+  "apple_ui_toggles","image_cluster_reel","liquid_glass_graph",
+  "notification_stack"
+]);
+function validateGuideEffect(value) {
+  const item=String(value ?? "auto");
+  if (CHOICES.guide_effect.split(" ").includes(item)) return item;
+  if (!item.startsWith("multi:") || item.length>215) {
+    throw new Error("Недопустимый режим интеллектуального монтажа.");
+  }
+  const effects=item.slice(6).split(",");
+  if (effects.length<1 || effects.length>8 ||
+      new Set(effects).size!==effects.length ||
+      effects.some(effect=>!SMART_FX.has(effect))) {
+    throw new Error("Выбери от одного до восьми поддерживаемых приёмов.");
+  }
+  return item;
+}
+
 function parseSettings(s) {
   if (!s || typeof s!=="object" || Array.isArray(s)) {
     throw new Error("Неверный формат настроек.");
@@ -111,7 +131,7 @@ function parseSettings(s) {
     insert_style:option("insert_style",s.insert_style,"reference_soft"),
     insert_density:option("insert_density",s.insert_density,"balanced"),
     insert_sound:option("insert_sound",s.insert_sound,"off"),
-    guide_effect:option("guide_effect",s.guide_effect,"auto")
+    guide_effect:validateGuideEffect(s.guide_effect)
   };
   return settings;
 }
