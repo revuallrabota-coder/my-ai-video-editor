@@ -73,75 +73,126 @@ def _label(words: Sequence[Word], t: float, limit: int = 22) -> str:
     return (featured or max(local,key=len) if local else "").upper()[:limit]
 
 
+# The eight understandable effect families are mappings, not an 18-item
+# roulette wheel. Every automatic trigger must be present in the actual speech.
+SMART_EFFECTS = (
+    "pov_carousel_spin", "match_cut", "split_reel",
+    "glass_explainer_reel", "apple_ui_toggles", "image_cluster_reel",
+    "liquid_glass_graph", "notification_stack",
+)
+# Order is intentional: concrete meaning wins over vague related wording.
+SMART_TRIGGERS = (
+    ("pov_carousel_spin", ("много", "несколько", "вариант", "перечисл",
+                           "список", "три", "четыре", "пять", "подборк",
+                           "коллекц", "many", "several", "options", "list")),
+    ("split_reel", ("сравн", "разниц", "отлич", "против", "сопостав",
+                    "compare", "versus", "difference")),
+    ("match_cut", ("главн", "важн", "ключев", "запомн", "основн",
+                   "самое", "важнейш", "important", "main", "key")),
+    ("glass_explainer_reel", ("объясн", "почему", "причин", "потому",
+                              "разбер", "поясн", "explain", "because", "why")),
+    ("apple_ui_toggles", ("этап", "шаг", "сначала", "затем", "во-первых",
+                          "во-вторых", "следующ", "порядок",
+                          "step", "first", "second")),
+    ("image_cluster_reel", ("пример", "покаж", "фото", "картин", "иллюстр",
+                            "демонстр", "example", "photo", "show")),
+    ("liquid_glass_graph", ("результ", "прогресс", "процент", "показател",
+                            "скорост", "вырос", "снизил", "percent", "result")),
+    ("notification_stack", ("секрет", "обратите", "предупреж", "вниман",
+                             "совет", "secret", "attention", "tip")),
+)
+SMART_GAP = {"subtle":10.5, "balanced":7.2, "dynamic":5.1}
+SMART_LIMIT = {"subtle":3, "balanced":5, "dynamic":7}
+
+
+def _allowed_auto_effects(choice: str) -> set[str] | None:
+    """None means unconstrained auto; multi: holds a validated preferred set."""
+    if choice == "auto":
+        return None
+    if not choice.startswith("multi:"):
+        raise ValueError("Некорректный набор эффектов.")
+    selected = choice[6:].split(",")
+    if (not 1 <= len(selected) <= len(SMART_EFFECTS) or
+            len(set(selected)) != len(selected) or
+            any(name not in SMART_EFFECTS for name in selected)):
+        raise ValueError("Укажи от одного до восьми совместимых эффектов.")
+    return set(selected)
+
+
+def _spoken_smart_cues(words: Sequence[Word], duration: float, choice: str,
+                       density: str) -> list[GuideCue]:
+    permitted = _allowed_auto_effects(choice)
+    # First four seconds are reserved for the original person and captions.
+    gap = SMART_GAP[density]
+    planned: list[GuideCue] = []
+    last = -gap
+    for start, end, spoken in sorted(words, key=lambda w: float(w[0])):
+        t = float(start)
+        if t < 4.0 or t > duration - 1.85 or float(end) <= t:
+            continue
+        if t - last < gap:
+            continue
+        token = _clean(str(spoken)).casefold().strip()
+        if not token:
+            continue
+        kind = next((
+            effect for effect, stems in SMART_TRIGGERS
+            if (permitted is None or effect in permitted) and
+            any(token.startswith(stem) for stem in stems)
+        ), None)
+        if kind is None:
+            # "до и после" qualifies as a comparison; "до 5 секунд" does not.
+            if permitted is None or "split_reel" in permitted:
+                if token == "до" and any(
+                    0 < float(st) - t < 3.5 and
+                    _clean(str(word)).casefold().startswith("после")
+                    for st, en, word in words
+                ):
+                    kind = "split_reel"
+        if kind is None:
+            continue
+        finish = min(duration - .05, t + 1.75)
+        planned.append(GuideCue(kind, t, finish,
+                                _clean(str(spoken)).upper()[:22], compact=True))
+        last = t
+        if len(planned) >= SMART_LIMIT[density]:
+            break
+    return planned
+
+
 def plan(words: Sequence[Word], duration: float, choice: str,
          density: str = "balanced") -> list[GuideCue]:
-    """Manual guide techniques are explicit; AUTO adds only quiet, relevant labels.
+    """Single intelligent selector: auto or a constrained group of favorites.
 
-    An unrelated generic word never authorizes a full-screen glitch/phone/graph.
-    No automatic graphics during the first 1.4 seconds of a talking video.
+    Auto and selected-multiple are always semantically triggered, non-overlapping
+    and face-safe. An explicit legacy single mode remains supported for
+    previously submitted jobs but is not displayed in the Mini App.
     """
-    if choice not in EFFECTS and choice not in ("off", "auto"):
+    if density not in SMART_GAP:
+        raise ValueError("Недопустимая частота эффектов.")
+    if choice not in EFFECTS and choice not in ("auto", "off") and not choice.startswith("multi:"):
         raise ValueError("Неизвестный приём из гайда: " + choice)
     if choice == "off" or duration < 1.05:
         return []
-    if density not in ("subtle", "balanced", "dynamic"):
-        raise ValueError("Недопустимая частота эффектов.")
+    if choice == "auto" or choice.startswith("multi:"):
+        return _spoken_smart_cues(words, duration, choice, density)
 
-    interval = {"subtle": 10.0, "balanced": 8.0, "dynamic": 7.0}[density]
-    limit = {"subtle": 3, "balanced": 4, "dynamic": 5}[density]
-
-    if choice == "auto":
-        # All labels are exact approved spoken words. The effect name only
-        # identifies a thematic family; render() uses a small compact chip.
-        keywords = (
-            ("ошиб", "match_cut"),
-            ("важн", "over_shoulder_zoom"),
-            ("запомн", "over_shoulder_zoom"),
-            ("результ", "liquid_glass_graph"),
-            ("прогресс", "liquid_glass_graph"),
-            ("сравн", "split_reel"),
-            ("разниц", "split_reel"),
-            ("проверк", "apple_ui_toggles"),
-            ("секунд", "over_shoulder_zoom"),
-            ("процент", "liquid_glass_graph"),
-        )
-        selected = []
-        last = -interval
-        for st, en, word in sorted(words, key=lambda item: item[0]):
-            start = float(st)
-            if start < 1.4 or start > duration - 0.85 or start-last < interval:
-                continue
-            token = _clean(str(word))
-            key = next((kind for root, kind in keywords
-                        if root in token.casefold()), None)
-            if not key:
-                continue
-            end = min(duration - .05, start + 1.65)
-            if end - start < .8:
-                continue
-            selected.append(GuideCue(key, start, end, token[:22].upper(),
-                                     compact=True))
-            last = start
-            if len(selected) >= limit:
-                break
-        return selected
-
-    # Manual selection still permits an intentional special effect.
-    starts = [max(.15, float(st)) for st, en, word in words
-              if 0 <= st < duration - 1.05 and len(_clean(str(word))) >= 3]
-    if not starts:
-        return []
+    # Compatibility for old projects that explicitly chose ONE cinematic effect.
+    interval = {"subtle":10.0,"balanced":8.0,"dynamic":7.0}[density]
+    limit = {"subtle":3,"balanced":4,"dynamic":5}[density]
+    starts = [max(.15, float(st)) for st,en,word in words
+              if 0 <= st < duration-1.05 and len(_clean(str(word))) >= 3]
     selected = []
     last = -interval
     for start in starts:
-        if start - last < interval or start + 1.05 > duration:
+        if start-last < interval or start+1.05 > duration:
             continue
-        end = min(duration - .02, start + SECS)
-        if end - start < 1.0:
+        end = min(duration-.02,start+SECS)
+        if end-start < 1.0:
             continue
-        selected.append(GuideCue(choice, start, end, _label(words, start)))
+        selected.append(GuideCue(choice,start,end,_label(words,start)))
         last = start
-        if len(selected) >= limit:
+        if len(selected)>=limit:
             break
     return selected
 
