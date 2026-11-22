@@ -56,6 +56,7 @@ class GuideCue:
     start: float
     end: float
     label: str
+    compact: bool = False  # Automatic labels stay small and never obscure a person.
 
 
 def _clean(s: str) -> str:
@@ -74,55 +75,75 @@ def _label(words: Sequence[Word], t: float, limit: int = 22) -> str:
 
 def plan(words: Sequence[Word], duration: float, choice: str,
          density: str = "balanced") -> list[GuideCue]:
-    """One 3s primary effect at a time, >=1s clear air before the next.
+    """Manual guide techniques are explicit; AUTO adds only quiet, relevant labels.
 
-    No silent overlap between the 18 choices or legacy studio ornaments.
-    Explicit mode repeats only at long intervals; auto is semantic, not random.
+    An unrelated generic word never authorizes a full-screen glitch/phone/graph.
+    No automatic graphics during the first 1.4 seconds of a talking video.
     """
-    if choice not in EFFECTS and choice not in ("off","auto"):
-        raise ValueError("Неизвестный приём из гайда: "+choice)
-    if choice=="off" or duration<1.05:
+    if choice not in EFFECTS and choice not in ("off", "auto"):
+        raise ValueError("Неизвестный приём из гайда: " + choice)
+    if choice == "off" or duration < 1.05:
         return []
-    if density not in ("subtle","balanced","dynamic"):
+    if density not in ("subtle", "balanced", "dynamic"):
         raise ValueError("Недопустимая частота эффектов.")
-    interval={"subtle":10.0,"balanced":7.0,"dynamic":5.0}[density]
-    starts=[max(.15,float(st)) for st,en,w in words if 0<=st<duration-1.05
-            and len(_clean(str(w)))>=3]
-    if not starts:return []  # never fabricate a phrase for a silent clip
-    out=[]
-    last=-interval
+
+    interval = {"subtle": 10.0, "balanced": 8.0, "dynamic": 7.0}[density]
+    limit = {"subtle": 3, "balanced": 4, "dynamic": 5}[density]
+
+    if choice == "auto":
+        # All labels are exact approved spoken words. The effect name only
+        # identifies a thematic family; render() uses a small compact chip.
+        keywords = (
+            ("ошиб", "match_cut"),
+            ("важн", "over_shoulder_zoom"),
+            ("запомн", "over_shoulder_zoom"),
+            ("результ", "liquid_glass_graph"),
+            ("прогресс", "liquid_glass_graph"),
+            ("сравн", "split_reel"),
+            ("разниц", "split_reel"),
+            ("проверк", "apple_ui_toggles"),
+            ("секунд", "over_shoulder_zoom"),
+            ("процент", "liquid_glass_graph"),
+        )
+        selected = []
+        last = -interval
+        for st, en, word in sorted(words, key=lambda item: item[0]):
+            start = float(st)
+            if start < 1.4 or start > duration - 0.85 or start-last < interval:
+                continue
+            token = _clean(str(word))
+            key = next((kind for root, kind in keywords
+                        if root in token.casefold()), None)
+            if not key:
+                continue
+            end = min(duration - .05, start + 1.65)
+            if end - start < .8:
+                continue
+            selected.append(GuideCue(key, start, end, token[:22].upper(),
+                                     compact=True))
+            last = start
+            if len(selected) >= limit:
+                break
+        return selected
+
+    # Manual selection still permits an intentional special effect.
+    starts = [max(.15, float(st)) for st, en, word in words
+              if 0 <= st < duration - 1.05 and len(_clean(str(word))) >= 3]
+    if not starts:
+        return []
+    selected = []
+    last = -interval
     for start in starts:
-        if start-last<interval or start+1.05>duration:continue
-        if len(out)>=({"subtle":5,"balanced":8,"dynamic":12}[density]):break
-        chosen=choice
-        if choice=="auto":
-            window=" ".join(_clean(str(w)).lower() for st,en,w in words
-                            if st>=start-.4 and st<=start+2.5)
-            if any(q in window for q in ("процент","рост","прогресс","%")):
-                chosen="liquid_glass_graph"
-            elif any(q in window for q in ("ошибк","неправил","ошибл","косяк")):
-                chosen="match_cut"
-            elif any(q in window for q in ("салон","студи","клиент")):
-                chosen="image_cluster_reel"
-            elif any(q in window for q in ("телефон","приложен","экран")):
-                chosen="phone_3d_float"
-            elif any(q in window for q in ("пошаг","пункт","этап","настро")):
-                chosen="apple_ui_toggles"
-            elif any(q in window for q in ("сравн","разниц","вместо")):
-                chosen="split_reel"
-            elif any(q in window for q in ("главно","важно","запомн")):
-                chosen="cinematic_type_reel"
-            else:
-                chosen=("screen_push_digital","over_shoulder_zoom",
-                        "notification_stack","liquid_glass_graph",
-                        "cinematic_type_reel")[len(out)%5]
-        end=min(duration-.02,start+SECS)
-        if end-start<1.0:continue
-        out.append(GuideCue(chosen,start,end,_label(words,start)))
-        last=start
-    if not out and choice!="auto" and duration>=1.05:
-        out=[GuideCue(choice,.05,min(duration-.01,SECS),_label(words,.05))]
-    return out
+        if start - last < interval or start + 1.05 > duration:
+            continue
+        end = min(duration - .02, start + SECS)
+        if end - start < 1.0:
+            continue
+        selected.append(GuideCue(choice, start, end, _label(words, start)))
+        last = start
+        if len(selected) >= limit:
+            break
+    return selected
 
 
 def _font(size: int, bold: bool=True):
@@ -438,6 +459,63 @@ def _draw(effect: str, p: float, label: str,
     return img
 
 
+def _compact_frame(label: str, progress: float,
+                   mask: Image.Image) -> Image.Image:
+    """A polished 720p micro-overlay with a strict person-shaped alpha hole.
+
+    If no corner stays clear of the person's *entire* silhouette, show
+    nothing. Never fall back to a black full-frame screen or generic text.
+    """
+    width, height = 720, 1280
+    layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    text = _clean(label).upper()[:22]
+    if not text:
+        return layer
+    expanded = mask.filter(ImageFilter.MaxFilter(47)).resize(
+        (width, height), Image.Resampling.BILINEAR
+    )
+    chip_w, chip_h = 256, 72
+    candidates = (
+        (36, 288), (width-chip_w-36, 288),
+        (36, 474), (width-chip_w-36, 474),
+        (36, 682), (width-chip_w-36, 682),
+        (36, 870), (width-chip_w-36, 870),
+    )
+    # Protect the subject over every animation frame; <3% overlap allowed
+    # before the mask subtraction, so there are no split half-visible cards.
+    scored = []
+    for x, y in candidates:
+        area = expanded.crop((x-12, y-12, x+chip_w+12, y+chip_h+12))
+        occupancy = sum(area.histogram()[128:]) / max(1, area.width*area.height)
+        scored.append((occupancy, x, y))
+    occupancy, x, y = min(scored)
+    if occupancy > .03:
+        return layer
+    ease = min(1., max(0., progress * 5.5))
+    fade = min(1., ease, max(0., (1-progress)*6))
+    y += round(11 * (1-ease))
+    draw = ImageDraw.Draw(layer, "RGBA")
+    draw.rounded_rectangle(
+        (x, y, x+chip_w, y+chip_h), radius=21,
+        fill=(32, 26, 31, 192), outline=(231, 212, 195, 172), width=2
+    )
+    draw.rounded_rectangle((x+15, y+17, x+20, y+55), radius=3,
+                           fill=(187, 113, 133, 245))
+    size = 28
+    font = _font(size, False)
+    while size > 16 and draw.textbbox((0, 0), text, font=font)[2] > chip_w-54:
+        size -= 1
+        font = _font(size, False)
+    draw.text((x+34, y+chip_h//2), text, anchor="lm",
+              font=font, fill=(255, 245, 237, 255))
+    # Transparent person exclusion is applied AFTER all card decoration.
+    alpha = ImageChops.subtract(layer.getchannel("A"), expanded)
+    if fade < 1:
+        alpha = alpha.point(lambda value: round(value * fade))
+    layer.putalpha(alpha)
+    return layer
+
+
 def render(source: Path, folder: Path, cue:GuideCue, index:int,
            words:Sequence[Word],palette:str="burgundy_brown",
            photos:Sequence[Path] | None = None,
@@ -448,7 +526,7 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
     count=max(1,int(math.ceil((cue.end-cue.start)*FPS)))
     raw=_read_video(source,cue.start,cue.end-cue.start)
     if not raw:raise RuntimeError("Нет кадров для монтажа.")
-    if cue.effect in SUBJECT_FX:
+    if cue.compact or cue.effect in SUBJECT_FX:
         masks=_mask_frames(raw)
     else:
         masks=[]
@@ -472,9 +550,12 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
     for i in range(count):
         current=raw[min(i,len(raw)-1)]
         mask=masks[min(i,len(masks)-1)] if masks else None
-        frame=_draw(cue.effect,i/max(1,count-1),cue.label,current,raw,
-                    i,mask,words,cue.start,palette,original_photos,
-                    grid_frames[min(i,len(grid_frames)-1)] if grid_frames else None)
+        if cue.compact:
+            frame=_compact_frame(cue.label,i/max(1,count-1),mask)
+        else:
+            frame=_draw(cue.effect,i/max(1,count-1),cue.label,current,raw,
+                        i,mask,words,cue.start,palette,original_photos,
+                        grid_frames[min(i,len(grid_frames)-1)] if grid_frames else None)
         frame.save(target/f"frame_{i:03d}.png",compress_level=2)
     return str(target/"frame_%03d.png"),count
 
