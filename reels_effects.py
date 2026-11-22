@@ -311,6 +311,14 @@ def apply_effects(
     geometry=phrase_emoji_anchors(words, caption_position,
                                   small_font_profile, font_profile,
                                   animation_style)
+    if studio_mode:
+        # The studio subtitle layout is moved 143 ASS units upward to stay
+        # outside the speaker's arched video. Move emoji anchors equally,
+        # otherwise they float far below the spoken phrase.
+        geometry=[
+            (start,end,x0,y0-143,x1,y1-143)
+            for start,end,x0,y0,x1,y1 in geometry
+        ]
     # Attach emoji to the emphasized phrase line, rather than the screen edge.
     visual=[]
     used_phrases=set()
@@ -351,7 +359,7 @@ def apply_effects(
                     continue
                 args.extend(["-loop","1","-framerate","30","-i",str(path)])
                 clip_end=min(duration,clip_end)
-                sticker_size=max(30,round(43*sx))
+                sticker_size=max(24,round((29 if studio_mode else 43)*sx))
                 moving_seconds=max(0.25,clip_end-start)
                 position=f"max(0,min(1,(t-{start:.3f})/{moving_seconds:.3f}))"
                 sticker_x=f"{x0*sx:.2f}+{(x1-x0)*sx:.2f}*{position}"
