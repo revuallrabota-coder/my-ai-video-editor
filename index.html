@@ -157,6 +157,7 @@
     <select id="reelsPreset">
       <option value="reference_soft" selected>🌸 Нежный референс — розовый акцент</option>
       <option value="old_money">🤎 Old Money — кремовый и антиква</option>
+      <option value="vintage_cinema">🎞️ Винтажное кино — плёнка, архив, ретро-звук и перебивки</option>
       <option value="editorial">🎬 Editorial — контрастный гротеск</option>
       <option value="minimal">🤍 Минимализм — чистый белый</option>
       <option value="contour_talk">🌿 Contour Talk — тёмный фон, волны, стикеры, арка с человеком</option>
@@ -372,7 +373,9 @@
       <option value="none" selected>Без фильтра, сохранять натуральные цвета</option>
       <option value="clean">Чистая студия</option>
       <option value="film">Мягкий плёночный свет</option>
+      <option value="vintage">🎞 Винтаж: зерно киноплёнки, сепия, затемнение углов</option>
     </select>
+    <p class="note">Винтаж добавляет настоящее плёночное зерно и затемнение углов к исходному видео. При выборе пресета «Винтажное кино» редактор автоматически подбирает архивные сцены, исходя только из произнесённых слов. Первые секунды остаются чистыми; новые сцены не перекрывают разговорную речь.</p>
     <p class="note">Для маникюра, где важен точный оттенок гель-лака, выбирай «Без фильтра» или Clean Studio.</p>
     <label class="field" for="pauseRemoval">✂️ Насколько сильно убирать паузы в речи</label>
     <select id="pauseRemoval">
@@ -782,7 +785,7 @@
       film:'sepia(.10) contrast(1.09) saturate(.92)',
       matte:'contrast(.91) saturate(.90) brightness(1.04)',
       old_money:'sepia(.14) contrast(.95) saturate(.83) brightness(1.045)',
-      vintage:'sepia(.27) contrast(.95) saturate(.80)',
+      vintage:'sepia(.35) contrast(1.08) saturate(.73) brightness(.95)',
       street:'contrast(1.17) saturate(1.17)',
       elegant:'contrast(1.035) saturate(.985) brightness(1.01)'
     };
@@ -852,6 +855,7 @@
   var reelPresets={
     reference_soft:{variant:'reference_soft',big:'old_money',small:'refined',color:'#E8A4B5',scene:'off'},
     old_money:{variant:'old_money',big:'vintage',small:'old_money',color:'#CEB68A',scene:'off'},
+    vintage_cinema:{variant:'vintage',big:'vintage',small:'old_money',color:'#D8BC91',scene:'off'},
     editorial:{variant:'editorial',big:'bold',small:'modern',color:'#F0443E',scene:'off'},
     minimal:{variant:'minimal',big:'refined',small:'clean',color:'#FFFFFF',scene:'off'},
     contour_talk:{variant:'contour_talk',big:'bebas',small:'modern',color:'#F6EDD6',scene:'contour'},
@@ -867,6 +871,17 @@
       byId('fontSmall').value=cfg.small;
       byId('color').value=cfg.color;
       byId('talkScene').value=cfg.scene;
+      // Only choosing the full Vintage preset activates its own film color,
+      // old typewriter accents, and motion engine. Other styles retain user
+      // choices and the same non-destructive subtitle/effect controls.
+      if(this.value==='vintage_cinema'){
+        byId('filter').value='vintage';
+        byId('subtitleSfx').value='typewriter';
+        byId('motionInserts').checked=true;
+        byId('assetSfx').checked=true;
+        byId('guideEffect').value='auto';
+        byId('motionFrequency').value='balanced';
+      }
       // Scene and typography never overwrite the user's audio, animation
       // density, filters, source speed or whether effects are enabled.
       // Every curated look uses the same gentle, mixed-size caption renderer.
@@ -1433,7 +1448,7 @@
       subtitle_delay:s.subtitleDelay,
       sound_effects:s.soundEffects,
       emoji_mode:s.emoji?'on':'off',
-      insert_style:s.motionInserts?'reference_soft':'off',
+      insert_style:s.motionInserts?(s.captionVariant==='vintage'?'vintage':'reference_soft'):'off',
       guide_effect:s.motionInserts?s.guideEffect:'off',
       insert_density:s.motionDensity,
       insert_sound:s.assetSound?'on':'off',
