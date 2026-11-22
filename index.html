@@ -1007,6 +1007,17 @@
           'Пока версия не обновлена, видео не загружаю, чтобы не получать неправильный стиль.'
         );
       }
+      if(!Array.isArray(workerHealth.supported_talk_scenes) &&
+         (settings.talk_scene==='pistachio' ||
+          settings.talk_scene==='burgundy_brown') ||
+         Array.isArray(workerHealth.supported_talk_scenes) &&
+         !workerHealth.supported_talk_scenes.includes(settings.talk_scene)){
+        throw new Error(
+          'Cloudflare ещё не поддерживает выбранный цветовой стиль. '+
+          'Обнови Worker последним кодом из GitHub, нажми Deploy. '+
+          'Видео не загружено: старый сервер не должен подменять фисташковый или бургунди другим оформлением.'
+        );
+      }
       status.textContent='Подготавливаю проект: '+videos.length+' видео, '+fmtBytes(totalSize)+'…';
       // Each file starts a fresh 4MB-chunk sequence. Flat chunk IDs
       // preserve the user's exact clip order without bundling 500MB in RAM.
