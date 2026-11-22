@@ -10,7 +10,7 @@ import wave
 from pathlib import Path
 
 from reels_effects import make_sfx_track
-from studio_kinetic import select_studio_cues, make_studio_card
+from studio_kinetic import select_studio_cues, make_studio_card, make_studio_keyword_asset
 from talking_scene_styles import render_scene
 
 
@@ -78,7 +78,8 @@ class DynamicReelsTests(unittest.TestCase):
                 insert_source=source,quality="balanced"
             )
             self.assertTrue(rendered.is_file() and rendered.stat().st_size>5000)
-            self.assertGreaterEqual(stats["insert_count"],1)
+            self.assertGreaterEqual(stats["insert_count"],2)
+            self.assertGreaterEqual(stats["kinetic_word_count"],1)
             self.assertGreaterEqual(stats["insert_sfx_count"],1)
             self.assertGreaterEqual(stats["caption_sfx_count"],1)
             probe=subprocess.run([
@@ -106,6 +107,11 @@ class DynamicReelsTests(unittest.TestCase):
         self.assertIn('<option value="dynamic">',html)
         self.assertIn('id="checkWorkerConnection"',html)
         self.assertIn('studio-film-overlay',html)
+        self.assertIn('id="studioPreviewWord"',html)
+        self.assertIn('id="studioInsertVideo"',html)
+        self.assertIn('id="videoFilterPreviewStatus"',html)
+        self.assertIn("make_studio_keyword_asset",(
+            root/"reels_effects.py").read_text("utf-8"))
         self.assertIn('subtitle_sfx:"off soft tick typewriter"',worker)
         self.assertIn('const CONTRACT = 3;',worker)
 
