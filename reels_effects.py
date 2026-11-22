@@ -305,6 +305,7 @@ def apply_effects(
     sx=frame_width/720
     sy=frame_height/1280
     from retro_inserts import choose_retro_cues, make_retro_card, make_retro_sound_track
+    from old_money_fx import select_old_money_cues, render_old_money_card
     from vintage_cinema import select_vintage_cues, render_vintage_scene, make_vintage_sound_track
     from reference_motion_scenes import select_motion_cues, make_motion_assets
     from studio_kinetic import select_studio_cues, make_studio_card, make_studio_keyword_asset
@@ -328,8 +329,11 @@ def apply_effects(
     studio_cues=(select_studio_cues(words,duration,insert_density)
                  if studio_mode and insert_style!="off" and guide_effect=="off"
                  else [])
-    retro=(choose_retro_cues(words,duration,density=insert_density)
-           if insert_style not in ("off","reference_soft","vintage") and not studio_mode else [])
+    retro=(select_old_money_cues(words,duration,density=insert_density)
+           if insert_style=="old_money" and not studio_mode else
+           choose_retro_cues(words,duration,density=insert_density)
+           if insert_style not in ("off","reference_soft","vintage","old_money") and not studio_mode
+           else [])
     vintage_cues=(select_vintage_cues(words,duration,insert_density)
                   if insert_style=="vintage" else [])
     # In a guide scene, no second independent studio card / kinetic headline
@@ -385,7 +389,7 @@ def apply_effects(
     }
     # No stickers merely for saying a generic "маникюр" or "видео".
     # Period-accurate vintage uses hand-drawn objects rather than modern emoji.
-    cues=([] if insert_style=="vintage" else
+    cues=([] if insert_style in ("vintage","old_money") else
           [(c.start,semantic_emojis.get(c.kind)) for c in semantic_cues]
           if studio_mode or insert_style=="reference_soft" else
           [(t,symbol) for t,symbol in pick_cues(words,duration)
@@ -474,7 +478,10 @@ def apply_effects(
         for i, insert in enumerate(retro):
             card = folder / f"vintage_card_{i}.png"
             try:
-                make_retro_card(card, insert.label, insert.symbol, style=insert_style)
+                if insert_style=="old_money":
+                    render_old_money_card(card, insert.label, insert.symbol)
+                else:
+                    make_retro_card(card, insert.label, insert.symbol, style=insert_style)
             except Exception as exc:
                 LOG.warning("Не удалось подготовить винтажную карточку: %s",exc)
                 continue
