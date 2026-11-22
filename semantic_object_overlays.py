@@ -35,6 +35,18 @@ WORD_STEMS = {
     "social": ("подпис", "лайк", "сохран", "коммент", "репост",
                "like", "comment", "share", "subscribe"),
     "record": ("пластинк", "винил", "музык", "vinyl", "record"),
+    # Vintage cinema/old-paper collection. Only literally spoken concepts
+    # trigger these user-owned PRIVATE cutouts; no unrelated Pinterest motifs.
+    "clock": ("врем", "часы", "часов", "минут", "секунд", "будильн", "clock"),
+    "film": ("кино", "фильм", "киноплен", "киноплён", "пленк", "плёнк", "проектор", "cinema"),
+    "paper": ("бумаж", "записк", "пергамент", "почерк", "листок", "paper"),
+    "key": ("ключ", "замок", "открыв", "открыть", "key"),
+    "lamp": ("ламп", "светильн", "освещен", "освещён", "lamp"),
+    "candle": ("свеч", "подсвечник", "candle"),
+    "basket": ("корзин", "basket"),
+    "ceramic": ("тарелк", "керамик", "посуда", "фарфор", "ceramic"),
+    "dance": ("танц", "диско", "дискотек", "dance"),
+
     "heart": ("сердц", "любов", "романтик", "heart"),
     "folder": ("папк", "документ", "архив", "folder"),
     "scroll": ("приглашен", "сертификат", "грамот", "certificate"),
