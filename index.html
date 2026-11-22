@@ -277,7 +277,7 @@
     <label class="option"><input id="motionInserts" type="checkbox" checked> 🎯 Смысловой монтаж: вставки только когда этого требует речь</label>
     <label class="field" for="assetPacks">Твои наборы анимированных вставок (необязательно)</label>
     <input id="assetPacks" type="file" accept=".zip,application/zip" multiple>
-    <p class="note">Можно прикрепить 4 приватных ZIP-пакета суммарно до 100 МБ. Готовые MOV-иконки и WAV-звуки используются по смыслу, а шаблоны Adobe .mogrt/.ffx не запускаются в FFmpeg. Эти файлы не публикуются в GitHub.</p>
+    <p class="note">Можно прикрепить 4 приватных ZIP-пакета суммарно до 100 МБ. Для эффектов из PDF можно добавить JPG/PNG/WebP в ZIP, чтобы карусели, коллажи и сетки показывали именно твои фотографии. Без них используем кадры видео. MOV/WAV тоже поддерживаются. Adobe .mogrt/.ffx не запускаются в FFmpeg. Эти файлы не публикуются в GitHub.</p>
     <div class="mini" id="assetPacksInfo">Наборы не выбраны: будут использоваться встроенные смысловые графические сцены.</div>
     <label class="option"><input id="assetSfx" type="checkbox" checked> 🔈 Звуки появления анимированных вставок (Whoosh) и мои WAV из ZIP</label>
     <label class="field" for="guideEffect">🎬 12 эффектов + 6 стилей из твоего PDF</label>
@@ -285,7 +285,7 @@
       <option value="auto" selected>✨ Автомонтаж по смыслу речи (без наложений)</option>
       <option value="off">Без приёмов из PDF, только стандартные титры</option>
       <optgroup label="12 отдельных эффектов">
-        <option value="pov_carousel_spin">1. Карусель карточек вокруг человека</option>
+        <option value="pov_carousel_spin">1. Карусель карточек вокруг человека *</option>
         <option value="liquid_glass_graph">2. Жидкое стекло и анимированный график</option>
         <option value="match_cut">3. Match cut на главном слове</option>
         <option value="screen_push_digital">4. Пиксельные слова с RGB-сдвигом</option>
@@ -1236,6 +1236,7 @@
              resumed.input_parts===uploadParts.length &&
              resumed.accepted_talk_scene===settings.talk_scene &&
              resumed.accepted_caption_variant===settings.caption_variant &&
+             resumed.accepted_guide_effect===settings.guide_effect &&
              resumed.style_contract_version===4){
             id=old.id;
             parts=resumed.input_parts;
@@ -1256,7 +1257,8 @@
         }),false);
         if(start.style_contract_version!==4 ||
            start.accepted_talk_scene!==settings.talk_scene ||
-           start.accepted_caption_variant!==settings.caption_variant){
+           start.accepted_caption_variant!==settings.caption_variant ||
+           start.accepted_guide_effect!==settings.guide_effect){
           throw new Error(
             'Сервер не подтвердил выбранное оформление. '+
             'Монтаж остановлен до передачи видео. Проверь обновление Cloudflare Worker.'
