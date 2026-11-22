@@ -306,6 +306,8 @@ def apply_effects(
     sy=frame_height/1280
     from retro_inserts import choose_retro_cues, make_retro_card, make_retro_sound_track
     from old_money_fx import select_old_money_cues, render_old_money_card
+    from aesthetic_fx import (select_mood_cues, render_mood_card,
+                              resolve_mood_asset, make_mood_sound_track)
     from vintage_cinema import select_vintage_cues, render_vintage_scene, make_vintage_sound_track
     from reference_motion_scenes import select_motion_cues, make_motion_assets
     from studio_kinetic import select_studio_cues, make_studio_card, make_studio_keyword_asset
@@ -327,13 +329,15 @@ def apply_effects(
     # Manual off retains the old studio module for backward-compatible
     # existing projects that intentionally selected it.
     studio_cues=(select_studio_cues(words,duration,insert_density)
-                 if studio_mode and insert_style!="off" and guide_effect=="off"
-                 else [])
+                 if studio_mode and insert_style not in ("off","old_money","burgundy","pink_tender")
+                 and guide_effect=="off" else [])
     retro=(select_old_money_cues(words,duration,density=insert_density)
-           if insert_style=="old_money" and not studio_mode else
+           if insert_style=="old_money" else
+           select_mood_cues(words,duration,insert_style,insert_density)
+           if insert_style in ("burgundy","pink_tender") else
            choose_retro_cues(words,duration,density=insert_density)
-           if insert_style not in ("off","reference_soft","vintage","old_money") and not studio_mode
-           else [])
+           if insert_style not in ("off","reference_soft","vintage","old_money","burgundy","pink_tender")
+           and not studio_mode else [])
     vintage_cues=(select_vintage_cues(words,duration,insert_density)
                   if insert_style=="vintage" else [])
     # In a guide scene, no second independent studio card / kinetic headline
@@ -389,7 +393,7 @@ def apply_effects(
     }
     # No stickers merely for saying a generic "маникюр" or "видео".
     # Period-accurate vintage uses hand-drawn objects rather than modern emoji.
-    cues=([] if insert_style in ("vintage","old_money") else
+    cues=([] if insert_style in ("vintage","old_money","burgundy","pink_tender") else
           [(c.start,semantic_emojis.get(c.kind)) for c in semantic_cues]
           if studio_mode or insert_style=="reference_soft" else
           [(t,symbol) for t,symbol in pick_cues(words,duration)
@@ -480,14 +484,44 @@ def apply_effects(
             try:
                 if insert_style=="old_money":
                     render_old_money_card(card, insert.label, insert.symbol)
+                elif insert_style in ("burgundy","pink_tender"):
+                    render_mood_card(card, insert.label, insert.symbol, insert_style)
                 else:
                     make_retro_card(card, insert.label, insert.symbol, style=insert_style)
             except Exception as exc:
                 LOG.warning("Не удалось подготовить винтажную карточку: %s",exc)
                 continue
-            args.extend(["-loop","1","-framerate","30","-i",str(card)])
             start=insert.time
-            finish=min(duration,start+(1.80 if insert_style=="reference_soft" else 1.35))
+            finish=min(duration,start+(1.80 if insert_style=="reference_soft" else
+                                       1.65 if insert_style in ("old_money","pink_tender") else 1.35))
+            # Real pre-licensed media cutaways, installed privately by the operator.
+            # The speaker's ORIGINAL AUDIO never switches to this clip's soundtrack.
+            mood=insert_style in ("old_money","burgundy","pink_tender")
+            stock=resolve_mood_asset(insert_style,insert.symbol,"mp4") if mood else None
+            if stock is not None:
+                span=finish-start
+                args.extend(["-stream_loop","-1","-t",f"{span+0.06:.3f}","-i",str(stock)])
+                layer=f"[realstyle{i}]"
+                filters.append(
+                    f"[{current_input}:v]fps=30,"
+                    f"scale={frame_width}:{frame_height}:force_original_aspect_ratio=increase,"
+                    f"crop={frame_width}:{frame_height},format=rgba,"
+                    f"fade=t=in:st=0:d=0.16:alpha=1,"
+                    f"fade=t=out:st={max(0.2,span-0.24):.3f}:d=0.22:alpha=1,"
+                    f"setpts=PTS-STARTPTS+{start:.3f}/TB{layer}"
+                )
+                stage=f"[realstylestage{i}]"
+                filters.append(
+                    f"{prev}{layer}overlay=x=0:y=0:"
+                    f"enable='between(t,{start:.3f},{finish:.3f})':"
+                    f"shortest=0:eof_action=pass:repeatlast=0{stage}"
+                )
+                prev=stage
+                current_input+=1
+                insert_count+=1
+                rendered_retro.append(insert)
+                continue
+            args.extend(["-loop","1","-framerate","30","-i",str(card)])
             # Reference cutaways take approximately half the picture, not
             # the tiny cards used by legacy vintage styles.
             large=insert_style=="reference_soft"
@@ -501,9 +535,21 @@ def apply_effects(
                 f"alpha=1[insert{i}]"
             )
             dest=f"[cardstage{i}]"
+            # Each aesthetic has its own transition trajectory and gentle entrance.
+            if insert_style=="old_money":
+                ox=f"(main_w-overlay_w)/2+5*sin((t-{start:.3f})*1.5)"
+                oy=f"main_h*0.16+16*max(0,1-(t-{start:.3f})*3)"
+            elif insert_style=="burgundy":
+                ox="(main_w-overlay_w)/2"
+                oy=f"main_h*0.21+24*max(0,1-(t-{start:.3f})*4)"
+            elif insert_style=="pink_tender":
+                ox=f"(main_w-overlay_w)/2+12*sin((t-{start:.3f})*1.8)"
+                oy=f"main_h*0.18-7*sin((t-{start:.3f})*1.4)"
+            else:
+                ox="(main_w-overlay_w)/2"
+                oy=f"main_h*{0.07 if large else 0.16}+26*max(0,1-(t-{start:.3f})*3)"
             filters.append(
-                f"{prev}[insert{i}]overlay=x='(main_w-overlay_w)/2':"
-                f"y='main_h*{0.07 if large else 0.16}+26*max(0,1-(t-{start:.3f})*3)':"
+                f"{prev}[insert{i}]overlay=x='{ox}':y='{oy}':"
                 f"enable='between(t,{start:.3f},{finish:.3f})':shortest=1{dest}"
             )
             prev=dest
@@ -913,12 +959,33 @@ def apply_effects(
             current_input+=1
             insert_sfx_count+=len(rendered_vintage)
         if insert_sound=="on" and has_audio and rendered_retro:
-            cue_track=folder/"retro_insert_accents.wav"
-            make_retro_sound_track(cue_track, rendered_retro, duration,
-                                   style=insert_style)
-            args.extend(["-i",str(cue_track)])
-            track_inputs.append(f"[{current_input}:a:0]")
-            current_input+=1
+            specialized=insert_style in ("old_money","burgundy","pink_tender")
+            synthetic=[]
+            for j,cue in enumerate(rendered_retro):
+                track=(resolve_mood_asset(insert_style,cue.symbol,"wav")
+                       if specialized else None)
+                if track is None:
+                    synthetic.append(cue)
+                    continue
+                args.extend(["-i",str(track)])
+                label=f"[moodlicensed{j}]"
+                filters.append(
+                    f"[{current_input}:a:0]atrim=duration=0.36,"
+                    f"asetpts=PTS-STARTPTS,aresample=48000,volume=0.13,"
+                    f"adelay={int(cue.time*1000)}:all=1{label}"
+                )
+                track_inputs.append(label)
+                current_input+=1
+            if synthetic:
+                cue_track=folder/"styled_insert_accents.wav"
+                if specialized:
+                    make_mood_sound_track(cue_track,synthetic,duration,insert_style)
+                else:
+                    make_retro_sound_track(cue_track,synthetic,duration,
+                                           style=insert_style)
+                args.extend(["-i",str(cue_track)])
+                track_inputs.append(f"[{current_input}:a:0]")
+                current_input+=1
             insert_sfx_count+=len(rendered_retro)
         # Dramatic trailer accents only when explicitly enabled and
         # meaningful; low-volume against the unchanged original speech.
