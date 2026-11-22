@@ -216,7 +216,7 @@ def _pct(words:Sequence[Word],start:float):
 def _draw(effect: str, p: float, label: str,
           video: Image.Image, frames: list[Image.Image], frame_index: int,
           mask: Image.Image | None, words: Sequence[Word], start:float,
-          palette: str) -> Image.Image:
+          palette: str, photos: Sequence[Image.Image] | None = None) -> Image.Image:
     """Build one animated RGBA scene frame. All visual branches are distinct."""
     bg=(78,34,51) if palette=="burgundy_brown" else (
        (219,231,198) if palette=="pistachio" else (248,236,214))
@@ -232,7 +232,8 @@ def _draw(effect: str, p: float, label: str,
             ang=(k*2*math.pi/8+p*5.76) # ~110 degrees/sec over 3s
             x=int(180+118*math.sin(ang)-35)
             y=int(310+85*math.cos(ang)-49)
-            sub=frames[(frame_index+k*4)%len(frames)]
+            sub=(photos[k%len(photos)] if photos else
+                 frames[(frame_index+k*4)%len(frames)])
             card=_frame_draw(sub,(max(0,x),max(0,y),min(360,x+70),min(640,y+98)))
             if math.cos(ang)>0 and mask is not None:
                 card.putalpha(ImageChops.subtract(card.getchannel("A"),mask))
@@ -364,7 +365,7 @@ def _draw(effect: str, p: float, label: str,
             x=25+k*162
             _rect(d,(x,163,x+148,269),(77,70,76,216),13)
             _text(d,(x+73,210),"ДО" if k==0 else "ПОСЛЕ",18,accent)
-            _text(d,(x+73,241),"1" if k==0 else "2",15,cream)
+            _text(d,(x+73,241),"БЫЛО" if k==0 else "СТАЛО",15,cream)
         img.alpha_composite(_frame_draw(video,(30,304,331,574)))
     elif effect=="cinematic_type_reel":
         if p<.32:
@@ -381,12 +382,14 @@ def _draw(effect: str, p: float, label: str,
             if p<k*.20:continue
             x=20+k*72
             y=84+round(20*math.sin(k*1.5))-round(30*(1-min(1,(p-k*.20)*5)))
-            img.alpha_composite(_frame_draw(frames[(frame_index+k*6)%len(frames)],
-                                             (x,y,x+105,y+137)))
+            picture=(photos[k%len(photos)] if photos else
+                     frames[(frame_index+k*6)%len(frames)])
+            img.alpha_composite(_frame_draw(picture,(x,y,x+105,y+137)))
     elif effect=="cutout_grid_reel":
         for k in range(4):
             x=(k%2)*180;y=(k//2)*320
-            sub=frames[(frame_index+int(p>.37)*11+k*6)%len(frames)]
+            sub=(photos[(k+int(p>.37)*4)%len(photos)] if photos else
+                 frames[(frame_index+int(p>.37)*11+k*6)%len(frames)])
             img.alpha_composite(_frame_draw(sub,(x,y,x+180,y+320),radius=0))
         if mask is not None:img.alpha_composite(_cutout(video,mask))
         d=ImageDraw.Draw(img)
@@ -417,8 +420,9 @@ def _draw(effect: str, p: float, label: str,
         _text(d,(180,464),"VS",14,cream)
         for k in range(5):
             x=(k*86-int(p*55))%450-60
-            img.alpha_composite(_frame_draw(frames[(frame_index+k*4)%len(frames)],
-                                              (x,540,x+77,629),radius=4))
+            photo=(photos[k%len(photos)] if photos else
+                   frames[(frame_index+k*4)%len(frames)])
+            img.alpha_composite(_frame_draw(photo,(x,540,x+77,629),radius=4))
     else:
         raise ValueError("Сцена отсутствует: "+effect)
     if effect not in FULL_FX:
@@ -429,7 +433,8 @@ def _draw(effect: str, p: float, label: str,
 
 
 def render(source: Path, folder: Path, cue:GuideCue, index:int,
-           words:Sequence[Word],palette:str="burgundy_brown") -> tuple[str,int]:
+           words:Sequence[Word],palette:str="burgundy_brown",
+           photos:Sequence[Path] | None = None) -> tuple[str,int]:
     """Return image2 input path and frame count for one verified 3-second cue."""
     if cue.effect not in EFFECTS:
         raise ValueError("Эффект не поддерживается.")
@@ -440,13 +445,24 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
         masks=_mask_frames(raw)
     else:
         masks=[]
+    original_photos=[]
+    if cue.effect in ("pov_carousel_spin","image_cluster_reel",
+                      "cutout_grid_reel","split_reel"):
+        for filepath in (photos or [])[:16]:
+            try:
+                with Image.open(filepath) as source_photo:
+                    picture=source_photo.convert("RGB")
+                    picture.thumbnail((640,960),Image.Resampling.LANCZOS)
+                    original_photos.append(picture)
+            except (OSError,ValueError):
+                continue
     target=folder/f"guide_fx_{index:02d}"
     target.mkdir(parents=True,exist_ok=True)
     for i in range(count):
         current=raw[min(i,len(raw)-1)]
         mask=masks[min(i,len(masks)-1)] if masks else None
         frame=_draw(cue.effect,i/max(1,count-1),cue.label,current,raw,
-                    i,mask,words,cue.start,palette)
+                    i,mask,words,cue.start,palette,original_photos)
         frame.save(target/f"frame_{i:03d}.png",compress_level=2)
     return str(target/"frame_%03d.png"),count
 
