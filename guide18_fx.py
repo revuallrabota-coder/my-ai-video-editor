@@ -544,43 +544,96 @@ def _compact_occupancy(mask: Image.Image, x: int, y: int) -> float:
 
 def _compact_frame(label: str, progress: float,
                    mask: Image.Image, location: tuple[int, int],
-                   caption_position: str) -> Image.Image:
-    """A polished 720p micro-overlay with a strict person-shaped alpha hole.
+                   caption_position: str, effect: str="match_cut",
+                   clips: Sequence[Image.Image] = (),
+                   palette: str="off") -> Image.Image:
+    """Different small effects per MEANING; same collision-safe 256x72 zone.
 
-    If no corner stays clear of the person's *entire* silhouette, show
-    nothing. Never fall back to a black full-frame screen or generic text.
+    A carousel uses real frames or user-owned photos, not imaginary examples.
+    A comparison, step, alert or highlight never invents spoken claims.
     """
-    width, height = 720, 1280
-    layer = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    text = _clean(label).upper()[:22]
-    if not text:
-        return layer
-    expanded = _compact_protection(mask, caption_position)
-    chip_w, chip_h = 256, 72
-    x, y = location
-    if _compact_occupancy(expanded, x, y) > .03:
-        return layer
-    ease = min(1., max(0., progress * 5.5))
-    fade = min(1., ease, max(0., (1-progress)*6))
-    y += round(11 * (1-ease))
-    draw = ImageDraw.Draw(layer, "RGBA")
-    draw.rounded_rectangle(
-        (x, y, x+chip_w, y+chip_h), radius=21,
-        fill=(32, 26, 31, 192), outline=(231, 212, 195, 172), width=2
-    )
-    draw.rounded_rectangle((x+15, y+17, x+20, y+55), radius=3,
-                           fill=(187, 113, 133, 245))
-    size = 28
-    font = _font(size, False)
-    while size > 16 and draw.textbbox((0, 0), text, font=font)[2] > chip_w-54:
-        size -= 1
-        font = _font(size, False)
-    draw.text((x+34, y+chip_h//2), text, anchor="lm",
-              font=font, fill=(255, 245, 237, 255))
-    # Transparent person exclusion is applied AFTER all card decoration.
-    alpha = ImageChops.subtract(layer.getchannel("A"), expanded)
-    if fade < 1:
-        alpha = alpha.point(lambda value: round(value * fade))
+    width,height=720,1280
+    layer=Image.new("RGBA",(width,height),(0,0,0,0))
+    title=_clean(label).upper()[:22]
+    if not title:return layer
+    expanded=_compact_protection(mask,caption_position)
+    x,y=location
+    if _compact_occupancy(expanded,x,y)>.03:return layer
+    ease=min(1.,max(0.,progress*5.5))
+    fade=min(1.,ease,max(0.,(1-progress)*6))
+    y+=round(11*(1-ease))
+    colors={
+        "old_money":((58,48,41,226),(205,179,136,235),(255,244,227,255)),
+        "burgundy":((56,15,34,232),(188,115,121,240),(255,233,225,255)),
+        "pink_tender":((250,232,239,236),(219,147,175,242),(91,55,75,255)),
+        "vintage":((45,37,33,225),(175,137,99,240),(248,227,199,255)),
+    }
+    bg,accent,ink=colors.get(palette,
+                              ((32,26,31,208),(187,113,133,245),(255,245,237,255)))
+    draw=ImageDraw.Draw(layer,"RGBA")
+    draw.rounded_rectangle((x,y,x+256,y+72),radius=20,
+                           fill=bg,outline=accent,width=2)
+    def speak(t,xx,yy,maxw,size=20):
+        text=_clean(t).upper()
+        font=_font(size,False)
+        while size>11 and draw.textbbox((0,0),text,font=font)[2]>maxw:
+            size-=1;font=_font(size,False)
+        draw.text((xx,yy),text,font=font,fill=ink,anchor="lm")
+    if effect in ("pov_carousel_spin","image_cluster_reel") and clips:
+        # A compact carousel of actual video frames / approved photos.
+        for k in range(3):
+            source=clips[(k+int(progress*3))%len(clips)]
+            thumb=source.resize((48,48),Image.Resampling.BILINEAR).convert("RGBA")
+            xx=x+12+53*k;yy=y+12
+            layer.alpha_composite(thumb,(xx,yy))
+            draw.rounded_rectangle((xx,yy,xx+48,yy+48),radius=5,
+                                   outline=accent,width=2)
+        speak(title,x+177,y+36,69,13)
+    elif effect=="split_reel":
+        draw.rounded_rectangle((x+10,y+14,x+88,y+58),radius=7,outline=accent,width=2)
+        draw.rounded_rectangle((x+111,y+14,x+190,y+58),radius=7,outline=accent,width=2)
+        speak(title,x+198,y+36,48,12)
+        draw.line((x+99,y+15,x+99,y+58),fill=accent,width=2)
+    elif effect=="match_cut":
+        draw.rounded_rectangle((x+12,y+10,x+244,y+62),radius=15,
+                               outline=accent,width=2)
+        speak(title,x+26,y+35,208,29)
+        draw.line((x+21,y+60,x+min(239,21+round(212*progress)),y+60),
+                  fill=accent,width=3)
+    elif effect=="liquid_glass_graph":
+        speak(title,x+16,y+25,165,20)
+        pts=[(x+16,y+57)]
+        for j in range(1,13):
+            p=j/12
+            if p>progress:break
+            pts.append((x+16+int(p*216),y+57-round(29*p+5*math.sin(p*6))))
+        if len(pts)>1:draw.line(pts,fill=accent,width=4)
+        draw.ellipse((pts[-1][0]-3,pts[-1][1]-3,
+                      pts[-1][0]+3,pts[-1][1]+3),fill=ink)
+    elif effect=="apple_ui_toggles":
+        for j in range(3):
+            draw.ellipse((x+14,y+11+j*18,x+26,y+23+j*18),
+                         outline=accent,width=2)
+            if progress>j*.28:
+                draw.line((x+16,y+17+j*18,x+19,y+20+j*18,x+25,y+12+j*18),
+                          fill=accent,width=2)
+        speak(title,x+46,y+36,195,21)
+    elif effect=="notification_stack":
+        for j in range(2):
+            draw.rounded_rectangle((x+12+j*8,y+10+j*13,x+224+j*6,y+43+j*13),
+                                   radius=11,outline=accent,width=2)
+        speak(title,x+26,y+31,190,19)
+    elif effect=="glass_explainer_reel":
+        draw.rounded_rectangle((x+10,y+11,x+47,y+61),radius=11,
+                               outline=accent,width=2)
+        speak("?",x+24,y+35,24,26)
+        speak(title,x+61,y+36,178,22)
+    else:
+        draw.rounded_rectangle((x+14,y+16,x+20,y+56),radius=3,fill=accent)
+        speak(title,x+35,y+36,202,25)
+    alpha=ImageChops.subtract(layer.getchannel("A"),expanded)
+    if fade<1:
+        alpha=alpha.point(lambda value:round(value*fade))
     layer.putalpha(alpha)
     return layer
 
@@ -640,7 +693,10 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
         if cue.compact:
             frame=_compact_frame(
                 cue.label,i/max(1,count-1),mask,
-                compact_location,caption_position
+                compact_location,caption_position,effect=cue.effect,
+                clips=original_photos or
+                    [raw[j] for j in (0,len(raw)//2,len(raw)-1)],
+                palette=palette
             )
         else:
             frame=_draw(cue.effect,i/max(1,count-1),cue.label,current,raw,
