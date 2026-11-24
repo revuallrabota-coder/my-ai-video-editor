@@ -37,7 +37,9 @@ class CinematicCarouselTests(unittest.TestCase):
         photos=[Image.new("RGB",(420,760),(92,15,39)) for _ in range(3)]
         burgundy=draw_carousel(.5,photos,"burgundy")
         pink=draw_carousel(.5,photos,"pink_tender")
-        self.assertNotEqual(burgundy.getpixel((15,170)),pink.getpixel((15,170)))
+        # Sample outside the full-height slides: side slides intentionally
+        # occupy x=15 around y=170, so that is a PHOTO pixel, not backdrop.
+        self.assertNotEqual(burgundy.getpixel((15,75)),pink.getpixel((15,75)))
         self.assertEqual(burgundy.getpixel((180,320))[:3],(92,15,39))
         self.assertEqual(pink.getpixel((180,320))[:3],(92,15,39))
 
