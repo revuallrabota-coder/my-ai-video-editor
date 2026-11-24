@@ -4,12 +4,14 @@
  */
 (function(root){
   "use strict";
+  var crcTable=Array.from({length:256},function(_,n){
+    for(var j=0;j<8;j++)n=(n>>>1)^(0xEDB88320&-(n&1));
+    return n>>>0;
+  });
   function crc32(bytes){
     var n=0xFFFFFFFF;
-    for(var i=0;i<bytes.length;i++){
-      n^=bytes[i];
-      for(var j=0;j<8;j++)n=(n>>>1)^(0xEDB88320&-(n&1));
-    }
+    for(var i=0;i<bytes.length;i++)
+      n=(n>>>8)^crcTable[(n^bytes[i])&255];
     return (n^0xFFFFFFFF)>>>0;
   }
   function header(size){return new Uint8Array(size);}
