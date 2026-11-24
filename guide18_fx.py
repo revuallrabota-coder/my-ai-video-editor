@@ -184,8 +184,8 @@ def _spoken_smart_cues(words: Sequence[Word], duration: float, choice: str,
         t,_,effect,label=min(cluster,key=lambda item:(item[1],item[0]))
         if t-last < gap:
             continue
-        planned.append(GuideCue(effect,t,min(duration-.05,t+1.75),
-                                label,compact=True))
+        planned.append(GuideCue(effect,t,min(duration-.05,t+2.35 if effect=="pov_carousel_spin" else t+1.75),
+                                label,compact=effect!="pov_carousel_spin"))
         last=t
         if len(planned)>=SMART_LIMIT[density]:
             break
@@ -227,7 +227,8 @@ def _manual_smart_cues(words: Sequence[Word], duration: float,
                 "liquid_glass_graph":"ГРАФИКА",
                 "notification_stack":"ВАЖНО",
             }[effect]
-        planned.append(GuideCue(effect,start,end,title,compact=True,required=True))
+        planned.append(GuideCue(effect,start,end,title,
+                                compact=effect!="pov_carousel_spin",required=True))
         next_start = end + 1.05
         if len(planned)>=SMART_LIMIT[density]:
             break
