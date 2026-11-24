@@ -15,20 +15,26 @@ class SmartSemanticMontageTests(unittest.TestCase):
         self.assertEqual(cues[0].label,"МНОГО")
         self.assertTrue(cues[0].compact)
 
-    def test_selected_favorites_trigger_only_on_relevant_speech(self):
+    def test_selected_favorites_are_required_not_keyword_lottery(self):
         speech=[(5.1,5.4,"много"),(15.5,15.9,"главное"),
                 (25.,25.4,"сравним"),(35.,35.4,"объясню")]
         cues=plan(speech,45,"multi:pov_carousel_spin,match_cut","dynamic")
         self.assertEqual([c.effect for c in cues],
                          ["pov_carousel_spin","match_cut"])
-        self.assertEqual(plan([(5,5.4,"клиент")],14,
-                              "multi:match_cut,pov_carousel_spin"),[])
+        self.assertTrue(all(c.required and c.compact for c in cues))
+        # No trigger words, but the user CHECKED both boxes.
+        mandatory=plan([(5,5.4,"клиент")],14,
+                       "multi:pov_carousel_spin,match_cut")
+        self.assertEqual([c.effect for c in mandatory],
+                         ["pov_carousel_spin","match_cut"])
+        self.assertTrue(all(c.start>=4 for c in mandatory))
+        self.assertTrue(all(y.start>x.end for x,y in zip(mandatory,mandatory[1:])))
         with self.assertRaises(ValueError):
             plan(speech,45,"multi:match_cut,match_cut")
         with self.assertRaises(ValueError):
             plan(speech,45,"multi:__import__('os')")
         with self.assertRaises(ValueError):
-            plan(speech,45,"multi:")
+            plan(speech,45, "multi:")
 
     def test_importance_comparison_and_steps_have_distinct_effects(self):
         important=plan([(5,5.3,"Главное")],19,"auto")
@@ -38,7 +44,10 @@ class SmartSemanticMontageTests(unittest.TestCase):
         self.assertEqual(pair[0].effect,"split_reel")
         self.assertEqual(plan([(5,5.2,"До"),(5.3,5.5,"пяти"),
                                (5.6,5.9,"секунд")],19,
-                              "multi:split_reel"),[])
+                              "auto"),[])
+        self.assertEqual([c.effect for c in plan(
+            [(5,5.2,"До"),(5.3,5.5,"пяти"),(5.6,5.9,"секунд")],
+            19,"multi:split_reel")],["split_reel"])
         steps=plan([(5,5.3,"Сначала"),(7,7.3,"затем")],20,"auto")
         self.assertEqual(steps[0].effect,"apple_ui_toggles")
         self.assertEqual(plan([(5,5.4,"Сначала"),(6,6.4,"поговорим")],
@@ -82,6 +91,8 @@ class SmartSemanticMontageTests(unittest.TestCase):
         for effect in SMART_EFFECTS:
             self.assertIn(f'value="{effect}"',ui)
         self.assertIn("'multi:'+selected.join(',')",ui)
+        self.assertIn("var manualFx=s.guideEffect.startsWith('multi:')",ui)
+        self.assertIn("required: bool = False", (root/"guide18_fx.py").read_text("utf-8"))
         self.assertNotIn("byId('reelsPreset').value='custom';",ui)
         self.assertIn("const CONTRACT = 7;",worker)
         self.assertEqual(worker,ipad)
