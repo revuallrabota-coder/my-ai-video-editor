@@ -332,6 +332,60 @@ def _read_video(source: Path,start: float,seconds: float, fps: int=FPS):
     return frames
 
 
+def _distinct_carousel_frames(source: Path, backup: Sequence[Image.Image]
+                              ) -> list[Image.Image]:
+    """Pick three genuinely separated moments across the WHOLE source video.
+
+    Previously all thumbnails came from 2.35 seconds around one sentence,
+    resulting in nearly identical pictures. Never invent unrelated imagery.
+    Favor diverse real frames when the footage has visual changes.
+    """
+    try:
+        probe=subprocess.run(
+            ["ffprobe","-v","error","-show_entries","format=duration",
+             "-of","default=noprint_wrappers=1:nokey=1",str(source)],
+            capture_output=True,text=True,timeout=15,check=True,
+        )
+        duration=float(probe.stdout.strip())
+        if not math.isfinite(duration) or duration<4.0:
+            raise ValueError("short source")
+        candidates=[]
+        size=360*640*3
+        for fraction in (.07,.22,.38,.54,.70,.86,.95):
+            t=max(0.,min(duration-.2,duration*fraction))
+            result=subprocess.run([
+                "ffmpeg","-hide_banner","-loglevel","error",
+                "-ss",f"{t:.3f}","-i",str(source),"-frames:v","1",
+                "-vf","scale=360:640:force_original_aspect_ratio=increase,"
+                      "crop=360:640,setsar=1",
+                "-f","rawvideo","-pix_fmt","rgb24","pipe:1",
+            ],capture_output=True,timeout=25,check=True)
+            if len(result.stdout)>=size:
+                image=Image.frombytes("RGB",SIZE,result.stdout[:size])
+                candidates.append(image)
+        if len(candidates)<3:
+            raise ValueError("not enough video frames")
+        # Perceptual contrast from resized grayscale avoids choosing three
+        # back-to-back near duplicates when the source contains real cuts.
+        thumbs=[x.convert("L").resize((24,43),Image.Resampling.BILINEAR)
+                for x in candidates]
+        def difference(i:int,j:int)->float:
+            from PIL import ImageStat
+            return ImageStat.Stat(
+                ImageChops.difference(thumbs[i],thumbs[j])).mean[0]
+        selected=[0]
+        while len(selected)<3:
+            remaining=[i for i in range(len(candidates)) if i not in selected]
+            selected.append(max(remaining,key=lambda i:
+                min(difference(i,j) for j in selected)))
+        return [candidates[i] for i in sorted(selected)]
+    except (OSError,ValueError,subprocess.SubprocessError):
+        if not backup:
+            raise RuntimeError("Нет реальных кадров для карусели.")
+        chosen=[backup[0],backup[len(backup)//2],backup[-1]]
+        return [frame.convert("RGB") for frame in chosen]
+
+
 def _mask_frames(frames):
     """Strict fail-closed subject segmentation, never a fake occlusion."""
     from portrait_caption_layer import _segmenter, _person_mask
@@ -378,17 +432,11 @@ def _draw(effect: str, p: float, label: str,
     enter=round((1-ease)*95)
     fade=min(1,p/.16,(1-p)/.18)
     if effect=="pov_carousel_spin":
-        for k in range(8):
-            ang=(k*2*math.pi/8+p*5.76) # ~110 degrees/sec over 3s
-            x=int(180+118*math.sin(ang)-35)
-            y=int(310+85*math.cos(ang)-49)
-            sub=(photos[k%len(photos)] if photos else
-                 frames[(frame_index+k*4)%len(frames)])
-            card=_frame_draw(sub,(max(0,x),max(0,y),min(360,x+70),min(640,y+98)))
-            if math.cos(ang)>0 and mask is not None:
-                card.putalpha(ImageChops.subtract(card.getchannel("A"),mask))
-            img.alpha_composite(card)
-        d=ImageDraw.Draw(img)
+        from cinematic_carousel import draw_carousel
+        actual=photos if photos else [
+            frames[0],frames[len(frames)//2],frames[-1]
+        ]
+        return draw_carousel(p,actual,palette)
     elif effect=="liquid_glass_graph":
         _rect(d,(22,315+enter,338,505+enter),(255,255,255,170),
               20,(255,255,255,215),2)
@@ -743,7 +791,11 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
     count=max(1,int(math.ceil((cue.end-cue.start)*FPS)))
     raw=_read_video(source,cue.start,cue.end-cue.start)
     if not raw:raise RuntimeError("Нет кадров для монтажа.")
-    if cue.compact or cue.effect in SUBJECT_FX:
+    # Full-frame carousel replaces the talking shot instead of wrapping
+    # 8 micro-images around a falsely detected face; no mask is required.
+    needs_mask=(cue.compact or cue.effect in SUBJECT_FX) and (
+        cue.effect!="pov_carousel_spin")
+    if needs_mask:
         try:
             masks=_mask_frames(raw)
         except Exception:
@@ -765,6 +817,9 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
                     original_photos.append(picture)
             except (OSError,ValueError):
                 continue
+    carousel_media=(original_photos[:16]
+                    if original_photos else _distinct_carousel_frames(source,raw)
+                    if cue.effect=="pov_carousel_spin" else [])
     compact_location=None
     if cue.compact:
         # Position is chosen ONCE for the whole animation, considering the
@@ -803,7 +858,9 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
             )
         else:
             frame=_draw(cue.effect,i/max(1,count-1),cue.label,current,raw,
-                        i,mask,words,cue.start,palette,original_photos,
+                        i,mask,words,cue.start,palette,
+                        carousel_media if cue.effect=="pov_carousel_spin"
+                        else original_photos,
                         grid_frames[min(i,len(grid_frames)-1)] if grid_frames else None)
         frame.save(target/f"frame_{i:03d}.png",compress_level=2)
     return str(target/"frame_%03d.png"),count
