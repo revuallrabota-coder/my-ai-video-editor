@@ -21,7 +21,7 @@ params.set("hash",createHmac("sha256",signingKey).update(raw).digest("hex"));
 const base="https://test-500mb.workers.dev";
 const origin="https://revuallrabota-coder.github.io";
 const data=new Map();
-let chunkReads=0;
+let chunkReads=0,metadataReads=0,kvListCalls=0;
 const uploads={
   async put(key,value,options={}){data.set(key,{value,metadata:options.metadata??null,
     ttl:options.expirationTtl??null,expiration:options.expiration??null})},
@@ -31,10 +31,19 @@ const uploads={
     if(!row)return null;
     return type==="json"?JSON.parse(row.value):row.value;
   },
-  async list({prefix}){
-    return {keys:[...data.entries()].filter(([name])=>name.startsWith(prefix))
-      .map(([name,row])=>({name,metadata:row.metadata})),
-      list_complete:true};
+  async getWithMetadata(key,type="text"){
+    metadataReads++;
+    const row=data.get(key);
+    if(!row)return {value:null,metadata:null};
+    // Matching real Workers KV stream mode, without duplicating 500 MB in memory.
+    const value=type==="stream"
+      ? new ReadableStream({start(controller){controller.close();}})
+      : row.value;
+    return {value,metadata:row.metadata};
+  },
+  async list(){
+    kvListCalls++;
+    throw new Error("KV list() limit exceeded for the day.");
   },
   async delete(key){data.delete(key)}
 };
@@ -130,6 +139,8 @@ for(let i=0;i<126;i++){
 }
 assert.equal((await request("/upload/"+id+"/status")).data.uploaded_parts.length,126);
 assert.equal(chunkReads,0,"Never fetch all 500 MB into a Worker at once");
+assert.equal(kvListCalls,0,"KV.list is prohibited, even after free-tier quota exhaustion");
+assert.ok(metadataReads>126,"KV chunk integrity uses exact metadata reads");
 assert.equal((await request("/upload/"+id+"/finish","POST",{})).status,202);
 assert.equal(dispatched,1);
 // Durable, owner-only progress persists independently of the iPad session.
@@ -189,6 +200,7 @@ assert.ok(cleanupCalls>=5);
 assert.ok(data.has("user-video:"+id+":meta"),
   "Keep small status metadata for 72h even after video source parts are freed");
 assert.equal((await request("/upload/"+id+"/status")).data.stage,"done");
+assert.equal(kvListCalls,0,"Status polling and output completion never call KV.list");
 assert.equal(data.has("user-video:"+id+":0"),false);
 assert.equal(data.has("user-video:"+id+":output:0"),true);
 const protectedManifest=(await request("/internal/upload/"+id+"/manifest","GET",null,true)).data;
@@ -247,4 +259,4 @@ const presets=html.match(/<select id="reelsPreset">([\s\S]*?)<\/select>/)?.[1];
 assert.ok(presets,"Visual presets missing");
 const styles=[...presets.matchAll(/value="([^"]+)"/g)].map(m=>m[1]);
 assert.deepEqual(styles,["reference_soft","pink_tender","old_money","vintage_cinema","editorial","contour_talk","burgundy_brown_talk","custom"]);
-console.log("✓ 500MB / 72h auto expiration / durable progress / secure private MP4 / paged source cleanup");
+console.log("✓ 500MB, zero KV.list, streaming chunk metadata, durable progress, private MP4, 72h cleanup");
