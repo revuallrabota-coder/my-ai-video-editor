@@ -26,8 +26,10 @@ class CinematicCarouselTests(unittest.TestCase):
         self.assertEqual(len(set(centers)),3,"Center slide must change by index")
         for i,expected in enumerate(((208,56,63),(45,166,79),(43,89,209))):
             self.assertLess(sum(abs(a-b) for a,b in zip(centers[i],expected)),38)
-        diff=ImageChops.difference(scenes[0],scenes[-1])
-        self.assertTrue(diff.getbbox())
+        # Alpha is equally opaque for both renders, so RGB difference is
+        # the meaningful measure (RGBA getbbox can ignore RGB when A==0).
+        diff=ImageChops.difference(scenes[0],scenes[-1]).convert("RGB")
+        self.assertIsNotNone(diff.getbbox())
         # The scene fades in/out gracefully without hard cuts.
         self.assertEqual(draw_carousel(0,pictures).getpixel((180,320))[3],0)
         self.assertEqual(draw_carousel(1,pictures).getpixel((180,320))[3],0)
