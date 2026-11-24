@@ -36,10 +36,16 @@ def _backdrop(palette: str) -> Image.Image:
                     for i,c in enumerate(base))
         draw.line((0,y,359,y),fill=(*color,255))
     # A quiet matte editorial composition, not a boxed sticker.
+    # IMPORTANT: Drawing a semi-transparent line on an RGBA background with
+    # ImageDraw replaces the alpha rather than blending it. That previously
+    # leaked the old talking-head image through the supposedly FULL cutaway.
+    def opaque_tint(strength):
+        return tuple(round(base[k]*(1-strength)+accent[k]*strength)
+                     for k in range(3))+(255,)
     for x in (19,340):
-        draw.line((x,45,x,594),fill=(*accent,38),width=1)
-    draw.line((31,51,329,51),fill=(*accent,75),width=1)
-    draw.line((31,589,329,589),fill=(*accent,75),width=1)
+        draw.line((x,45,x,594),fill=opaque_tint(.15),width=1)
+    draw.line((31,51,329,51),fill=opaque_tint(.28),width=1)
+    draw.line((31,589,329,589),fill=opaque_tint(.28),width=1)
     return image
 
 
