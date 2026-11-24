@@ -576,9 +576,10 @@ def burn_subtitles(
     profile = get_export_profile(quality)
     args = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-        "-i", str(input_path), "-vf", f"ass={ass_path}",
+        "-threads", "2", "-i", str(input_path),
+        "-filter_threads", "2", "-vf", f"ass={ass_path}",
         "-c:v", "libx264", "-preset", profile.preset,
-        "-crf", str(profile.crf),
+        "-threads", "2", "-crf", str(profile.crf),
         "-pix_fmt", "yuv420p", "-c:a", "copy",
         "-movflags", "+faststart", str(output_path),
     ]
