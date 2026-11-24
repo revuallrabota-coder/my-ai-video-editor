@@ -7,6 +7,7 @@
   <meta name="description" content="Личный видеомонтажёр — мини-приложение Telegram">
   <title>Мой AI Монтажёр</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="./carousel_photo_zip.js"></script>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&family=Lato:wght@400;700;900&family=Roboto:wght@400;700;900&family=Ubuntu:wght@400;700&display=swap">
   <style>
     :root {--ink:#20193e;--muted:#7e759c;--pink:#f636a1;--violet:#aa64f2;--line:#e5d8f7;--cream:#fff;--bg:#f8effe}
@@ -272,6 +273,9 @@
     <label class="option"><input id="motionInserts" type="checkbox" checked> 🎯 Смысловой монтаж: вставки только когда этого требует речь</label>
     <label class="field" for="assetPacks">Твои наборы анимированных вставок (необязательно)</label>
     <input id="assetPacks" type="file" accept=".zip,application/zip" multiple>
+    <label class="field" for="photos">🖼 Свои фотографии для полноэкранной карусели</label>
+    <input id="photos" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple>
+    <p class="note" id="photoInfo">Выбери 3–12 разных фотографий, если хочешь показать разные работы. Они попадут в карусель в выбранном порядке. Без фотографий редактор использует разные моменты исходного видео. Если весь ролик снят одним неподвижным кадром, фотографии лучше добавить.</p>
     <p class="note">Можно прикрепить 4 приватных ZIP-пакета суммарно до 100 МБ. Для эффектов из PDF можно добавить JPG/PNG/WebP в ZIP, чтобы карусели, коллажи и сетки показывали именно твои фотографии. Без них используем кадры видео. MOV/WAV тоже поддерживаются. Adobe .mogrt/.ffx не запускаются в FFmpeg. Эти файлы не публикуются в GitHub.</p>
     <div class="mini" id="assetPacksInfo">Наборы не выбраны: будут использоваться встроенные смысловые графические сцены.</div>
     
@@ -285,7 +289,7 @@
     <details id="fxFavorites" hidden>
       <summary style="font-weight:700;margin:12px 0">Любимые приёмы: можно отметить несколько</summary>
       <div class="mini">Ручной выбор означает реальную команду: монтажёр добавит отмеченные анимации после первых 4 секунд, даже если в речи нет слов «варианты» или «карусель». В коротком ролике количество эффектов ограничено длительностью.</div>
-      <label class="option"><input type="checkbox" name="preferredGuideFx" value="pov_carousel_spin"> 🖼 Перечисление, много вариантов → небольшая карусель</label>
+      <label class="option"><input type="checkbox" name="preferredGuideFx" value="pov_carousel_spin"> 🎞 Полноэкранная карусель: крупные кадры с плавным перелистыванием</label>
       <label class="option"><input type="checkbox" name="preferredGuideFx" value="match_cut"> ⭐ Главное, важный момент → выделить ключевое слово</label>
       <label class="option"><input type="checkbox" name="preferredGuideFx" value="split_reel"> ⚖️ Сравнение, разница → два кадра рядом</label>
       <label class="option"><input type="checkbox" name="preferredGuideFx" value="glass_explainer_reel"> 💡 Почему, причина → пояснение</label>
@@ -435,8 +439,7 @@
     <div id="legacyControls" hidden aria-hidden="true">
       <!-- Hidden for compatibility only; the new previewPhoto input is the
            supported photo control and never uploads user images. -->
-      <input id="photos" type="file" accept="image/*" multiple>
-      <div id="photoInfo"></div>
+      <!-- Photo picker is now visible in the active effects screen. -->
       <button id="launchWithoutCard" type="button">Старый запуск GitHub Actions</button>
       <p id="launchStatus"></p>
       <input id="apiBase" type="url" autocomplete="off">
@@ -679,8 +682,15 @@
     player.hidden=!referenceUrl;
     if(referenceUrl){player.src=referenceUrl;player.load()}else{player.removeAttribute('src')}
   });
-  // The legacy photo-to-video picker is disabled; previewPhoto is
-  // intentionally local-only and never submitted with the video project.
+  photoInput.addEventListener("change",function(){
+    var n=photoInput.files.length;
+    byId("photoInfo").textContent=n
+      ?("Выбрано "+n+" фото. Они будут отправлены с твоим видео приватно, "+
+        "без публикации в GitHub. В карусели появятся в выбранном порядке.")
+      :"Выбери 3–12 разных фото, чтобы карусель показывала твои работы, "+
+        "а не несколько похожих кадров одной съёмки.";
+  });
+  // previewPhoto is local-only and independent of the photo carousel picker.
   document.querySelectorAll('[data-ratio]').forEach(function(button){
     button.addEventListener('click',function(){
       ratio=button.dataset.ratio;
@@ -1230,9 +1240,15 @@
       if(settings.mode==='reference')throw new Error('Для проекта до 500 МБ выбери «Мой стиль» (без второго видео-референса).');
       var totalSize=videos.reduce(function(sum,file){return sum+file.size},0);
       var assets=selectedAssetPacks.slice();
+      if(photoInput.files.length){
+        if(typeof makeCarouselPhotoZip!=="function")
+          throw new Error("Не удалось подготовить фотографии. Обнови Mini App.");
+        var picturePack=await makeCarouselPhotoZip(photoInput.files);
+        assets.push(picturePack);
+      }
       var assetSize=assets.reduce(function(sum,file){return sum+file.size},0);
       if(assets.length>4 || assetSize>100000000)
-        throw new Error('Максимум четыре ZIP-пакета до 100 МБ суммарно.');
+        throw new Error('Для эффектов и фотографий доступно до четырёх ZIP-пакетов и до 100 МБ суммарно.');
       if(assets.some(function(f){return !/\.zip$/i.test(f.name)||f.size<100}))
         throw new Error('Для анимаций выбери ZIP-архивы из прикреплённых наборов.');
       if(totalSize>500000000)throw new Error(
