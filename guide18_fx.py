@@ -191,13 +191,55 @@ def _spoken_smart_cues(words: Sequence[Word], duration: float, choice: str,
     return planned
 
 
+def _manual_smart_cues(words: Sequence[Word], duration: float,
+                       choice: str, density: str) -> list[GuideCue]:
+    """Manually checked favorites are instructions, NOT speech keyword filters.
+
+    Preserve the exact selected order, prefer matching spoken timing when
+    nearby, otherwise use a speech-adjacent slot after the clean intro.
+    """
+    permitted = _allowed_auto_effects(choice)
+    assert permitted is not None
+    chosen = choice[6:].split(",")
+    matched = _spoken_smart_cues(words, duration, choice, density)
+    planned: list[GuideCue] = []
+    next_start = 4.5
+    for effect in chosen:
+        if duration-next_start < 1.48:
+            break
+        matching = next((cue for cue in matched
+                         if cue.effect == effect
+                         and next_start <= cue.start <= next_start + 3.5), None)
+        start = matching.start if matching else next_start
+        end = min(duration-.08, start+2.35)
+        if end-start < 1.4:
+            break
+        title = matching.label if matching else _label(words,start)
+        if not title:
+            title = {
+                "pov_carousel_spin":"КАДРЫ",
+                "image_cluster_reel":"КАДРЫ",
+                "split_reel":"СРАВНЕНИЕ",
+                "apple_ui_toggles":"ШАГИ",
+                "match_cut":"АКЦЕНТ",
+                "glass_explainer_reel":"ПОЯСНЕНИЕ",
+                "liquid_glass_graph":"ГРАФИКА",
+                "notification_stack":"ВАЖНО",
+            }[effect]
+        planned.append(GuideCue(effect,start,end,title,compact=True))
+        next_start = end + 1.05
+        if len(planned)>=SMART_LIMIT[density]:
+            break
+    return planned
+
+
 def plan(words: Sequence[Word], duration: float, choice: str,
          density: str = "balanced") -> list[GuideCue]:
     """Single intelligent selector: auto or a constrained group of favorites.
 
-    Auto and selected-multiple are always semantically triggered, non-overlapping
-    and face-safe. An explicit legacy single mode remains supported for
-    previously submitted jobs but is not displayed in the Mini App.
+    Auto is speech-triggered. Explicitly selected favorites must actually
+    render (when duration permits), not silently wait for keyword matches.
+    A legacy explicit single-effect choice also remains supported.
     """
     if density not in SMART_GAP:
         raise ValueError("Недопустимая частота эффектов.")
@@ -205,8 +247,10 @@ def plan(words: Sequence[Word], duration: float, choice: str,
         raise ValueError("Неизвестный приём из гайда: " + choice)
     if choice == "off" or duration < 1.05:
         return []
-    if choice == "auto" or choice.startswith("multi:"):
+    if choice == "auto":
         return _spoken_smart_cues(words, duration, choice, density)
+    if choice.startswith("multi:"):
+        return _manual_smart_cues(words, duration, choice, density)
 
     # Compatibility for old projects that explicitly chose ONE cinematic effect.
     interval = {"subtle":10.0,"balanced":8.0,"dynamic":7.0}[density]
