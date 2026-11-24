@@ -298,9 +298,11 @@ def add_virtual_camera(
         vf += f",ass={subtitles_ass}"
     execute([
         "ffmpeg","-hide_banner","-loglevel","error","-y",
-        "-i",str(source),"-vf",vf,
+        "-threads","2","-i",str(source),
+        "-filter_threads","2","-vf",vf,
         "-map","0:v:0","-map","0:a:0?",
         "-c:v","libx264","-preset",profile.preset,
+        "-threads","2",
         "-crf",str(min(14, profile.crf) if intermediate else profile.crf),
         "-pix_fmt","yuv420p",
         "-c:a","copy","-movflags","+faststart",str(output),
