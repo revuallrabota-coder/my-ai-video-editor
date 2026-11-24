@@ -1,0 +1,40 @@
+name: "🎞️ Проверить выбранную карусель, анимацию и звук"
+
+on:
+  push:
+    paths:
+      - "guide18_fx.py"
+      - "reels_effects.py"
+      - "process_uploaded_video.py"
+      - "test_manual_carousel_render.py"
+      - "test_smart_semantic_montage.py"
+      - "index.html"
+      - ".github/workflows/manual-carousel-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-carousel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install FFmpeg, fonts and test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          python -m pip install "Pillow>=10,<13" "telethon>=1.40,<2" "requests>=2.31,<3"
+      - name: Verify Python syntax
+        run: python -m py_compile guide18_fx.py reels_effects.py process_uploaded_video.py test_manual_carousel_render.py
+      - name: Verify semantic auto and mandatory manual effects
+        run: python -m unittest -v test_smart_semantic_montage.py
+      - name: Render actual MP4 with a carousel and synced sound
+        env:
+          OMP_NUM_THREADS: "2"
+          OPENBLAS_NUM_THREADS: "2"
+        run: python -m unittest -v test_manual_carousel_render.py
