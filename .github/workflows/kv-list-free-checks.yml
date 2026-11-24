@@ -1,0 +1,26 @@
+name: "🗄️ Cloudflare KV без дневного лимита list()"
+
+on:
+  push:
+    paths:
+      - "cloudflare_launcher.js"
+      - "cloudflare_launcher_ipad.txt"
+      - "test_upload_500mb.mjs"
+      - ".github/workflows/kv-list-free-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kv-no-list:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Worker syntax
+        run: node --input-type=module --check < cloudflare_launcher.js
+      - name: Simulate exhausted KV.list quota and a 500 MB upload and download
+        run: node test_upload_500mb.mjs
+      - name: Confirm iPad deploy file exactly matches Worker
+        run: cmp cloudflare_launcher.js cloudflare_launcher_ipad.txt
