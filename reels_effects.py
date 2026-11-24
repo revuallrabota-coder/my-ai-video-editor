@@ -774,10 +774,15 @@ def apply_effects(
                 )
                 )
             except Exception as exc:
-                # An automatic accent is optional: if we cannot identify and
-                # protect a person, SKIP instead of obscuring them or losing MP4.
+                # Auto decorations may be omitted if unavailable. An explicit
+                # user-selected carousel is NOT optional: show an actionable
+                # failure rather than deliver an unchanged video.
+                if cue.required:
+                    raise RuntimeError(
+                        f"Выбрана анимация {cue.effect}, но её не удалось "
+                        f"создать: {exc}") from exc
                 if cue.compact:
-                    LOG.warning("Safe small animation skipped: %s",exc)
+                    LOG.warning("Safe automatic animation skipped: %s",exc)
                     continue
                 raise
             args.extend(["-framerate","15","-start_number","0",
