@@ -4,6 +4,10 @@ on:
   push:
     paths:
       - "guide18_fx.py"
+      - "cinematic_carousel.py"
+      - "carousel_photo_zip.js"
+      - "test_cinematic_carousel.py"
+      - "test_carousel_photo_zip.mjs"
       - "reels_effects.py"
       - "process_uploaded_video.py"
       - "test_manual_carousel_render.py"
@@ -30,7 +34,22 @@ jobs:
           sudo apt-get install -y ffmpeg fonts-dejavu-core
           python -m pip install "Pillow>=10,<13" "telethon>=1.40,<2" "requests>=2.31,<3"
       - name: Verify Python syntax
-        run: python -m py_compile guide18_fx.py reels_effects.py process_uploaded_video.py test_manual_carousel_render.py
+        run: python -m py_compile cinematic_carousel.py guide18_fx.py reels_effects.py process_uploaded_video.py test_manual_carousel_render.py test_cinematic_carousel.py
+      - name: Verify real full-screen composition and diverse footage
+        run: python -m unittest -v test_cinematic_carousel.py
+      - name: Validate iPad's private photo ZIP
+        run: |
+          node test_carousel_photo_zip.mjs
+          python -m zipfile -t /tmp/carousel_on_ipad.zip
+          python - <<'PY'
+          from zipfile import ZipFile
+          with ZipFile("/tmp/carousel_on_ipad.zip") as z:
+              assert z.namelist() == [
+                  "carousel_01.jpg","carousel_02.png","carousel_03.webp"
+              ]
+              assert [len(z.read(name)) for name in z.namelist()] == [500,600,700]
+          print("Photos preserved in original order, no duplicate frames.")
+          PY
       - name: Verify semantic auto and mandatory manual effects
         run: python -m unittest -v test_smart_semantic_montage.py
       - name: Render actual MP4 with a carousel and synced sound
