@@ -136,7 +136,7 @@ def draw_carousel(progress: float, photos: Sequence[Image.Image],
         x=150+k*21
         dim=tuple(round(base[j]*.68+accent[j]*.32) for j in range(3))
         draw.rounded_rectangle((x,563,x+13,565),radius=1,
-                               fill=(* (accent if k==visible else dim),255))
+                               fill=(accent if k==visible else dim)+(255,))
     draw.line((31,602,31+round(298*p),602),fill=(*accent,255),width=2)
     # Cinematic dissolve back to talking head; no harsh black flash.
     opacity=min(1.,p/.12,(1-p)/.12)
