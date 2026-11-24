@@ -56,7 +56,8 @@ class GuideCue:
     start: float
     end: float
     label: str
-    compact: bool = False  # Automatic labels stay small and never obscure a person.
+    compact: bool = False  # Compact overlay.
+    required: bool = False  # Manually requested visual.
 
 
 def _clean(s: str) -> str:
@@ -226,7 +227,7 @@ def _manual_smart_cues(words: Sequence[Word], duration: float,
                 "liquid_glass_graph":"ГРАФИКА",
                 "notification_stack":"ВАЖНО",
             }[effect]
-        planned.append(GuideCue(effect,start,end,title,compact=True))
+        planned.append(GuideCue(effect,start,end,title,compact=True,required=True))
         next_start = end + 1.05
         if len(planned)>=SMART_LIMIT[density]:
             break
@@ -603,25 +604,25 @@ def _compact_protection(mask: Image.Image,
     return expanded
 
 
-def _compact_candidates() -> tuple[tuple[int, int], ...]:
-    return (
-        (36, 245), (428, 245),
-        (36, 475), (428, 475),
-        (36, 680), (428, 680),
-        (36, 890), (428, 890),
-    )
+def _compact_candidates(effect: str="match_cut") -> tuple[tuple[int, int], ...]:
+    if effect in ("pov_carousel_spin","image_cluster_reel"):
+        return ((24,245),(376,245),(24,1005),(376,1005))
+    return ((36,245),(428,245),(36,475),(428,475),
+            (36,680),(428,680),(36,890),(428,890))
 
 
-def _compact_occupancy(mask: Image.Image, x: int, y: int) -> float:
-    area = mask.crop((x-12, y-12, x+268, y+84))
-    return sum(area.histogram()[128:]) / max(1, area.width*area.height)
-
+def _compact_occupancy(mask: Image.Image,x:int,y:int,
+                       effect:str="match_cut") -> float:
+    wide=effect in ("pov_carousel_spin","image_cluster_reel")
+    area=mask.crop((x-8,y-8,x+(324 if wide else 268),y+(158 if wide else 84)))
+    return sum(area.histogram()[128:])/max(1,area.width*area.height)
 
 def _compact_frame(label: str, progress: float,
                    mask: Image.Image, location: tuple[int, int],
                    caption_position: str, effect: str="match_cut",
                    clips: Sequence[Image.Image] = (),
-                   palette: str="off") -> Image.Image:
+                   palette: str="off",
+                   required: bool=False) -> Image.Image:
     """Different small effects per MEANING; same collision-safe 256x72 zone.
 
     A carousel uses real frames or user-owned photos, not imaginary examples.
@@ -633,7 +634,8 @@ def _compact_frame(label: str, progress: float,
     if not title:return layer
     expanded=_compact_protection(mask,caption_position)
     x,y=location
-    if _compact_occupancy(expanded,x,y)>.03:return layer
+    if _compact_occupancy(expanded,x,y,effect)>.03 and not required:
+        return layer
     ease=min(1.,max(0.,progress*5.5))
     fade=min(1.,ease,max(0.,(1-progress)*6))
     y+=round(11*(1-ease))
@@ -646,24 +648,40 @@ def _compact_frame(label: str, progress: float,
     bg,accent,ink=colors.get(palette,
                               ((32,26,31,208),(187,113,133,245),(255,245,237,255)))
     draw=ImageDraw.Draw(layer,"RGBA")
-    draw.rounded_rectangle((x,y,x+256,y+72),radius=20,
-                           fill=bg,outline=accent,width=2)
+    carousel=effect in ("pov_carousel_spin","image_cluster_reel") and bool(clips)
+    draw.rounded_rectangle(
+        (x,y,x+(320 if carousel else 256),y+(150 if carousel else 72)),
+        radius=20,fill=bg,outline=accent,width=3 if carousel else 2)
     def speak(t,xx,yy,maxw,size=20):
         text=_clean(t).upper()
         font=_font(size,False)
         while size>11 and draw.textbbox((0,0),text,font=font)[2]>maxw:
             size-=1;font=_font(size,False)
         draw.text((xx,yy),text,font=font,fill=ink,anchor="lm")
-    if effect in ("pov_carousel_spin","image_cluster_reel") and clips:
-        # A compact carousel of actual video frames / approved photos.
+    if carousel:
+        # Three large, animated cards made from actual video frames/photos.
+        phase=min(2,int(progress*3))
+        glide=round(8*math.sin(math.pi*progress))
         for k in range(3):
-            source=clips[(k+int(progress*3))%len(clips)]
-            thumb=source.resize((48,48),Image.Resampling.BILINEAR).convert("RGBA")
-            xx=x+12+53*k;yy=y+12
-            layer.alpha_composite(thumb,(xx,yy))
-            draw.rounded_rectangle((xx,yy,xx+48,yy+48),radius=5,
-                                   outline=accent,width=2)
-        speak(title,x+177,y+36,69,13)
+            source=clips[(k+phase)%len(clips)].convert("RGB")
+            ratio=max(91/source.width,94/source.height)
+            scaled=source.resize(
+                (math.ceil(source.width*ratio),math.ceil(source.height*ratio)),
+                Image.Resampling.BILINEAR)
+            left=(scaled.width-91)//2
+            top=(scaled.height-94)//2
+            cropped=scaled.crop((left,top,left+91,top+94)).convert("RGBA")
+            rounded=Image.new("L",(91,94),0)
+            ImageDraw.Draw(rounded).rounded_rectangle(
+                (0,0,90,93),radius=10,fill=255)
+            cropped.putalpha(rounded)
+            xx=x+13+100*k+glide*(1 if k==1 else -1)
+            yy=y+11+(5 if k!=1 else 0)
+            layer.alpha_composite(cropped,(xx,yy))
+            draw.rounded_rectangle((xx,yy,xx+91,yy+94),
+                                   radius=10,outline=accent,width=3)
+        speak(title,x+15,y+126,278,19)
+        draw.ellipse((x+292,y+120,x+302,y+130),fill=accent)
     elif effect=="split_reel":
         draw.rounded_rectangle((x+10,y+14,x+88,y+58),radius=7,outline=accent,width=2)
         draw.rounded_rectangle((x+111,y+14,x+190,y+58),radius=7,outline=accent,width=2)
@@ -725,7 +743,14 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
     raw=_read_video(source,cue.start,cue.end-cue.start)
     if not raw:raise RuntimeError("Нет кадров для монтажа.")
     if cue.compact or cue.effect in SUBJECT_FX:
-        masks=_mask_frames(raw)
+        try:
+            masks=_mask_frames(raw)
+        except Exception:
+            if not cue.required:
+                raise
+            # Optional face segmenter failure must not erase an explicit
+            # small corner carousel. Never fake a person cutout.
+            masks=[Image.new("L",SIZE,0) for _ in raw]
     else:
         masks=[]
     original_photos=[]
@@ -746,11 +771,12 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
         protected=[_compact_protection(mask,caption_position)
                    for mask in masks[::max(1,len(masks)//12)]]
         ranked=[
-            (max(_compact_occupancy(mask,x,y) for mask in protected),x,y)
-            for x,y in _compact_candidates()
+            (max(_compact_occupancy(mask,x,y,cue.effect)
+                 for mask in protected),x,y)
+            for x,y in _compact_candidates(cue.effect)
         ]
         risk,x,y=min(ranked)
-        if risk>.025:
+        if risk>.025 and not cue.required:
             raise RuntimeError(
                 "Нет безопасной области для текста без перекрытия человека "
                 "и обычных субтитров."
@@ -771,7 +797,8 @@ def render(source: Path, folder: Path, cue:GuideCue, index:int,
                 compact_location,caption_position,effect=cue.effect,
                 clips=original_photos or
                     [raw[j] for j in (0,len(raw)//2,len(raw)-1)],
-                palette=palette
+                palette=palette,
+                required=cue.required
             )
         else:
             frame=_draw(cue.effect,i/max(1,count-1),cue.label,current,raw,
