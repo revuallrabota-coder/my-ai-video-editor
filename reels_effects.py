@@ -974,8 +974,21 @@ def apply_effects(
                 "social":"notification_stack",
                 "film":"image_cluster_reel",
             }
+            timed_guides=[]
+            for guide in rendered_guide_cues:
+                timed_guides.append(guide)
+                if guide.effect=="pov_carousel_spin":
+                    # Three understated tactile swishes: opening slide and
+                    # both actual page transitions, not one arbitrary tick.
+                    span=guide.end-guide.start
+                    for fraction in (.34,.70):
+                        t=guide.start+span*fraction
+                        timed_guides.append(GuideCue(
+                            "pov_carousel_spin",t,min(guide.end,t+.35),
+                            guide.label
+                        ))
             soundtrack_events=sorted([
-                *rendered_guide_cues,
+                *timed_guides,
                 *[GuideCue(object_sfx.get(o.concept,"image_cluster_reel"),
                            o.start,o.end,o.concept)
                   for o in rendered_object_cues]
