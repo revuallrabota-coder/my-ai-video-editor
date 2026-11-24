@@ -774,7 +774,12 @@ def apply_effects(
         rendered_guide_cues=[]
         for i,cue in enumerate(guide_cues):
             from guide18_fx import SUBJECT_FX
-            guide_source=(source if cue.effect in SUBJECT_FX
+            # Fullscreen carousel uses UNCAPTIONED footage so its large
+            # editorial slides do not repeat tiny subtitles from the talking
+            # head. Subject-cutout effects still use the final aligned frame.
+            guide_source=(insert_source or source
+                          if cue.effect=="pov_carousel_spin"
+                          else source if cue.effect in SUBJECT_FX
                           else insert_source or source)
             try:
                 pattern,count=render_guide(
@@ -785,13 +790,12 @@ def apply_effects(
                 # Auto mode never pours unrelated decorative PNGs into a
                 # generic collage. Manual photo collage may use provided
                 # client imagery; ordinary word-based props use separate cues.
-                photos=([p for p in private_assets.photos
-                         if p.name.startswith("photo_sticker_")]
+                photos=(private_assets.photos[:16]
                         if private_assets is not None and
                         cue.effect in ("image_cluster_reel",
-                                         "cutout_grid_reel",
-                                         "pov_carousel_spin",
-                                         "split_reel") else []),
+                                        "cutout_grid_reel",
+                                        "pov_carousel_spin",
+                                        "split_reel") else []),
                 background_path=(
                     private_assets.backgrounds.get(
                         "grid_blue" if studio_scene=="pistachio"
