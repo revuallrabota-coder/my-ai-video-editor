@@ -1330,8 +1330,15 @@
             status.textContent='↩️ Восстанавливаю загрузку: '+completed.size+
               ' частей уже в облаке.';
           }else if(resumed.state==='queued' || resumed.state==='done'){
-            status.textContent='✅ Этот видеопроект уже передан на монтаж.';
-            return;
+            if(resumed.stage==='failed'){
+              // A failed GitHub Actions run can leave KV meta.state="queued".
+              // Do not lock an iPad user into the old broken 7/9 project.
+              status.textContent='⚠️ Предыдущий монтаж завершился с ошибкой. Создаю новую попытку.';
+            }else{
+              status.textContent='✅ Этот видеопроект уже передан на монтаж.';
+              refreshProjectStatus();
+              return;
+            }
           }
         }catch(ignore){ /* create a new session when the old one expired */ }
       }
