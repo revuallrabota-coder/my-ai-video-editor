@@ -465,7 +465,7 @@ def montage_by_reference(
             studio_mode=(talk_scene!="off"),
             studio_scene=talk_scene,
             guide_effect=guide_effect,
-            insert_source=(clean_camera if talk_scene!="off" else None),
+            insert_source=(clean_camera if talk_scene!="off" else joined),
         )
     return {
         "before": round(source_duration, 1),
