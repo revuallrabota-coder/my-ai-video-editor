@@ -308,7 +308,7 @@
       <option value="off">🔇 Без добавленных звуков — только моя исходная речь</option>
       <option value="custom">🎛 Настроить звуки отдельно</option>
     </select>
-    <p class="note" id="soundDesignHint">Редактор автоматически ставит тихие звуки только вместе с реальными смысловыми анимациями, подбирая их под Vintage, Old Money, Burgundy или розовую эстетику. Не озвучивает каждое слово и не заменяет твой голос.</p>
+    <p class="note" id="soundDesignHint">По умолчанию добавляются деликатные звуки появления субтитров: воздушное скольжение, мягкий pop и бумажный шорох. Каждый звук совпадает с началом анимации фразы, голос сохраняется.</p>
     <details id="soundDesignDetails" hidden>
       <summary style="font-weight:700;margin:12px 0">Раздельная настройка звуков</summary>
       <label class="field" for="soundfx">Звуковые акценты на ключевых словах</label>
@@ -321,7 +321,7 @@
       <label class="field" for="subtitleSfx">Звук появления субтитров</label>
       <select id="subtitleSfx">
         <option value="off" selected>Только текст, без звука</option>
-        <option value="soft">Тихий Pop на отдельных фразах</option>
+        <option value="soft">🎞 Референс: разные деликатные звуки появления фраз</option>
         <option value="tick">Нежный Tick на отдельных фразах</option>
         <option value="typewriter">Звук печатной машинки на фразах</option>
       </select>
@@ -501,7 +501,7 @@
   // override the user's previous manual setup after switching presets.
   function resolvedSoundSettings(){
     var mode=byId('soundDesign').value;
-    if(mode==='auto')return {keywords:'off',captions:'off',inserts:true};
+    if(mode==='auto')return {keywords:'off',captions:'soft',inserts:true};
     if(mode==='delicate')return {keywords:'off',captions:'soft',inserts:true};
     if(mode==='expressive')return {keywords:'soft',captions:'tick',inserts:true};
     if(mode==='off')return {keywords:'off',captions:'off',inserts:false};
@@ -515,9 +515,9 @@
     byId('soundDesignDetails').hidden=!custom;
     if(custom)byId('soundDesignDetails').open=true;
     var captions={
-      auto:'Звуки появляются только вместе с подходящими по смыслу вставками. Характер звука определяет выбранная эстетика: плёнка, бумага, ткань или нежные акценты.',
-      delicate:'Смысловые вставки звучат тихо; только отдельные субтитры получают мягкий акцент.',
-      expressive:'Акцентных звуков больше, но голос остаётся главным. При слишком насыщенном монтаже выбери автоматический режим.',
+      auto:'Как в референсе: на появлении отдельных фраз звучат воздушные переходы, мягкие щелчки и шорохи. Смысловые вставки получают свои звуки; голос остаётся главным.',
+      delicate:'Разные оригинальные тихие звуки сопровождают появление отдельных фраз, но не каждого слова. Смысловые вставки звучат мягко.',
+      expressive:'Более заметные короткие звуки на выделениях и титрах; голос остаётся главным. Если слишком насыщенно, выбери автоматический режим.',
       off:'Дополнительные звуки отключены. Исходная речь и её собственная аудиодорожка сохраняются.',
       custom:'Вручную включи только нужные категории. При отключении всех трёх дополнительных звуков не будет.'
     };
