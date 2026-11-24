@@ -529,6 +529,26 @@ def main() -> None:
                     "Ролик не отправляю, исправь настройки рендера."
                 )
             selected_guide=str(config.get("guide_effect","off"))
+            # A manually checked favorite is a required visual outcome, not a
+            # semantic suggestion. Never send a plain talking-head video while
+            # claiming that the user-selected carousel has been applied.
+            if (selected_guide.startswith("multi:") and
+                str(config.get("insert_style","reference_soft"))!="off" and
+                float(stats.get("after",0))>=6.0 and
+                int(stats.get("guide_effect_count",0))<1):
+                raise RuntimeError(
+                    "Отмеченные вручную анимации не появились в MP4. "
+                    "Отправка остановлена: нужно проверить создание карусели."
+                )
+            if (selected_guide.startswith("multi:") and
+                str(config.get("insert_sound","off"))=="on" and
+                int(stats.get("guide_effect_count",0))>0 and
+                int(stats.get("insert_sfx_count",0))<
+                int(stats.get("guide_effect_count",0))):
+                raise RuntimeError(
+                    "Выбранная анимация создана, но звук перехода пропал. "
+                    "Отправка некорректного монтажа остановлена."
+                )
             if (selected_guide not in ("off","auto") and
                 not selected_guide.startswith("multi:") and
                 str(config.get("insert_style","reference_soft"))!="off" and
