@@ -13,7 +13,8 @@ class SmartSemanticMontageTests(unittest.TestCase):
         self.assertEqual(len(cues),1)
         self.assertEqual(cues[0].effect,"pov_carousel_spin")
         self.assertEqual(cues[0].label,"МНОГО")
-        self.assertTrue(cues[0].compact)
+        self.assertFalse(cues[0].compact)
+        self.assertFalse(cues[0].required)  # Automatic but cinematic cutaway.
 
     def test_selected_favorites_are_required_not_keyword_lottery(self):
         speech=[(5.1,5.4,"много"),(15.5,15.9,"главное"),
@@ -21,7 +22,8 @@ class SmartSemanticMontageTests(unittest.TestCase):
         cues=plan(speech,45,"multi:pov_carousel_spin,match_cut","dynamic")
         self.assertEqual([c.effect for c in cues],
                          ["pov_carousel_spin","match_cut"])
-        self.assertTrue(all(c.required and c.compact for c in cues))
+        self.assertTrue(all(c.required for c in cues))
+        self.assertFalse(cues[0].compact)  # Manual carousel must be fullscreen.
         # No trigger words, but the user CHECKED both boxes.
         mandatory=plan([(5,5.4,"клиент")],14,
                        "multi:pov_carousel_spin,match_cut")
@@ -58,7 +60,7 @@ class SmartSemanticMontageTests(unittest.TestCase):
                 (7,7.3,"много"),(16.,16.4,"вариантов"),
                 (26,26.4,"результат")]
         cues=plan(speech,33,"auto","dynamic")
-        self.assertTrue(all(c.compact and c.start>=4 and c.end<=33 for c in cues))
+        self.assertTrue(all(c.start>=4 and c.end<=33 for c in cues))
         self.assertTrue(all(y.start-x.end>=1. for x,y in zip(cues,cues[1:])))
         self.assertEqual(cues,plan(speech,33,"auto","dynamic"))
 
