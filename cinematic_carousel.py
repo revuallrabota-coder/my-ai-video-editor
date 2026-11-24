@@ -116,19 +116,28 @@ def draw_carousel(progress: float, photos: Sequence[Image.Image],
         vertical=304+round(25*abs_rel)+round(4*math.sin(p*math.pi*2))
         center_x=round(horizontal-panel.width/2)
         center_y=round(vertical-panel.height/2)
-        # Paste safely clips offscreen cards into the vertical frame.
-        image.paste(panel,(center_x,center_y),panel)
+        # Correct RGBA composition onto an OPAQUE editorial background.
+        # paste(..., mask=panel) could lower alpha around shadows and cause
+        # translucent holes that show the old talking footage underneath.
+        left=max(0,-center_x);top=max(0,-center_y)
+        right=min(panel.width,360-center_x)
+        bottom=min(panel.height,640-center_y)
+        if right>left and bottom>top:
+            clipped=panel.crop((left,top,right,bottom))
+            image.alpha_composite(
+                clipped,(max(0,center_x),max(0,center_y)))
     draw=ImageDraw.Draw(image,"RGBA")
     # Subtle slide counter and progress, no unrelated generated headlines.
     font_path="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
     font=ImageFont.truetype(font_path,12)
     draw.text((31,75),f"{visible+1:02d} / 03",
-              font=font,fill=(*accent,235))
+              font=font,fill=(*accent,255))
     for k in range(3):
         x=150+k*21
+        dim=tuple(round(base[j]*.68+accent[j]*.32) for j in range(3))
         draw.rounded_rectangle((x,563,x+13,565),radius=1,
-                               fill=(*accent,230 if k==visible else 67))
-    draw.line((31,602,31+round(298*p),602),fill=(*accent,222),width=2)
+                               fill=(* (accent if k==visible else dim),255))
+    draw.line((31,602,31+round(298*p),602),fill=(*accent,255),width=2)
     # Cinematic dissolve back to talking head; no harsh black flash.
     opacity=min(1.,p/.12,(1-p)/.12)
     if opacity<1.:
