@@ -1,0 +1,36 @@
+name: "🧯 Проверка безопасного Full HD монтажа"
+
+on:
+  push:
+    paths:
+      - "telegram_editor.py"
+      - "video_filters.py"
+      - "export_profiles.py"
+      - "test_bounded_video_render.py"
+      - ".github/workflows/bounded-render-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-fullhd:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install FFmpeg and minimal Python dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+          python -m pip install "telethon>=1.40,<2"
+      - name: Verify syntax of optimized render code
+        run: python -m py_compile telegram_editor.py video_filters.py export_profiles.py test_bounded_video_render.py
+      - name: Test bounded memory FFmpeg graph and real Full HD video/audio sync
+        env:
+          OMP_NUM_THREADS: "2"
+          OPENBLAS_NUM_THREADS: "2"
+        run: python -m unittest -v test_bounded_video_render.py
