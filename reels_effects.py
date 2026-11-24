@@ -84,19 +84,39 @@ def pick_cues(
 def pick_caption_cues(
     words: Sequence[Word], duration: float, *,
     style: str = "soft", limit: int = 36,
+    animation_style: str = "float", font_profile: str = "modern",
 ) -> list[tuple[float, str | None]]:
-    """One gentle cue per displayed PHRASE, never a chime on every word."""
+    """Tie each editorial SFX to the REAL start of an animated text phrase.
+
+    Different visual entrance styles get different short sounds. Never create
+    one click per spoken word, and leave a gap between audible accents.
+    """
     if style not in ("soft","tick","typewriter"):
-        raise ValueError("Звуки субтитров: soft или tick.")
+        raise ValueError("Звуки субтитров: soft, tick или typewriter.")
     from reference_dynamic_captions import phrase_groups
-    min_gap=1.22 if style=="soft" else 0.84
+    min_gap=0.93 if style=="soft" else 0.84
     last=-10.0
     cues=[]
-    for group in phrase_groups(words):
+    for index, group in enumerate(phrase_groups(words)):
         t=float(group[0][0])
-        if t < 0.25 or t > duration-0.30 or t-last < min_gap:
+        if t < 0.18 or t > duration-0.30 or t-last < min_gap:
             continue
-        cues.append((t,None))
+        family=None
+        if style=="soft":
+            # Editorial phrases alternate their placement and size; the sound
+            # changes in the same predictable rhythm, never randomly.
+            family=("air","paper","pop","silk")[index%4]
+            if len(group)>=5:
+                family="air"
+            elif len(group)==1:
+                family="pop"
+            if animation_style=="slide" and index%2==0:
+                family="air"
+            elif animation_style=="pop" and index%2==0:
+                family="pop"
+            elif font_profile=="script" and index%2:
+                family="silk"
+        cues.append((t,family))
         last=t
         if len(cues)>=limit:break
     return cues
@@ -176,8 +196,12 @@ def make_sfx_track(
     intensity: str = "soft",
     rate: int = 48000,
 ) -> None:
-    """Тихие короткие собственные pop-звуки, не подавляющие речь."""
-    if intensity not in ("soft", "punch", "whoosh", "caption_soft", "caption_tick", "caption_typewriter"):
+    """Short original sound effects that stay below the original speech."""
+    if intensity=="caption_soft":
+        from editorial_caption_sfx import render_caption_sounds
+        render_caption_sounds(target,cues,duration,rate)
+        return
+    if intensity not in ("soft", "punch", "whoosh", "caption_tick", "caption_typewriter"):
         raise ValueError("Недопустимая интенсивность звуков.")
     total = max(1, round(duration*rate))
     peak = {"soft":0.10, "punch":0.18, "whoosh":0.15,
@@ -404,7 +428,9 @@ def apply_effects(
            if t>=intro_clear_seconds])
     caption_cues = (pick_caption_cues(
                         words,duration,
-                        style=caption_sound
+                        style=caption_sound,
+                        animation_style=animation_style,
+                        font_profile=font_profile,
                     ) if caption_sound != "off" else [])
     # Обычные смайлы не перекрывают большую иллюстрированную карточку.
     from reference_dynamic_captions import phrase_emoji_anchors
