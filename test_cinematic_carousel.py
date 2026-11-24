@@ -19,10 +19,9 @@ class CinematicCarouselTests(unittest.TestCase):
                 for progress in (.12,.50,.88)]
         self.assertTrue(all(x.size==(360,640) for x in scenes))
         for scene in scenes:
-            # Opaque editorial background replaces the previous person.
-            self.assertGreater(scene.getpixel((20,330))[3],240)
-            self.assertGreater(scene.getpixel((180,320))[3],240)
-            self.assertGreater(scene.getpixel((340,480))[3],240)
+            # The ENTIRE scene hides the previous footage, not just the
+            # middle: even borders, drop shadows, labels and progress markers.
+            self.assertEqual(scene.getchannel("A").getextrema(),(255,255))
         centers=[frame.convert("RGB").getpixel((180,320)) for frame in scenes]
         self.assertEqual(len(set(centers)),3,"Center slide must change by index")
         for i,expected in enumerate(((208,56,63),(45,166,79),(43,89,209))):
