@@ -32,6 +32,7 @@ class ManualCarouselVideoTests(unittest.TestCase):
         chosen=plan(words,7.8,"multi:pov_carousel_spin")
         self.assertEqual(len(chosen),1)
         self.assertTrue(chosen[0].required)
+        self.assertFalse(chosen[0].compact,"The user chose cinematic fullscreen, not a widget")
         with tempfile.TemporaryDirectory(prefix="actual_carousel_") as tmp:
             root=Path(tmp)
             original=root/"source.mp4"
@@ -44,7 +45,8 @@ class ManualCarouselVideoTests(unittest.TestCase):
                 "-c:v","libx264","-preset","ultrafast","-threads","2",
                 "-c:a","aac","-shortest",str(original)
             ],capture_output=True,check=True,timeout=80)
-            # Exercise the manual fallback if optional person segmentation fails.
+            # Cinematic scene must never need person segmentation or tiny
+            # corner-caption protection. It replaces the frame entirely.
             with patch("guide18_fx._mask_frames",
                        side_effect=RuntimeError("segmenter not available")):
                 stats=apply_effects(
@@ -64,13 +66,19 @@ class ManualCarouselVideoTests(unittest.TestCase):
             a=still(original,5.2,root/"before.png")
             b=still(edited,5.2,root/"after.png")
             self.assertEqual(a.size,b.size)
-            # Carousel is in the upper side, even with standard middle captions.
-            crop=(5,112,190,210)
-            diff=ImageChops.difference(a.crop(crop),b.crop(crop)).convert("RGB")
-            histogram=diff.convert("L").histogram()
-            changed=sum(histogram[35:])
-            self.assertGreater(changed,350,
-                "User-selected carousel is visually missing from the finished MP4")
+            # The entire 9:16 composition must change, not just a tiny
+            # floating 320x150 rectangle in the top-left corner.
+            diff=ImageChops.difference(a,b).convert("L")
+            histogram=diff.histogram()
+            changed=sum(histogram[38:])
+            self.assertGreater(changed, a.width*a.height*.53,
+                "Carousel must replace the conversation with a cinematic scene")
+            # Middle-right and lower corners must be visibly treated as well.
+            bottom_right=(220,350,355,560)
+            bottom=ImageChops.difference(
+                a.crop(bottom_right),b.crop(bottom_right)).convert("L")
+            self.assertGreater(sum(bottom.histogram()[38:]),4300,
+                "Old tiny corner widget must never pass the visual regression")
 
 
 if __name__=="__main__":
