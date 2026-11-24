@@ -554,7 +554,7 @@ export default {
     } catch(error) {
       const message=String(error?.message??error);
       const status=/подпись|владельцу|Telegram|секреты/i.test(message)?403:
-        /настройк|файл|размер|формат|цвет|JSON|название/i.test(message)?400:500;
+        /настройк|файл|размер|формат|цвет|JSON|название|допустимо|видео|архив|ZIP/i.test(message)?400:500;
       return response({error:message},status);
     }
   }
