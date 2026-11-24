@@ -846,8 +846,10 @@ def sound_track(path:Path,events:Sequence[GuideCue],duration:float,
     clips and licensed recordings must be supplied separately.
     """
     if rate<8000 or rate>96000:raise ValueError("Invalid audio sample rate")
-    base_volume={"pink_tender":0.038,"old_money":0.048,"burgundy":0.053,
-                 "vintage":0.047}.get(style,0.060)
+    # Audible over normal dialogue, but still quieter than the speech track.
+    # Former 0.038..0.060 gains were effectively inaudible on phone speakers.
+    base_volume={"pink_tender":0.080,"old_money":0.095,"burgundy":0.103,
+                 "vintage":0.095}.get(style,0.112)
     pitch={"pink_tender":1.28,"old_money":0.88,"burgundy":0.79,
            "vintage":0.78}.get(style,1.)
     total=max(1,int(duration*rate))
