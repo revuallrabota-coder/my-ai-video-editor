@@ -60,7 +60,8 @@ class SmartSoundDesignTests(unittest.TestCase):
         self.assertIn('<select id="soundDesign">',page)
         self.assertIn('<option value="auto" selected>',page)
         self.assertIn('<details id="soundDesignDetails" hidden>',page)
-        self.assertIn("if(mode==='auto')return {keywords:'off',captions:'off',inserts:true};",page)
+        self.assertIn("if(mode==='auto')return {keywords:'off',captions:'soft',inserts:true};",page)
+        self.assertIn('Референс: разные деликатные звуки появления фраз',page)
         self.assertIn("if(mode==='off')return {keywords:'off',captions:'off',inserts:false};",page)
         self.assertIn("guide_audio(audio,soundtrack_events,duration,style=insert_style)",renderer)
         # Changing the visual preset must not turn on typewriter audio
