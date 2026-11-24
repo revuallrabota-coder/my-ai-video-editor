@@ -203,22 +203,26 @@ function expectedBytes(meta,i) {
   return f ? Math.min(CHUNK,f.size-(i-f.offset)*CHUNK) : -1;
 }
 async function completeParts(env,id,parts,prefix,meta=null) {
+  // On the Free plan KV.list has only 1,000 requests/day. Reading the
+  // precise chunk keys avoids that quota entirely, including for uploads
+  // created by older Worker versions. STREAM values are canceled immediately:
+  // verification must never load 500 MB of uploaded video into Worker RAM.
   const found=new Set();
-  const base=key(id,prefix);
-  let cursor;
-  do {
-    const page=await env.UPLOADS.list({prefix:base,limit:1000,...(cursor?{cursor}:{})});
-    for (const item of page.keys) {
-      const suffix=item.name.slice(base.length);
-      if (!/^(0|[1-9]\d*)$/.test(suffix)) continue;
-      const i=Number(suffix);
-      const size=meta ? expectedBytes(meta,i) :
+  for (let start=0;start<parts.count;start+=12) {
+    const indexes=Array.from({length:Math.min(12,parts.count-start)},(_,j)=>start+j);
+    const confirmed=await Promise.all(indexes.map(async i=>{
+      const expected=meta ? expectedBytes(meta,i) :
         Math.min(CHUNK,parts.total-i*CHUNK);
-      if (Number.isSafeInteger(i) && i>=0 && i<parts.count &&
-          item.metadata?.bytes===size) found.add(i);
-    }
-    cursor=page.list_complete ? null : page.cursor;
-  } while (cursor);
+      if (expected<=0) return null;
+      const entry=await env.UPLOADS.getWithMetadata(key(id,prefix+i),"stream");
+      const exists=entry?.value!=null;
+      if (entry?.value && typeof entry.value.cancel==="function") {
+        try {await entry.value.cancel();} catch { /* Read only metadata. */ }
+      }
+      return exists && Number(entry?.metadata?.bytes)===expected ? i : null;
+    }));
+    for (const i of confirmed) if (i!==null) found.add(i);
+  }
   return found;
 }
 async function readJSON(request) {
@@ -329,8 +333,11 @@ async function githubRunOutcome(env,runId) {
 async function status(env,id) {
   const meta=await env.UPLOADS.get(key(id,"meta"),"json");
   if (!meta) return response({error:"Загрузка удалена или срок хранения истёк."},404);
-  const stages=await env.UPLOADS.list({prefix:key(id,"progress:"),limit:50});
-  const latest=(stages.keys||[]).map(x=>x.metadata)
+  // Progress has a fixed set of stage keys. Lookup exact keys instead of
+  // spending a KV.list call on every status refresh.
+  const stageRecords=await Promise.all(Object.keys(STAGES).map(stage=>
+    env.UPLOADS.getWithMetadata(key(id,"progress:"+stage),"text")));
+  const latest=stageRecords.map(x=>x?.metadata)
     .filter(x=>x && Object.hasOwn(STAGES,x.stage))
     .sort((a,b)=>(b.at??0)-(a.at??0))[0];
   const uploaded=meta.state==="uploading" ?
