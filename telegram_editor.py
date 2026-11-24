@@ -279,20 +279,27 @@ def base_video(
     from video_filters import video_filter_chain
     extra_filters = video_filter_chain(filter_style)
 
-    filters: list[str] = []
-    concat_inputs = ""
-    for idx, fragment in enumerate(ranges):
-        a, b = fragment.start, fragment.end
-        filters.append(f"[0:v]trim=start={a:.3f}:end={b:.3f},setpts=PTS-STARTPTS[v{idx}]")
-        concat_inputs += f"[v{idx}]"
-        if has_audio:
-            filters.append(f"[0:a]atrim=start={a:.3f}:end={b:.3f},asetpts=PTS-STARTPTS[a{idx}]")
-            concat_inputs += f"[a{idx}]"
-
+    if not ranges:
+        raise ValueError("Не осталось фрагментов речи для монтажа.")
+    # A filtergraph with a separate trim/atrim branch for every pause-cut
+    # queues full-resolution frames in multiple branches. On the hosted
+    # runner that allowed FFmpeg RSS to grow beyond 7 GB in 30 seconds.
+    # Select only the required frames/samples from ONE decoded stream.
+    selection = "+".join(
+        f"gte(t,{fragment.start:.3f})*lt(t,{fragment.end:.3f})"
+        for fragment in ranges
+    )
+    LOG.info("Single-stream edit decision, %d speech segments, %s export",
+             len(ranges), profile.name)
+    filters: list[str] = [
+        "[0:v]setpts=PTS-STARTPTS,fps=30,"
+        f"select='{selection}',setpts=N/(30*TB)[vjoined]"
+    ]
     if has_audio:
-        filters.append(f"{concat_inputs}concat=n={len(ranges)}:v=1:a=1[vjoined][ajoined]")
-    else:
-        filters.append(f"{concat_inputs}concat=n={len(ranges)}:v=1:a=0[vjoined]")
+        filters.append(
+            "[0:a]asetpts=PTS-STARTPTS,"
+            f"aselect='{selection}',asetpts=N/SR/TB[ajoined]"
+        )
 
     video_source = "[vjoined]"
     audio_source = "[ajoined]"
@@ -321,8 +328,12 @@ def base_video(
 
     args = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-        "-i", str(path), "-filter_complex", ";".join(filters),
+        "-threads", "2", "-i", str(path),
+        "-filter_complex_threads", "1",
+        "-filter_threads", "2",
+        "-filter_complex", ";".join(filters),
         "-map", "[vout]", "-c:v", "libx264", "-preset", profile.preset,
+        "-threads", "2",
         "-crf", str(min(12, profile.crf) if intermediate else profile.crf),
         "-pix_fmt", "yuv420p",
     ]
