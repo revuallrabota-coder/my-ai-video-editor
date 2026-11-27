@@ -1,0 +1,36 @@
+name: "📦 Бесплатная загрузка 3 ГБ через Durable Objects"
+
+on:
+  push:
+    paths:
+      - "cloudflare_launcher_do_v9.js"
+      - "test_upload_3gb_do.mjs"
+      - "wrangler.do.v9.toml.template"
+      - "process_uploaded_video.py"
+      - "index.html"
+      - ".github/workflows/free-do-3gb-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  three-gb-sqlite:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify Worker v9 JavaScript syntax
+        run: node --input-type=module --check < cloudflare_launcher_do_v9.js
+      - name: Verify 3GB chunk routing, SQLite shard lifecycle, cleanup and private output
+        run: node test_upload_3gb_do.mjs
+      - name: Verify GitHub 10-minute processing and HTML integration syntax
+        run: |
+          python -m py_compile process_uploaded_video.py clip_montage.py
+          node --check --input-type=commonjs < carousel_photo_zip.js
+      - name: Check free Wrangler SQLite migration is present
+        run: |
+          grep -q 'new_sqlite_classes = \["VideoChunkShard"\]' wrangler.do.v9.toml.template
