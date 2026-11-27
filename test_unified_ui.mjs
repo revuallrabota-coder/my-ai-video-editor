@@ -68,3 +68,33 @@ const close=html.indexOf("</script>",open);
 assert.ok(open>=0 && close>open);
 new Function(html.slice(open+"<script>".length,close));
 console.log("✓ Single My Style flow, 4 steps, no missing DOM IDs, font+photo preview, independent controls");
+
+
+ // Exercise the same upload scheduler used by the Mini App, including resume.
+const schedulerStart=html.indexOf("  async function transferUploadParts(");
+const schedulerEnd=html.indexOf("  async function inspectVideoDuration(",schedulerStart);
+assert.ok(schedulerStart>=0&&schedulerEnd>schedulerStart);
+const transfer=new Function(html.slice(schedulerStart,schedulerEnd)+"\nreturn transferUploadParts;")();
+const completed=new Set([1,5]);
+const sent=[];
+let active=0,peak=0;
+await transfer(12,completed,3,async i=>{
+  active++;
+  peak=Math.max(peak,active);
+  await new Promise(resolve=>setTimeout(resolve,1));
+  sent.push(i);
+  active--;
+},()=>{});
+assert.equal(peak,3);
+assert.equal(active,0);
+assert.equal(completed.size,12);
+assert.equal(new Set(sent).size,10);
+assert.ok(!sent.includes(1)&&!sent.includes(5));
+let settled=0;
+await assert.rejects(transfer(12,new Set(),3,async i=>{
+  if(i===0)throw new Error("simulated failure");
+  await new Promise(resolve=>setTimeout(resolve,1));
+  settled++;
+},()=>{}),/simulated failure/);
+assert.equal(settled,2,"No outstanding upload workers when retry is enabled");
+console.log("✓ Bounded three-lane transfer, resumable uploads and failure handling");
