@@ -1,0 +1,27 @@
+name: "🎥 10 минут: большие видео через Cloudflare R2"
+
+on:
+  push:
+    paths:
+      - "cloudflare_launcher_r2_v8.js"
+      - "test_upload_10min_r2.mjs"
+      - "clip_montage.py"
+      - "process_uploaded_video.py"
+      - ".github/workflows/ten-minute-r2-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  r2-storage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Worker v8 syntax
+        run: node --input-type=module --check < cloudflare_launcher_r2_v8.js
+      - name: Simulate two-gigabyte upload and half-gigabyte private master
+        run: node test_upload_10min_r2.mjs
+      - name: Validate 10-minute processing logic syntax
+        run: python -m py_compile process_uploaded_video.py clip_montage.py
