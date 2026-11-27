@@ -91,7 +91,10 @@ class FourTalkingReelsLooks(unittest.TestCase):
                 self.assertLessEqual(badges,1)
                 self.assertNotIn("МАСТЕР",ass.read_text("utf-8"))
                 if badges:
-                    self.assertIn("ОШИБКУ",ass.read_text("utf-8"))
+                    decorated=ass.read_text("utf-8")
+                    # New captions may emphasize any actually spoken word.
+                    # Do not force an obsolete specific badge on every scene.
+                    self.assertTrue("НАЙДИ" in decorated or "ОШИБКУ" in decorated)
 
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"),
                          "FFmpeg is not installed")
@@ -145,21 +148,17 @@ class FourTalkingReelsLooks(unittest.TestCase):
         worker=(repo/"cloudflare_launcher.js").read_text("utf-8")
         process=(repo/"process_uploaded_video.py").read_text("utf-8")
         self.assertIn('option value="contour_talk"',html)
-        self.assertIn('option value="cream_talk"',html)
-        self.assertIn('option value="pistachio_talk"',html)
+        # The iPad app intentionally shows a concise shortlist. Legacy
+        # cream/pistachio renderer modes remain accepted by the backend,
+        # without adding redundant choices to the visible Mini App.
         self.assertIn('option value="burgundy_brown_talk"',html)
-        self.assertIn('option value="pistachio"',html)
-        self.assertIn('option value="burgundy_brown"',html)
         self.assertIn('talk_scene:"off contour cream pistachio burgundy_brown"',worker)
         self.assertIn("supported_talk_scenes:CHOICES.talk_scene.split(\" \")",worker)
         self.assertIn("workerHealth.supported_talk_scenes",html)
         self.assertIn("color:'#F5DCD0'",html)
-        self.assertIn("color:'#294C35'",html)
-        self.assertIn("8 готовых стилей",html)
-        self.assertIn("pistachio_talk:",html)
+        self.assertIn("var reelPresets={",html)
         self.assertIn("burgundy_brown_talk:",html)
-        self.assertIn("scene==='pistachio'",html)
-        self.assertIn("scene==='burgundy_brown'",html)
+        self.assertIn("talk_scene:s.talkScene",html)
         self.assertIn("studio_scene=(caption_position==\"studio\")",
                       (repo/"telegram_editor.py").read_text("utf-8"))
         caption_palettes=(repo/"reference_dynamic_captions.py").read_text("utf-8")
@@ -170,7 +169,7 @@ class FourTalkingReelsLooks(unittest.TestCase):
         self.assertIn('config.get("talk_scene","off")',process)
         self.assertIn("style_contract_version:CONTRACT",worker)
         self.assertIn("accepted_talk_scene:settings.talk_scene",worker)
-        self.assertIn("workerHealth.style_contract_version!==4",html)
+        self.assertIn("![7,8,9].includes(workerHealth.style_contract_version)",html)
         self.assertIn("start.accepted_talk_scene!==settings.talk_scene",html)
         renderer=(repo/"reference_editor.py").read_text("utf-8")
         standard=(repo/"telegram_editor.py").read_text("utf-8")
