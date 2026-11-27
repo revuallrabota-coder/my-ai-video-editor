@@ -44,7 +44,10 @@ def select_studio_cues(
         if len(group)<2:
             continue
         start=max(0.,float(group[0][0]))
-        if start<2.4 or start>duration-1.8 or start-last<gap:
+        # Reserve the first four seconds for the speaker BEFORE applying
+        # minimum spacing. Otherwise an early (2.7s) cue consumes the
+        # only slot and is later removed by the global intro guard.
+        if start<4.0 or start>duration-1.8 or start-last<gap:
             continue
         words_clean=[]
         for _,_,raw in group:
