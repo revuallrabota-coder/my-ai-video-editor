@@ -500,6 +500,88 @@ async function downloadResult(env,id,index) {
     "Access-Control-Allow-Headers":"X-Telegram-Init-Data","Vary":"Origin"
   }});
 }
+// Time-limited browser link: owner authentication remains in Mini App.
+// Safari can download a multi-GB file without accumulating a Blob on iPad.
+async function createMasterLink(request,env,id){
+  const meta=await env.UPLOADS.get(key(id,"meta"),"json");
+  if(meta?.state!=="done"||meta?.output?.state!=="ready")
+    return response({error:"Мастер-файл пока не готов."},409);
+  const exp=Math.floor(Date.now()/1000)+600;
+  const signature=await hmac(new TextEncoder().encode(env.TELEGRAM_BOT_TOKEN),
+                              "master:"+id+":"+exp);
+  const url=new URL(request.url);
+  return response({
+    url:url.origin+"/master/"+id+"?expires="+exp+"&signature="+signature,
+    expires_at:exp*1000,size:meta.output.size
+  });
+}
+async function masterDownload(request,env,id){
+  const url=new URL(request.url);
+  const expires=Number(url.searchParams.get("expires"));
+  const signature=String(url.searchParams.get("signature")||"");
+  if(!Number.isSafeInteger(expires)||expires<Math.floor(Date.now()/1000)||
+     expires>Math.floor(Date.now()/1000)+605|| !/^[a-f0-9]{64}$/.test(signature))
+    return response({error:"Ссылка истекла. Получи новую из Mini App."},403,"null");
+  const signed=await hmac(new TextEncoder().encode(env.TELEGRAM_BOT_TOKEN),
+                           "master:"+id+":"+expires);
+  if(!safeEqual(signature,signed))
+    return response({error:"Неверная подпись."},403,"null");
+  const meta=await env.UPLOADS.get(key(id,"meta"),"json");
+  const out=meta?.output;
+  if(meta?.state!=="done"||out?.state!=="ready")
+    return response({error:"Видео пока не готово."},404,"null");
+  const total=Number(out.size);
+  let fromByte=0,toByte=total-1,code=200;
+  const range=request.headers.get("Range");
+  if(range){
+    const matched=range.match(/^bytes=(\d+)-(\d*)$/);
+    if(!matched)return new Response(null,{status:416,
+      headers:{"Content-Range":"bytes */"+total}});
+    fromByte=Number(matched[1]);
+    toByte=matched[2]?Number(matched[2]):total-1;
+    if(!Number.isSafeInteger(fromByte)||!Number.isSafeInteger(toByte)||
+       fromByte<0||fromByte>=total||toByte<fromByte||toByte>=total)
+      return new Response(null,{status:416,
+        headers:{"Content-Range":"bytes */"+total}});
+    code=206;
+  }
+  let cursor=Math.floor(fromByte/CHUNK);
+  const lastPart=Math.floor(toByte/CHUNK);
+  const stream=new ReadableStream({
+    async pull(controller){
+      if(cursor>lastPart){controller.close();return;}
+      const i=cursor++;
+      try{
+        const obj=useDO(env,meta)
+          ? await doPartRead(env,id,"output:",i)
+          : useR2(env,meta)
+          ? await env.VIDEO_FILES.get(r2key(id,"output:",i))
+          : await env.UPLOADS.get(key(id,"output:"+i),"arrayBuffer");
+        if(!obj||(useDO(env,meta)&&!obj.ok))
+          throw new Error("Часть результата не найдена");
+        const bytes=new Uint8Array(
+          useDO(env,meta)||useR2(env,meta)
+          ? await obj.arrayBuffer():obj);
+        const lo=i===Math.floor(fromByte/CHUNK)?fromByte%CHUNK:0;
+        const hi=i===lastPart?toByte%CHUNK+1:bytes.length;
+        controller.enqueue(bytes.subarray(lo,hi));
+      }catch(e){controller.error(e);}
+    }
+  });
+  const headers={
+    "Content-Type":"video/mp4",
+    "Content-Disposition":'attachment; filename="my-reels-fullhd.mp4"',
+    "Content-Length":String(toByte-fromByte+1),
+    "Accept-Ranges":"bytes",
+    "Cache-Control":"private, no-store",
+    "X-Content-Type-Options":"nosniff",
+    "Referrer-Policy":"no-referrer"
+  };
+  if(code===206)headers["Content-Range"]=
+    "bytes "+fromByte+"-"+toByte+"/"+total;
+  return new Response(stream,{status:code,headers});
+}
+
 async function internalRoute(request,env,path) {
   const token=(request.headers.get("Authorization")||"").replace(/^Bearer /,"");
   if (!token || !safeEqual(token,env.TELEGRAM_BOT_TOKEN)) {
@@ -612,6 +694,9 @@ async function internalRoute(request,env,path) {
 }
 async function publicRoute(request,env,path) {
   await verifyTelegram(request.headers.get("X-Telegram-Init-Data"),env);
+  const masterLink=path.match(/^\/upload\/([a-f0-9-]{36})\/master-link$/);
+  if(request.method==="GET"&&masterLink)
+    return createMasterLink(request,env,masterLink[1]);
   const statusMatch=path.match(/^\/upload\/([a-f0-9-]{36})\/status$/);
   if (request.method==="GET" && statusMatch) return status(env,statusMatch[1]);
   const resultMatch=path.match(/^\/upload\/([a-f0-9-]{36})\/result\/(\d+)$/);
@@ -705,6 +790,9 @@ export class VideoChunkShard {
 export default {
   async fetch(request,env) {
     const path=new URL(request.url).pathname;
+    const masterPath=path.match(/^\/master\/([a-f0-9-]{36})$/);
+    if(request.method==="GET"&&masterPath)
+      return masterDownload(request,env,masterPath[1]);
     if (request.method==="GET" && (path==="/" || path==="/health")) {
       return response({
         status:"online",mode:"github-actions-launcher",
