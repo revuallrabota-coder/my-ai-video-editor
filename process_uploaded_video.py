@@ -24,7 +24,8 @@ from telegram_editor import duration_and_audio, transcribe_words
 
 LOG = logging.getLogger("private_upload_montage")
 MAX_BYTES = 500_000_000  # legacy KV route
-MAX_R2_BYTES = 4_000_000_000  # size threshold from worker v8; GH runner is finite
+MAX_R2_BYTES = 4_000_000_000  # Paid R2 path, when configured
+MAX_DO_BYTES = 3_000_000_000  # Free Durable Objects, one project
 
 
 def read_chunked_project(
@@ -55,10 +56,11 @@ def read_chunked_project(
     if not isinstance(meta, dict):
         raise RuntimeError("Не удалось получить файлы из Cloudflare.")
     storage = meta.get("storage","kv")
-    if storage not in ("kv","r2"):
+    if storage not in ("kv","r2","do"):
         raise ValueError("Неизвестный тип хранилища проекта.")
-    cap = MAX_R2_BYTES if storage=="r2" else MAX_BYTES
-    part_cap = 1100 if storage=="r2" else 165
+    cap = (MAX_DO_BYTES if storage=="do" else
+           MAX_R2_BYTES if storage=="r2" else MAX_BYTES)
+    part_cap = 800 if storage=="do" else 1100 if storage=="r2" else 165
     size = meta.get("size")
     parts = meta.get("parts")
     chunk_size = meta.get("chunk_size")
@@ -205,7 +207,7 @@ def publish_large_mp4(worker_url: str, upload_id: str, token: str, file: Path,
                       *, storage: str="kv") -> None:
     """Keep the original-quality output in private KV or R2, without shrinking."""
     size=file.stat().st_size
-    limit=3_000_000_000 if storage=="r2" else 250_000_000
+    limit=3_000_000_000 if storage in ("r2","do") else 250_000_000
     if size>limit:
         raise ValueError("Готовый MP4 превышает доступный объём временного хранилища.")
     url=worker_url.rstrip("/")+"/internal/upload/"+upload_id+"/result"
@@ -324,6 +326,14 @@ def main() -> None:
             metadata,clips=read_chunked_project(
                 worker_url,upload_id,token,root/"source_clips"
             )
+            # This is critical for 3 GB on the Free plan's 5 GB TOTAL DO
+            # storage. The verified source files are now local to GitHub;
+            # free the remote shards BEFORE generating/uploading the master.
+            if metadata.get("storage")=="do":
+                release_upload(worker_url,upload_id,token)
+                send_text(token,owner,
+                    "🧹 Исходники загружены на сервер монтажа. "
+                    "Освобождаю бесплатное облачное хранилище перед экспортом.")
             config=metadata.get("settings") or {}
             mode=config.get("mode","my_style")
             talk_scene=str(config.get("talk_scene","off"))
@@ -611,7 +621,7 @@ def main() -> None:
                 send_error=str(exc)
                 LOG.exception("Telegram upload failed; keeping a download backup.")
             master_saved=False
-            if large and out.stat().st_size<=(3_000_000_000 if metadata.get("storage")=="r2" else 250_000_000):
+            if large and out.stat().st_size<=(3_000_000_000 if metadata.get("storage") in ("r2","do") else 250_000_000):
                 # Optional *high-quality master* for an iPad backup. The owner
                 # does not need to open the app to receive the playable copy.
                 try:
