@@ -63,7 +63,7 @@ class VideoProjectTests(unittest.TestCase):
             for file in clips:
                 file.write_bytes(b"X"*5000)
             with patch("clip_montage.duration_and_audio",
-                       side_effect=[(70.0,True),(70.0,True)]):
+                       side_effect=[(310.0,True),(310.0,True)]):
                 with self.assertRaisesRegex(ValueError,"продолжительность"):
                     join_clips(clips,root/"out.mp4","balanced")
             self.assertFalse((root/"out.mp4").exists())
