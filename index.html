@@ -131,7 +131,7 @@
     <p class="note">Один монтаж для всех твоих роликов: склейка, вырезание пауз, скорость, шрифты, смысловые вставки и отправка в Telegram. Все параметры настраиваются отдельно.</p>
     <input type="radio" name="mode" value="Мой стиль" checked hidden>
     <h3>Загрузи исходные видео</h3>
-    <p>Выбери несколько видео с iPad. <strong>До 10 минут суммарно</strong>. Видео свыше 500 МБ загружаются через R2 (нужно отдельно подключить). У текущего сервера монтажа безопасный предел проекта 4 ГБ. Соединим их по порядку и смонтируем один Reels.</p>
+    <p>Выбери несколько видео с iPad. <strong>До 10 минут суммарно</strong>. Видео свыше 500 МБ передаются через бесплатные Durable Objects: нужен Worker v9. До 3 ГБ на проект, без R2 и карты. Соединим их по порядку и смонтируем один Reels.</p>
     <label class="upload">
       <div class="emoji">📎</div>
       <strong>Выбрать несколько видео</strong>
@@ -424,14 +424,14 @@
       <a id="workerHealthLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none">Открыть /health в Safari</a>
       <button class="btn primary" id="upload50Button" type="button" style="width:100%;margin-top:12px">🎬 Смонтировать Reels</button>
       <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
-      <p class="mini" id="upload50Status" role="status" aria-live="polite">До 500 МБ работает KV, для больших файлов нужен отдельный Cloudflare R2 bucket VIDEO_FILES. Исходник не сжимается при загрузке.</p>
+      <p class="mini" id="upload50Status" role="status" aria-live="polite">До 500 МБ работает KV. Для видео до 3 ГБ нужен бесплатный Worker v9 с Durable Objects VIDEO_SHARDS. Файл передаётся частями без сжатия.</p>
       <button class="btn secondary" id="checkUploadedResult" type="button" style="width:100%;margin-top:8px" hidden>⬇️ Скачать готовое Full HD</button>
       <button class="btn secondary" id="checkMontageStatus" type="button" style="width:100%;margin-top:8px">📍 Посмотреть этап обработки</button>
       <p class="note">Видео в Cloudflare хранятся максимум 3 дня; исходники освобождаются сразу после обработки. Статус доступен после закрытия и повторного открытия приложения.</p>
       <details style="margin-top:12px">
         <summary style="cursor:pointer;font-weight:650">Первое подключение Cloudflare · инструкция</summary>
-        <p class="note">Для больших видео нужны два ресурса: KV <strong>UPLOADS</strong> для статусов и R2 bucket <strong>VIDEO_FILES</strong> для файлов. Используй Worker v8.</p>
-        <p class="note"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/TEN_MINUTE_R2_SETUP.md" target="_blank" rel="noopener noreferrer">Настроить загрузку больших файлов с iPad</a></p>
+        <p class="note">Для больших видео без карты нужны KV <strong>UPLOADS</strong> для статусов и SQLite Durable Objects <strong>VIDEO_SHARDS</strong> для файлов. Разверни Worker v9 через GitHub Actions, а не обычным копированием в редактор Cloudflare.</p>
+        <p class="note"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/TEN_MINUTE_FREE_DO_SETUP.md" target="_blank" rel="noopener noreferrer">Настроить загрузку больших файлов с iPad</a></p>
       </details>
     </div>
     <!-- Скрытые элементы прежних прототипов сохраняют совместимость JS,
@@ -600,11 +600,11 @@
     var list=byId('clipsList');
     list.replaceChildren();
     var total=selectedClips.reduce(function(sum,f){return sum+f.size},0);
-    var warning=total>4000000000||selectedClips.length>12;
+    var warning=total>3000000000||selectedClips.length>12;
     byId('videoInfo').textContent=selectedClips.length
       ? ('🎬 '+selectedClips.length+' видео · '+fmtBytes(total)+
-         ' · до 10 минут · '+(total>500000000?'для этого объёма нужен R2':'KV или R2')+
-         (warning?' ⚠️ Превышен безопасный объём 4 ГБ!':''))
+         ' · до 10 минут · '+(total>500000000?'нужен Worker v9 с Durable Objects':'обычное KV')+
+         (warning?' ⚠️ Превышен лимит 3 ГБ!':''))
       : 'Видео пока не выбраны. Добавь исходники выше.';
     selectedClips.forEach(function(file,index){
       var item=document.createElement('div');
@@ -1043,10 +1043,10 @@
       throw new Error('По адресу '+url+' отвечает не наш монтажёр.');
     }
     out.style.whiteSpace='pre-line';
-    if(![7,8].includes(version)){
+    if(![7,8,9].includes(version)){
       out.textContent='⚠️ Приложение проверяет: '+url+
         '\nВерсия по этому адресу: '+(version==null?'старая, без номера':version)+
-        '. Нужна v7 (малые файлы) или v8 (до 10 минут и большой объём).'+
+        '. Нужна v7 (малые файлы), v8 (R2) или v9 (бесплатные Durable Objects).'+
         ' Сверь адрес с Cloudflare → Workers & Pages → Visit.';
       return false;
     }
@@ -1058,9 +1058,11 @@
     try{localStorage.setItem('personalEditorLauncher',url)}catch(ignore){}
     out.textContent='✅ Подключение к Cloudflare работает!\nWorker: '+url+
       '\nВерсия: '+version+' · до 10 минут видео.'+
-      (version===8&&data.large_storage_configured===true
-        ?'\nR2 подключён: можно загружать большие видео (до 4 ГБ на этом сервере).'
-        :'\nR2 не подключён: пока доступны видео до 500 МБ.');
+      (version===9&&data.durable_storage_configured===true
+        ?'\nSQLite Durable Objects подключены: до 3 ГБ без банковской карты.'
+        :version===8&&data.large_storage_configured===true
+        ?'\nR2 подключён: поддерживаются большие файлы.'
+        :'\nБольшое хранилище не подключено: пока до 500 МБ.');
     return true;
   }
   byId('checkWorkerConnection').addEventListener('click',async function(){
@@ -1247,7 +1249,7 @@
       player.load();
     });
   }
-  // Video up to 10 minutes. KV for legacy <=500 MB; R2 for large projects.
+  // Video up to 10 minutes. KV <=500MB; free SQLite Durable Objects up to 3GB.
   // Обычный Bot API не скачивает больше 20 MB: здесь он не используется
   // для исходника. Размер частей 4 MB и поочерёдная отправка с iPad.
   byId('upload50Button').addEventListener('click',async function(){
@@ -1292,8 +1294,8 @@
         throw new Error('Для эффектов и фотографий доступно до четырёх ZIP-пакетов и до 100 МБ суммарно.');
       if(assets.some(function(f){return !/\.zip$/i.test(f.name)||f.size<100}))
         throw new Error('Для анимаций выбери ZIP-архивы из прикреплённых наборов.');
-      if(totalSize>4000000000)throw new Error(
-        'Общий размер проекта '+fmtBytes(totalSize)+'. Для монтажа на текущем сервере безопасный предел 4 ГБ. Для ещё больших видео нужен другой сервер.');
+      if(totalSize>3000000000)throw new Error(
+        'Общий размер проекта '+fmtBytes(totalSize)+'. Для монтажа на текущем сервере предел 3 ГБ на текущем бесплатном хранилище.');
       for(var f=0;f<videos.length;f++){
         if(videos[f].size<4096)throw new Error(
           'Видео №'+(f+1)+' пустое или слишком маленькое.');
@@ -1321,13 +1323,13 @@
       }
       status.textContent='Проверяю, что Cloudflare поддерживает выбранный стиль…';
       var workerHealth=await request('/health','GET');
-      if(![7,8].includes(workerHealth.style_contract_version)){
+      if(![7,8,9].includes(workerHealth.style_contract_version)){
         byId('workerHealthLink').href=url+'/health';
         byId('workerHealthLink').style.display='inline-block';
         throw new Error(
           'Приложение проверяет адрес '+url+
           '. Версия сервера: '+(workerHealth.style_contract_version??'старая, без номера')+
-          ', требуется версия 7 или 8. Для больших файлов нужна версия 8. Сравни адрес с Cloudflare → Workers & Pages → Visit. '+
+          ', требуется Worker v7/8/9. Для 3 ГБ без карты нужна v9. Сравни адрес с Cloudflare → Workers & Pages → Visit. '+
           'Если отличается, замени адрес в поле «Адрес Cloudflare». '+
           'Если совпадает, проверь публикацию Deploy именно этого Worker.'
         );
@@ -1343,11 +1345,14 @@
           'Видео не загружено: старый сервер не должен подменять фисташковый или бургунди другим оформлением.'
         );
       }
-      if(totalSize>500000000 && (workerHealth.style_contract_version!==8 ||
-          workerHealth.large_storage_configured!==true)){
+      if(totalSize>500000000 && !(
+          (workerHealth.style_contract_version===9 &&
+           workerHealth.durable_storage_configured===true) ||
+          (workerHealth.style_contract_version===8 &&
+           workerHealth.large_storage_configured===true))){
         throw new Error('Видео '+fmtBytes(totalSize)+
-          ' нельзя передать в старое хранилище KV. Подключи R2 bucket VIDEO_FILES '+
-          'и опубликуй Worker v8, затем нажми проверку подключения.');
+          ' нельзя передать в старое KV. Чтобы не нужна была банковская карта, '+
+          'разверни Worker v9 через GitHub Actions и подключи VIDEO_SHARDS.');
       }
       status.textContent='Подготавливаю проект: '+videos.length+' видео, '+fmtBytes(totalSize)+'…';
       // Each file starts a fresh 4MB-chunk sequence. Flat chunk IDs
@@ -1385,7 +1390,7 @@
              resumed.accepted_talk_scene===settings.talk_scene &&
              resumed.accepted_caption_variant===settings.caption_variant &&
              resumed.accepted_guide_effect===settings.guide_effect &&
-             [7,8].includes(resumed.style_contract_version) &&
+             [7,8,9].includes(resumed.style_contract_version) &&
               resumed.accepted_insert_style===settings.insert_style){
             id=old.id;
             parts=resumed.input_parts;
@@ -1411,7 +1416,7 @@
           assets:assets.map(function(file){return {name:file.name,size:file.size}}),
           size:totalSize,settings:settings
         }),false);
-        if(![7,8].includes(start.style_contract_version) ||
+        if(![7,8,9].includes(start.style_contract_version) ||
             start.accepted_insert_style!==settings.insert_style ||
            start.accepted_talk_scene!==settings.talk_scene ||
            start.accepted_caption_variant!==settings.caption_variant ||
