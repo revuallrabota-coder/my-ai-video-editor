@@ -1,0 +1,50 @@
+name: "🧪 Реальная локальная SQLite проверка Worker v9"
+
+on:
+  push:
+    paths:
+      - "cloudflare_launcher_do_v9.js"
+      - "wrangler.do.v9.toml.template"
+      - "test_do_sqlite_local.mjs"
+      - ".github/workflows/free-do-real-sqlite-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sqlite-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Prepare local SQLite Durable Objects binding
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          t=Path("wrangler.do.v9.toml.template").read_text("utf-8")
+          Path("wrangler.do.v9.generated.toml").write_text(
+            t.replace("__EXISTING_UPLOADS_KV_NAMESPACE_ID__","0"*32),"utf-8")
+          PY
+      - name: Start real Wrangler local worker with SQLite storage (no card)
+        run: |
+          nohup npx --yes wrangler@4 dev             --config wrangler.do.v9.generated.toml             --ip 127.0.0.1 --port 8787 --local             --var "TELEGRAM_BOT_TOKEN:1234:LOCAL_SQLITE_TEST"             --var "OWNER_TELEGRAM_ID:404040"             --var "GITHUB_PAT:TEST_NO_DISPATCH"             >/tmp/free-do-wrangler.log 2>&1 &
+          echo $! >/tmp/free-do.pid
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:8787/health >/tmp/free-do-health.json; then
+              cat /tmp/free-do-health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          tail -100 /tmp/free-do-wrangler.log
+          exit 1
+      - name: Upload real 4 MB to local SQLite and verify persisted status
+        run: node test_do_sqlite_local.mjs
+      - name: Stop local worker
+        if: always()
+        run: |
+          if test -f /tmp/free-do.pid; then kill "$(cat /tmp/free-do.pid)" || true; fi
