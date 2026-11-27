@@ -1224,7 +1224,26 @@
   window.addEventListener('focus',refreshProjectStatus);
   // The timer runs only while the app is OPEN. Telegram notifications work
   // separately even when the user closes the app.
-  setInterval(function(){if(!document.hidden && showStatusCard())refreshProjectStatus()},20000);
+  setInterval(function(){if(!document.hidden && !byId('upload50Button').disabled && showStatusCard())refreshProjectStatus()},20000);
+
+  // Bounded parallel transfers: keep only a few 4MB slices in flight.
+  // Wait for every in-flight request to settle before allowing a retry.
+  async function transferUploadParts(parts,completed,concurrency,sendPart,onComplete){
+    var cursor=0,firstError=null;
+    async function lane(){
+      while(!firstError && cursor<parts){
+        var i=cursor++;
+        if(completed.has(i))continue;
+        try{
+          await sendPart(i);
+          completed.add(i);
+          onComplete(i);
+        }catch(err){if(!firstError)firstError=err;}
+      }
+    }
+    await Promise.all(Array.from({length:Math.min(parts,concurrency)},function(){return lane()}));
+    if(firstError)throw firstError;
+  }
 
   async function inspectVideoDuration(file){
     // Native media metadata reads the local iPad file without transferring it
@@ -1315,7 +1334,8 @@
         var headers={'X-Telegram-Init-Data':auth};
         if(!isBinary) headers['Content-Type']='application/json';
         var controller=new AbortController();
-        var timer=setTimeout(function(){controller.abort()},45000);
+        var requestTimeout=isBinary?120000:45000;
+        var timer=setTimeout(function(){controller.abort()},requestTimeout);
         try{
           var response=await fetch(url+path,{
             method:method,headers:headers,body:body,
@@ -1329,7 +1349,7 @@
           if(!response.ok)throw new Error(data.error||('Cloudflare ответил HTTP '+response.status));
           return data;
         }catch(err){
-          if(controller.signal.aborted)throw new Error('Cloudflare не ответил за 45 секунд ('+path.split('/').slice(-1)[0]+'). Нажми «Смонтировать Reels» повторно.');
+          if(controller.signal.aborted)throw new Error('Cloudflare не ответил за '+(requestTimeout/1000)+' секунд ('+path.split('/').slice(-1)[0]+'). Нажми «Смонтировать Reels» повторно.');
           throw err;
         }finally{clearTimeout(timer)}
 
@@ -1457,8 +1477,11 @@
       byId('checkUploadedResult').hidden=true;
       progress.value=Math.round(completed.size*100/parts);
       status.textContent='📤 Начинаю загрузку: '+completed.size+'/'+parts+' частей. Не закрывай приложение до 100%.';
-      for(var i=0;i<parts;i++){
-        if(completed.has(i))continue;
+      var concurrency=workerHealth.durable_storage_configured?3:workerHealth.large_storage_configured?3:1;
+      var transferred=0;
+      completed.forEach(function(i){var p=uploadParts[i];if(p)transferred+=p.end-p.start});
+      var initialBytes=transferred,startedAt=Date.now(),allBytes=totalSize+assetSize;
+      await transferUploadParts(parts,completed,concurrency,async function(i){
         var piece=uploadParts[i];
         var file=piece.archiveIndex===undefined
           ? videos[piece.clipIndex] : assets[piece.archiveIndex];
@@ -1466,21 +1489,23 @@
         for(var tries=0;tries<4;tries++){
           try{
             await request('/upload/'+id+'/'+i,'PUT',chunk,true);
-            break;
+            return;
           }catch(err){
             if(tries===3)throw new Error('Не удалось передать часть '+(i+1)+
               '. Повторно нажми «Смонтировать Reels», загрузка продолжится. '+err.message);
             await new Promise(function(resolve){setTimeout(resolve,(tries+1)*1200)});
           }
         }
-        completed.add(i);
-        progress.value=Math.round(completed.size*100/parts);
-        status.textContent='📤 '+progress.value+'% · '+
-          (piece.archiveIndex===undefined
-            ? 'Видео '+(piece.clipIndex+1)+'/'+videos.length
-            : 'Пакет эффектов '+(piece.archiveIndex+1)+'/'+assets.length)+
-          ' · часть '+completed.size+'/'+parts;
-      }
+      },function(i){
+        var piece=uploadParts[i];
+        transferred+=piece.end-piece.start;
+        progress.value=Math.floor(transferred*100/allBytes);
+        var elapsed=(Date.now()-startedAt)/1000;
+        var speed=elapsed>0?(transferred-initialBytes)/elapsed:0;
+        status.textContent='📤 '+progress.value+'% · '+fmtBytes(transferred)+' / '+fmtBytes(allBytes)+
+          ' · части '+completed.size+'/'+parts+
+          (elapsed>=2&&speed>0?' · '+(speed/1000000).toFixed(1)+' МБ/с':'');
+      });
       status.textContent='Проверяю целостность файла и запускаю GitHub Actions…';
       var response;
       for(var retries=0;retries<10;retries++){
