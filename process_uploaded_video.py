@@ -354,8 +354,8 @@ def main() -> None:
             send_text(token,owner,
                 "🎞️ Объединил "+str(len(clips))+
                 " видео в один ролик. Анализирую общую звуковую дорожку.")
-            if not 0 < seconds <= 125:
-                raise ValueError("Видео должно быть не длиннее 2 минут.")
+            if not 0 < seconds <= 600:
+                raise ValueError("Видео должно быть не длиннее 10 минут.")
             if not audio and mode!="cuts":
                 raise ValueError("В видео отсутствует речь / звуковая дорожка.")
             delay=float(config.get("subtitle_delay",0.0))
@@ -633,7 +633,7 @@ def main() -> None:
             LOG.exception("Private upload montage failed")
             send_text(
                 token,owner,
-                "⚠️ Монтаж 500 МБ завершился с ошибкой: "
+                "⚠️ Монтаж видео завершился с ошибкой: "
                 + str(exc)[:220]
                 + "\nПроверь журнал GitHub Actions → upload-video-50mb."
             )
