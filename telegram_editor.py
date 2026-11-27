@@ -227,6 +227,28 @@ def get_speech_keep_ranges(
     return kept
 
 
+
+def exclude_speech_repeats(ranges: Sequence[Segment], cuts: Sequence[tuple[float,float]]) -> list[Segment]:
+    """Subtract source retakes from both audio and video selection."""
+    result=list(ranges)
+    for left,right in sorted(cuts):
+        if right<=left:
+            continue
+        next_ranges=[]
+        for seg in result:
+            if right<=seg.start or left>=seg.end:
+                next_ranges.append(seg)
+                continue
+            if left>seg.start:
+                next_ranges.append(Segment(seg.start,left))
+            if right<seg.end:
+                next_ranges.append(Segment(right,seg.end))
+        result=next_ranges
+    if not result:
+        raise ValueError("После удаления повторов не осталось видео.")
+    return result
+
+
 def get_keep_ranges(path: Path, duration: float, has_audio: bool) -> list[Segment]:
     if not has_audio:
         return [Segment(0.0, duration)]
@@ -617,6 +639,7 @@ def edit_video(
     subject_layout: str = "standard",
     talk_scene: str = "off",
     guide_effect: str = "off",
+    repeat_cuts: Sequence[tuple[float,float]] = (),
 ) -> dict:
     from reels_effects import apply_effects, validate_effects
     from speech_review import map_words_to_ranges, shift_word_timestamps
@@ -631,6 +654,8 @@ def edit_video(
               else get_speech_keep_ranges(words_override,duration,pause_removal)
               if words_override is not None
               else get_keep_ranges(original,duration,has_audio))
+    if mode != "captions" and repeat_cuts:
+        ranges=exclude_speech_repeats(ranges,repeat_cuts)
     with tempfile.TemporaryDirectory(prefix="editor_") as directory:
         folder=Path(directory)
         work = folder / "joined.mp4"
