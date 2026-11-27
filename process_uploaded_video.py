@@ -262,7 +262,7 @@ def wait_for_transcript_review(
     offset = recent[-1]["update_id"]+1 if recent else None
     send_text(
         token,chat_id,
-        "📝 Черновик субтитров для видео до 500 МБ:\n\n"
+        "📝 Черновик субтитров для видео:\n\n"
         + transcript[:3500]
         + "\n\n⏱ Сдвиг титров: +"+str(round(delay,2))+" сек.\n"
         "Ответь /ok или /fix ошибка=правильно, /text ПОЛНЫЙ ТЕКСТ.\n"
@@ -322,7 +322,7 @@ def main() -> None:
         out = root/"finished-reels.mp4"
         try:
             stage("downloading","📥 Скачиваю все исходные видео в монтаж.")
-            send_text(token,owner,"📥 Получаю исходные видео (до 500 МБ суммарно) через защищённый Cloudflare.")
+            send_text(token,owner,"📥 Получаю исходные видео через защищённый Cloudflare.")
             metadata,clips=read_chunked_project(
                 worker_url,upload_id,token,root/"source_clips"
             )
@@ -656,6 +656,7 @@ def main() -> None:
                 + str(exc)[:220]
                 + "\nПроверь журнал GitHub Actions → upload-video-50mb."
             )
+            raise
         finally:
             release_upload(worker_url,upload_id,token)
 
