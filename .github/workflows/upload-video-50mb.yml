@@ -1,4 +1,4 @@
-name: "📥 Монтаж видео до 500 МБ (несколько файлов) (Cloudflare KV)"
+name: "📥 Монтаж до 10 минут (Cloudflare KV/R2)"
 
 on:
   workflow_dispatch:
@@ -23,7 +23,7 @@ jobs:
   import-and-montage:
     name: "🔐 Скачать исходник, проверить слова, смонтировать Reels"
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 240
     steps:
       - name: "Получить код редактора"
         uses: actions/checkout@v4
