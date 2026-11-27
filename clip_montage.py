@@ -15,7 +15,7 @@ from telegram_editor import duration_and_audio
 
 LOG = logging.getLogger("clip_montage")
 MAX_CLIPS = 12
-MAX_SECONDS = 125.0
+MAX_SECONDS = 600.0
 
 
 def join_clips(
@@ -26,7 +26,7 @@ def join_clips(
     """Return (duration, at_least_one_source_has_audio).
 
     Never silently drop speech or trim clips. Refuse projects longer than the
-    current two-minute Reels limit rather than losing requested footage.
+    ten-minute project limit rather than losing requested footage.
     """
     if not 1 <= len(clips) <= MAX_CLIPS:
         raise ValueError("В одном проекте поддерживается от 1 до 12 видео.")
@@ -43,7 +43,7 @@ def join_clips(
     total=sum(durations)
     if total>MAX_SECONDS:
         raise ValueError(
-            "Общая продолжительность всех видео больше двух минут. "
+            "Общая продолжительность всех видео больше десяти минут. "
             "Выбери более короткие фрагменты: монтаж не должен обрезать твою речь."
         )
     if len(clips)==1:
@@ -98,5 +98,5 @@ def join_clips(
         raise RuntimeError("Не удалось соединить исходные видео в один MP4.")
     seconds,has_audio=duration_and_audio(target)
     if seconds>MAX_SECONDS+0.001:
-        raise ValueError("После соединения длительность превысила две минуты.")
+        raise ValueError("После соединения длительность превысила десять минут.")
     return seconds, any(original_audio)
