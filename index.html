@@ -119,10 +119,12 @@
     <progress id="montageStageProgress" max="100" value="0" style="width:100%;height:12px"></progress>
     <p class="note" id="montageStageHint">Полоса показывает этап работы, а не точное оставшееся время.</p>
     <p class="note" id="montageRetention"></p>
+    <button type="button" class="btn primary" id="resumePendingUpload" style="width:100%;margin:8px 0" hidden>↩️ Продолжить загрузку</button>
+    <input type="file" id="resumePendingFiles" accept="video/*" multiple hidden>
     <button type="button" class="btn secondary" id="refreshMontageStatus" style="width:100%;margin:8px 0">🔄 Проверить этап монтажа</button>
     <a id="montageGithubRun" href="#" target="_blank" rel="noopener noreferrer" hidden>🔍 Открыть журнал задания GitHub Actions</a>
     <button type="button" class="btn primary" id="downloadMasterQuick" style="width:100%;margin:8px 0" hidden>⬇️ Скачать Full HD без перехода по шагам</button>
-    <p class="note">После завершения загрузки (100%) можно закрыть приложение: обработка продолжится в GitHub Actions. Закрытие во время передачи файлов останавливает загрузку, которую потом можно возобновить. Этапы придут в Telegram.</p>
+    <p class="note">Когда бот подтвердит запуск монтажа, можно закрыть приложение: обработка продолжится в GitHub Actions. iPad может остановить передачу при закрытии окна. Для незавершённой загрузки без дополнительных ZIP и фото выбери «Продолжить загрузку» и те же видео; уже полученные части не передаются повторно. Этапы придут в Telegram.</p>
   </section>
   <div class="progress" id="progress"></div>
 
@@ -472,6 +474,7 @@
   var byId=function(id){return document.getElementById(id)};
   var videoInput=byId('videos');
   var selectedClips=[];
+  var resumeProject=null;
   var selectedAssetPacks=[]; // Ordered, editable collection; each File stays on device.
   var photoInput=byId('photos');
   function fmtBytes(n){return n>=1000000000?(n/1000000000).toFixed(2)+' ГБ':(n/1000000).toFixed(1)+' МБ'}
@@ -1154,6 +1157,7 @@
         headers:{'X-Telegram-Init-Data':proof},cache:'no-store'
       });
       var data=await res.json();
+      byId('resumePendingUpload').hidden=true;
       if(!res.ok){
         if(res.status===404){
           stage.textContent='🗑 Этот проект удалён из временного хранилища. Можно загрузить новое видео.';
@@ -1168,6 +1172,13 @@
         byId('montageRetention').textContent='Срок хранения 3 дня и этапы монтажа заработают после обновления Worker.';
         return;
       }
+      var savedFiles=[];
+      try{savedFiles=JSON.parse(project.fingerprint||'[]')}catch(ignore){}
+      byId('resumePendingUpload').hidden=!(data.state==='uploading' &&
+        data.stage!=='failed' && Array.isArray(savedFiles) && savedFiles.length &&
+        savedFiles.every(function(f){return f[0]==='video'}) &&
+        typeof project.settings==='string' &&
+        !byId('upload50Button').disabled);
       var githubLink=byId('montageGithubRun');
       var verifiedUrl=/^https:\/\/github\.com\/revuallrabota-coder\/my-ai-video-editor\/actions\/runs\/[0-9]+$/.test(data.github_run_url||"");
       githubLink.hidden=!verifiedUrl;
@@ -1205,6 +1216,36 @@
     }finally{refreshingStatus=false}
   }
   byId('refreshMontageStatus').addEventListener('click',refreshProjectStatus);
+  byId('resumePendingUpload').addEventListener('click',function(){
+    if(byId('upload50Button').disabled)return;
+    byId('resumePendingFiles').value='';
+    byId('resumePendingFiles').click();
+  });
+  byId('resumePendingFiles').addEventListener('change',function(){
+    var files=Array.from(this.files||[]),old=loadLastProject();
+    if(!files.length||!old)return;
+    var expected;
+    try{expected=JSON.parse(old.fingerprint)}catch(ignore){return}
+    var pool=files.slice(),ordered=[];
+    for(var item of expected){
+      var at=pool.findIndex(function(file){return item[0]==='video' &&
+        file.name===item[1]&&file.size===item[2]&&file.lastModified===item[3]});
+      if(at<0){
+        byId('montageStageHint').textContent='Выбери те же исходные файлы из «Файлов». Если iPad изменил их свойства, потребуется новая загрузка.';
+        return;
+      }
+      ordered.push(pool.splice(at,1)[0]);
+    }
+    if(pool.length)return;
+    selectedClips=ordered;
+    selectedAssetPacks=[];
+    photoInput.value='';
+    resumeProject=old;
+    renderSelectedClips();
+    current=3;
+    draw();
+    byId('upload50Button').click();
+  });
   byId('downloadMasterQuick').addEventListener('click',function(){
     byId('checkUploadedResult').click();
     byId('upload50Status').scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -1286,7 +1327,9 @@
         throw new Error('Выбери от 1 до 12 видео на первом экране.');
       if(ratio!=='9:16')throw new Error('Для Reels выбери вертикальный формат 9:16.');
 
-      var settings=buildRenderSettings();
+      var requestedResume=resumeProject;
+      resumeProject=null;
+      var settings=requestedResume?JSON.parse(requestedResume.settings):buildRenderSettings();
       if(settings.mode==='reference')throw new Error('Для проекта до 10 минут выбери «Мой стиль» (без второго видео-референса).');
       status.textContent='Проверяю длительность исходных видео перед загрузкой…';
       var detected=0,unavailable=0;
@@ -1413,6 +1456,8 @@
       ]);
       var old=null,signature=JSON.stringify(settings);
       try{old=JSON.parse(localStorage.getItem('personalEditorLastUpload')||'null')}catch(ignore){}
+      if(requestedResume && (!old || old.id!==requestedResume.id || old.fingerprint!==fingerprint || old.url!==url))
+        throw new Error('Исходники или адрес сервера изменились; прежний проект не возобновлён.');
       var id=null,partSize=4000000,parts=0,completed=new Set();
       if(old && old.url===url && old.fingerprint===fingerprint &&
           old.settings===signature && Date.now()-old.created<71*60*60*1000){
@@ -1443,8 +1488,9 @@
               return;
             }
           }
-        }catch(ignore){ /* create a new session when the old one expired */ }
+        }catch(err){ if(requestedResume)throw err; /* ordinary new project may start again */ }
       }
+      if(requestedResume&&!id)throw new Error('Старый проект уже не доступен для продолжения. Проверь его статус.');
       if(!id){
         status.textContent='Создаю новый проект в Cloudflare…';
         var start=await request('/upload/start','POST',JSON.stringify({
@@ -1533,6 +1579,7 @@
       status.textContent='⚠️ '+(err.message||err);
     }finally{
       btn.disabled=false;
+      if(requestedResume)refreshProjectStatus();
     }
   });
 
