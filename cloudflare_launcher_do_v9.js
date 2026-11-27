@@ -433,7 +433,8 @@ async function status(env,id) {
     env.UPLOADS.getWithMetadata(key(id,"progress:"+stage),"text")));
   const latest=stageRecords.map(x=>x?.metadata)
     .filter(x=>x && Object.hasOwn(STAGES,x.stage))
-    .sort((a,b)=>(b.at??0)-(a.at??0))[0];
+    .sort((a,b)=>((b.at??0)-(a.at??0)) ||
+      ((STAGES[b.stage]??0)-(STAGES[a.stage]??0)))[0];
   const uploaded=meta.state==="uploading" ?
     await completeParts(env,id,{count:meta.parts,total:meta.size+meta.asset_size},"",meta) : new Set();
   const out=meta.output;
