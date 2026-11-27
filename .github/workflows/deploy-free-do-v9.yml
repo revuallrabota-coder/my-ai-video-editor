@@ -2,6 +2,13 @@ name: "🚀 Deploy бесплатный Worker v9 (без R2)"
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'cloudflare_launcher_do_v9.js'
+      - 'wrangler.do.v9.toml.template'
+      - '.github/workflows/deploy-free-do-v9.yml'
+      - 'test_upload_3gb_do.mjs'
 
 permissions:
   contents: read
@@ -50,6 +57,10 @@ jobs:
         run: |
           node --input-type=module --check < cloudflare_launcher_do_v9.js
           grep -q 'new_sqlite_classes = \["VideoChunkShard"\]' wrangler.do.v9.generated.toml
+      - name: Test Worker storage and signed downloads before deployment
+        run: node test_upload_3gb_do.mjs
+      - name: Compile Worker before deployment
+        run: npx --yes wrangler@4 deploy --config wrangler.do.v9.generated.toml --dry-run --outdir /tmp/worker-v9-dry
       - name: Deploy v9 to EXISTING black-violet-9e64 Worker without deleting secrets
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
