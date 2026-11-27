@@ -113,7 +113,9 @@ class DynamicReelsTests(unittest.TestCase):
         self.assertIn("make_studio_keyword_asset",(
             root/"reels_effects.py").read_text("utf-8"))
         self.assertIn('subtitle_sfx:"off soft tick typewriter"',worker)
-        self.assertIn('const CONTRACT = 4;',worker)
+        self.assertIn('const CONTRACT = 7;',worker)
+        self.assertIn('const CONTRACT = 9;',
+                      (root/"cloudflare_launcher_do_v9.js").read_text("utf-8"))
 
 
 if __name__=="__main__":
