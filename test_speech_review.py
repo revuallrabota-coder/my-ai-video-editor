@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import unittest
 
-from speech_review import align_corrected_words, apply_word_fixes, map_words_to_ranges, plain_transcript, shift_word_timestamps
+from speech_review import align_corrected_words, apply_word_fixes, map_words_to_ranges, plain_transcript, shift_word_timestamps, plan_speech_repeats
 from reference_editor import speech_zoom_windows, smooth_zoom_expression, editorial_zoom_expression
-from telegram_editor import Segment
+from telegram_editor import Segment, exclude_speech_repeats
 
 
 class TranscriptReviewTests(unittest.TestCase):
@@ -86,6 +86,51 @@ class SubtitleTimingTests(unittest.TestCase):
         self.assertAlmostEqual(shifted[0][1],1.1)
         with self.assertRaises(ValueError):
             shift_word_timestamps([(0.7,0.95,"конец")],9.0,1.1)
+
+
+class RetakeTests(unittest.TestCase):
+    @staticmethod
+    def words(text):
+        return [(i*.6+.1,i*.6+.38,w) for i,w in enumerate(text.split())]
+
+    def test_three_attempts_keep_latest_and_preserve_unique_words(self):
+        raw=self.words("Сначала я покажу ошибку я покажу ошибку Я покажу ошибку дальше")
+        kept,cuts=plan_speech_repeats(raw)
+        self.assertEqual(plain_transcript(kept),"Сначала Я покажу ошибку дальше")
+        self.assertEqual(kept[1],raw[7])
+        self.assertEqual(len(cuts),2)
+        ranges=exclude_speech_repeats([Segment(0,7)],cuts)
+        for a,b,_ in kept:
+            self.assertTrue(any(s.start<=a and s.end>=b for s in ranges))
+        self.assertEqual(plain_transcript(map_words_to_ranges(raw,ranges,1.2)),
+                         plain_transcript(kept))
+
+    def test_restart_with_filler_and_continuation(self):
+        raw=self.words("я покажу как э я покажу как правильно наносить гель")
+        kept,cuts=plan_speech_repeats(raw)
+        self.assertEqual(plain_transcript(kept),"я покажу как правильно наносить гель")
+        self.assertEqual(len(cuts),1)
+        self.assertEqual(kept[0],raw[4])
+
+    def test_single_word_and_intentional_emphasis(self):
+        raw=self.words("покрытие покрытие очень очень ровное")
+        kept,cuts=plan_speech_repeats(raw)
+        self.assertEqual(plain_transcript(kept),"покрытие очень очень ровное")
+        self.assertEqual(kept[0],raw[1])
+        self.assertEqual(len(cuts),1)
+
+    def test_different_meaning_or_distant_repeat_is_preserved(self):
+        for text in ("я покажу ошибку потом я покажу результат",
+                     "первый шаг важен затем подпиливаем край первый шаг важен"):
+            raw=self.words(text)
+            self.assertEqual(plan_speech_repeats(raw),(raw,[]))
+        raw=[(.1,.3,"покажу"),(.4,.7,"ошибку"),(12,12.3,"покажу"),(12.4,12.7,"ошибку")]
+        self.assertEqual(plan_speech_repeats(raw),(raw,[]))
+
+    def test_unsafe_overlapping_timestamps_are_not_cut(self):
+        raw=[(.1,.5,"покрытие"),(.4,.7,"покрытие")]
+        self.assertEqual(plan_speech_repeats(raw),(raw,[]))
+
 
 if __name__=="__main__":
     unittest.main()
