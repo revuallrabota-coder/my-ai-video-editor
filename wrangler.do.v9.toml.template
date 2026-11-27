@@ -1,0 +1,20 @@
+# Free Durable Objects deployment for the EXISTING Cloudflare Worker.
+# Do not paste the KV namespace ID into GitHub source. The deploy workflow
+# generates a temporary config using its GitHub repository secret.
+name = "black-violet-9e64"
+main = "cloudflare_launcher_do_v9.js"
+compatibility_date = "2026-11-27"
+workers_dev = true
+keep_vars = true
+
+[[kv_namespaces]]
+binding = "UPLOADS"
+id = "__EXISTING_UPLOADS_KV_NAMESPACE_ID__"
+
+[[durable_objects.bindings]]
+name = "VIDEO_SHARDS"
+class_name = "VideoChunkShard"
+
+[[migrations]]
+tag = "v9-free-video-shards-sqlite"
+new_sqlite_classes = ["VideoChunkShard"]
