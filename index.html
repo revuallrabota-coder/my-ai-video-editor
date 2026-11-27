@@ -1043,22 +1043,24 @@
       throw new Error('По адресу '+url+' отвечает не наш монтажёр.');
     }
     out.style.whiteSpace='pre-line';
-    if(version!==4){
+    if(![7,8].includes(version)){
       out.textContent='⚠️ Приложение проверяет: '+url+
         '\nВерсия по этому адресу: '+(version==null?'старая, без номера':version)+
-        '. Нужна версия 4.\nСравни этот адрес с Cloudflare → Workers & Pages → Visit. '+
-        'Если отличаются, вставь адрес обновлённого Worker. '+
-        'Если совпадают, обновление не опубликовано на этом адресе.';
+        '. Нужна v7 (малые файлы) или v8 (до 10 минут и большой объём).'+
+        ' Сверь адрес с Cloudflare → Workers & Pages → Visit.';
       return false;
     }
     if(data.uploads_500mb_configured!==true){
-      out.textContent='⚠️ Версия 4 активна: '+url+
-        '. Но не подключено KV-хранилище UPLOADS.';
+      out.textContent='⚠️ Worker v'+version+
+        ' активен, но не подключён KV namespace UPLOADS для статусов.';
       return false;
     }
     try{localStorage.setItem('personalEditorLauncher',url)}catch(ignore){}
-    out.textContent='✅ Подключение правильное!\nWorker: '+url+
-      '\nВерсия: 4 · загрузка до 500 МБ настроена. Можно монтировать.';
+    out.textContent='✅ Подключение к Cloudflare работает!\nWorker: '+url+
+      '\nВерсия: '+version+' · до 10 минут видео.'+
+      (version===8&&data.large_storage_configured===true
+        ?'\nR2 подключён: можно загружать большие видео (до 4 ГБ на этом сервере).'
+        :'\nR2 не подключён: пока доступны видео до 500 МБ.');
     return true;
   }
   byId('checkWorkerConnection').addEventListener('click',async function(){
