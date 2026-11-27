@@ -1223,6 +1223,30 @@
   // separately even when the user closes the app.
   setInterval(function(){if(!document.hidden && showStatusCard())refreshProjectStatus()},20000);
 
+  async function inspectVideoDuration(file){
+    // Native media metadata reads the local iPad file without transferring it
+    // and prevents a wasted multi-gigabyte upload of 11+ minute footage.
+    return await new Promise(function(resolve){
+      var player=document.createElement('video');
+      var address=URL.createObjectURL(file);
+      var complete=false;
+      function done(duration){
+        if(complete)return;
+        complete=true;
+        clearTimeout(timer);
+        player.removeAttribute('src');
+        try{player.load()}catch(ignore){}
+        URL.revokeObjectURL(address);
+        resolve(Number.isFinite(duration)?duration:null);
+      }
+      var timer=setTimeout(function(){done(null)},6500);
+      player.preload='metadata';
+      player.onloadedmetadata=function(){done(player.duration)};
+      player.onerror=function(){done(null)};
+      player.src=address;
+      player.load();
+    });
+  }
   // Video up to 10 minutes. KV for legacy <=500 MB; R2 for large projects.
   // Обычный Bot API не скачивает больше 20 MB: здесь он не используется
   // для исходника. Размер частей 4 MB и поочерёдная отправка с iPad.
@@ -1240,7 +1264,21 @@
       if(ratio!=='9:16')throw new Error('Для Reels выбери вертикальный формат 9:16.');
 
       var settings=buildRenderSettings();
-      if(settings.mode==='reference')throw new Error('Для проекта до 500 МБ выбери «Мой стиль» (без второго видео-референса).');
+      if(settings.mode==='reference')throw new Error('Для проекта до 10 минут выбери «Мой стиль» (без второго видео-референса).');
+      status.textContent='Проверяю длительность исходных видео перед загрузкой…';
+      var detected=0,unavailable=0;
+      for(var clip of videos){
+        var seconds=await inspectVideoDuration(clip);
+        if(seconds===null){unavailable++;continue;}
+        detected+=seconds;
+        if(detected>600.5)
+          throw new Error('Общая длительность видео превышает 10 минут. '+
+            'Выбери короткие фрагменты, не загружая гигабайты впустую.');
+      }
+      if(unavailable){
+        status.textContent='⚠️ Для '+unavailable+' видео Safari не прочитал длительность. '+
+          'Монтажёр дополнительно проверит все исходники после загрузки.';
+      }
       var totalSize=videos.reduce(function(sum,file){return sum+file.size},0);
       var assets=selectedAssetPacks.slice();
       if(photoInput.files.length){
