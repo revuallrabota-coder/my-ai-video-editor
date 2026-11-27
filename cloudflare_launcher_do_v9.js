@@ -506,7 +506,7 @@ async function createMasterLink(request,env,id){
   const meta=await env.UPLOADS.get(key(id,"meta"),"json");
   if(meta?.state!=="done"||meta?.output?.state!=="ready")
     return response({error:"Мастер-файл пока не готов."},409);
-  const exp=Math.floor(Date.now()/1000)+600;
+  const exp=Math.floor(Date.now()/1000)+7200; // 2 hours for slow mobile downloads.
   const signature=await hmac(new TextEncoder().encode(env.TELEGRAM_BOT_TOKEN),
                               "master:"+id+":"+exp);
   const url=new URL(request.url);
@@ -520,7 +520,7 @@ async function masterDownload(request,env,id){
   const expires=Number(url.searchParams.get("expires"));
   const signature=String(url.searchParams.get("signature")||"");
   if(!Number.isSafeInteger(expires)||expires<Math.floor(Date.now()/1000)||
-     expires>Math.floor(Date.now()/1000)+605|| !/^[a-f0-9]{64}$/.test(signature))
+     expires>Math.floor(Date.now()/1000)+7205|| !/^[a-f0-9]{64}$/.test(signature))
     return response({error:"Ссылка истекла. Получи новую из Mini App."},403,"null");
   const signed=await hmac(new TextEncoder().encode(env.TELEGRAM_BOT_TOKEN),
                            "master:"+id+":"+expires);
@@ -742,6 +742,9 @@ export class VideoChunkShard {
     this.db.exec("CREATE TABLE IF NOT EXISTS pieces (i INTEGER PRIMARY KEY, data BLOB NOT NULL, bytes INTEGER NOT NULL)");
   }
   async fetch(request) {
+    // deleteAll() removes SQLite tables; after early cleanup a late retry
+    // must remain idempotent instead of failing with 'no such table'.
+    this.db.exec("CREATE TABLE IF NOT EXISTS pieces (i INTEGER PRIMARY KEY, data BLOB NOT NULL, bytes INTEGER NOT NULL)");
     const path=new URL(request.url);
     const match=path.pathname.match(/^\/piece\/(0|[1-9]\d*)$/);
     if(request.method==="PUT" && match){
