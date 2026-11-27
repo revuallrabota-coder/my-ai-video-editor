@@ -5,9 +5,21 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from clip_montage import MAX_SECONDS,join_clips
+from telegram_editor import duration_and_audio
 
 
 class TenMinuteTimelineTests(unittest.TestCase):
+    def test_real_probe_accepts_long_clips_and_rejects_over_limit(self):
+        for seconds in (126, 300, 600):
+            info={"format":{"duration":str(seconds)},
+                  "streams":[{"codec_type":"video"},{"codec_type":"audio"}]}
+            with self.subTest(seconds=seconds), patch("telegram_editor.media_info",return_value=info):
+                self.assertEqual(duration_and_audio(Path("source.mp4")),(float(seconds),True))
+        info={"format":{"duration":"600.1"},"streams":[{"codec_type":"video"}]}
+        with patch("telegram_editor.media_info",return_value=info):
+            with self.assertRaisesRegex(ValueError,"10 минут"):
+                duration_and_audio(Path("source.mp4"))
+
     def test_project_accepts_six_hundred_seconds_without_reencoding_single_clip(self):
         self.assertEqual(MAX_SECONDS,600.0)
         with tempfile.TemporaryDirectory(prefix="ten_min_") as folder:
