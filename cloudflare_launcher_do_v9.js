@@ -658,7 +658,7 @@ export class VideoChunkShard {
   }
   async fetch(request) {
     const path=new URL(request.url);
-    const match=path.pathname.match(/^\\/piece\\/(0|[1-9]\\d*)$/);
+    const match=path.pathname.match(/^\/piece\/(0|[1-9]\d*)$/);
     if(request.method==="PUT" && match){
       const i=Number(match[1]);
       if(!Number.isSafeInteger(i))return new Response("Bad index",{status:400});
