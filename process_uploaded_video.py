@@ -377,8 +377,13 @@ def main() -> None:
             if not audio and mode!="cuts":
                 raise ValueError("В видео отсутствует речь / звуковая дорожка.")
             delay=float(config.get("subtitle_delay",0.0))
+            repeat_cuts=()
             if mode=="cuts":
                 words=None
+                if audio:
+                    from speech_review import plan_speech_repeats
+                    raw=transcribe_words(source,model_size="small",language="ru")
+                    words,repeat_cuts=plan_speech_repeats(raw)
             else:
                 stage("transcribing","🎧 Распознаю оригинальную речь и таймкоды.")
                 send_text(token,owner,"🎧 Видео получено. Распознаю речь и готовлю черновик.")
@@ -389,6 +394,13 @@ def main() -> None:
                 words=transcribe_words(
                     source,model_size=recognition_model,language="ru"
                 )
+                if mode!="captions":
+                    from speech_review import plan_speech_repeats
+                    words,repeat_cuts=plan_speech_repeats(words)
+                    if repeat_cuts:
+                        send_text(token,owner,"✂️ Найдено повторных дублей: "+str(len(repeat_cuts))+
+                            ". Оставляю последние варианты. Ранние дубли вырежу из видео и звука; "
+                            "ниже текст без этих повторов для проверки.")
                 stage("review","📝 Текст готов. Жду проверки КАЖДОГО слова перед монтажом.")
                 words,delay=wait_for_transcript_review(token,owner,words,seconds,delay)
                 stage("planning","🧠 Подбираю смысловые вставки по тексту.")
@@ -466,6 +478,7 @@ def main() -> None:
                     "off" if str(config.get("sound_effects","soft"))=="off" else "on",
                 )),
                 private_assets=private_assets,
+                repeat_cuts=tuple(repeat_cuts),
             )
             if mode in ("my_style", "reference"):
                 from reference_editor import montage_by_reference
@@ -513,7 +526,8 @@ def main() -> None:
             # Сохраняем фактические результаты наложения, а не обещаем
             # эмодзи и звук, если они не были добавлены рендерером.
             effect_report = (
-                "\n✨ Эмодзи: " + str(stats.get("emoji_count", 0))
+                "\n✂️ Удалено повторных дублей: " + str(len(repeat_cuts))
+                + "\n✨ Эмодзи: " + str(stats.get("emoji_count", 0))
                 + " · 🔊 акценты: " + str(stats.get("sfx_count", 0))
                 + " · 🎵 звуки титров: " + str(stats.get("caption_sfx_count", 0))
                 + " · 🧠 смысловые акценты: " + str(stats.get("semantic_cue_count", 0))
