@@ -143,7 +143,8 @@ assert.equal(binary.has(uploadId+"/result/0"),true);
 const legacy={...env,VIDEO_FILES:undefined};
 const fallback=await request("/upload/start","POST",{
   files:[{name:"short.mp4",size:12_000_000}],size:12_000_000
-},"POST",undefined,false,legacy);
+},false,legacy);
+assert.equal(fallback.status,201,JSON.stringify(fallback));
 assert.equal(health.large_storage_configured,true);
 const legacyHealth=(await request("/health","GET",undefined,false,legacy)).data;
 assert.equal(legacyHealth.large_storage_configured,false);
