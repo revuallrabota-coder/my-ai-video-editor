@@ -23,7 +23,8 @@ from speech_review import (
 from telegram_editor import duration_and_audio, transcribe_words
 
 LOG = logging.getLogger("private_upload_montage")
-MAX_BYTES = 500_000_000  # entire multi-video project
+MAX_BYTES = 500_000_000  # legacy KV route
+MAX_R2_BYTES = 4_000_000_000  # size threshold from worker v8; GH runner is finite
 
 
 def read_chunked_project(
@@ -52,7 +53,12 @@ def read_chunked_project(
                 raise
             time.sleep(min(3 + attempt * 2, 15))
     if not isinstance(meta, dict):
-        raise RuntimeError("Не удалось получить загруженные файлы из Cloudflare KV.")
+        raise RuntimeError("Не удалось получить файлы из Cloudflare.")
+    storage = meta.get("storage","kv")
+    if storage not in ("kv","r2"):
+        raise ValueError("Неизвестный тип хранилища проекта.")
+    cap = MAX_R2_BYTES if storage=="r2" else MAX_BYTES
+    part_cap = 1100 if storage=="r2" else 165
     size = meta.get("size")
     parts = meta.get("parts")
     chunk_size = meta.get("chunk_size")
@@ -61,9 +67,9 @@ def read_chunked_project(
         # Compatibility with existing one-file sessions.
         files = [{"name":meta.get("original_name","original.mp4"),
                   "size":size,"parts":parts,"offset":0}]
-    if not isinstance(size,int) or size<4096 or size>MAX_BYTES or \
+    if not isinstance(size,int) or size<4096 or size>cap or \
        not isinstance(chunk_size,int) or chunk_size!=4_000_000 or \
-       not isinstance(parts,int) or not 1<=parts<=165 or \
+       not isinstance(parts,int) or not 1<=parts<=part_cap or \
        not 1<=len(files)<=12:
         raise ValueError("Недостоверные размеры проекта из Cloudflare.")
     validated=[]
@@ -79,7 +85,7 @@ def read_chunked_project(
         if not isinstance(name,str) or not re.search(
             r"\.(mp4|mov|m4v|webm|mkv)$",name,re.I
         ) or not isinstance(file_size,int) or \
-           not 4096<=file_size<=MAX_BYTES or \
+           not 4096<=file_size<=cap or \
            not isinstance(count,int) or count!=(file_size+chunk_size-1)//chunk_size or \
            not isinstance(offset,int) or offset!=expected_offset:
             raise ValueError("Не совпадает список видео и фрагментов.")
@@ -175,7 +181,7 @@ def release_upload(worker_url: str, upload_id: str, token: str) -> None:
     try:
         with requests.Session() as session:
             position=0
-            for _ in range(7):
+            for _ in range(50):
                 response=session.delete(
                     url+"?from="+str(position),
                     headers={"Authorization":"Bearer "+token},timeout=70
@@ -195,11 +201,13 @@ def release_upload(worker_url: str, upload_id: str, token: str) -> None:
 
 
 
-def publish_large_mp4(worker_url: str, upload_id: str, token: str, file: Path) -> None:
-    """Keep the original-quality output in private KV instead of recompressing."""
+def publish_large_mp4(worker_url: str, upload_id: str, token: str, file: Path,
+                      *, storage: str="kv") -> None:
+    """Keep the original-quality output in private KV or R2, without shrinking."""
     size=file.stat().st_size
-    if size>250_000_000:
-        raise ValueError("Готовый MP4 больше 250 МБ: временное хранилище переполнится.")
+    limit=3_000_000_000 if storage=="r2" else 250_000_000
+    if size>limit:
+        raise ValueError("Готовый MP4 превышает доступный объём временного хранилища.")
     url=worker_url.rstrip("/")+"/internal/upload/"+upload_id+"/result"
     headers={"Authorization":"Bearer "+token}
     chunk_size=4_000_000
@@ -235,7 +243,7 @@ def publish_large_mp4(worker_url: str, upload_id: str, token: str, file: Path) -
             if response.status_code!=409:
                 response.raise_for_status()
             time.sleep(min(3+attempt*2,15))
-        raise RuntimeError("Не удалось проверить MP4 в KV после передачи.")
+        raise RuntimeError("Не удалось проверить MP4 после передачи.")
 
 
 def wait_for_transcript_review(
@@ -603,11 +611,12 @@ def main() -> None:
                 send_error=str(exc)
                 LOG.exception("Telegram upload failed; keeping a download backup.")
             master_saved=False
-            if large and out.stat().st_size<=250_000_000:
+            if large and out.stat().st_size<=(3_000_000_000 if metadata.get("storage")=="r2" else 250_000_000):
                 # Optional *high-quality master* for an iPad backup. The owner
                 # does not need to open the app to receive the playable copy.
                 try:
-                    publish_large_mp4(worker_url,upload_id,token,out)
+                    publish_large_mp4(worker_url,upload_id,token,out,
+                                      storage=metadata.get("storage","kv"))
                     master_saved=True
                 except Exception:
                     LOG.exception("Optional Full HD master backup failed.")
