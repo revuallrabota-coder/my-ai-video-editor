@@ -32,7 +32,7 @@ Cloudflare не подключён к GitHub от имени помощника:
 1. Открой [Deploy бесплатный Worker v9](https://github.com/revuallrabota-coder/my-ai-video-editor/actions/workflows/deploy-free-do-v9.yml).
 2. Нажми **Run workflow → Run workflow**. GitHub скачает Wrangler, создаст SQLite Durable Object namespace миграцией `new_sqlite_classes`, привяжет `VIDEO_SHARDS`, сохранив прежние секреты Worker. Название прежнего Worker: `black-violet-9e64`.
 3. Дождись зелёной галочки. При красной открой шаг с ошибкой; не заменяй код в Cloudflare вручную, потому что миграция SQLite namespace нужна отдельно.
-4. Открой существующий адрес Worker: `https://black-violet-9e64.revuall-rabota.workers.dev/health`.
+4. В Cloudflare открой существующий Worker → **Visit** и добавь `/health` к показанному адресу. Адрес зависит от твоего аккаунта, поэтому не подставляй чужой поддомен.
    Убедись в полях `"style_contract_version":9`, `"durable_storage_configured":true`, `"storage_mode":"do"`, `"max_upload_mb":3000`, `"max_video_seconds":600`.
 5. Закрой Mini App Telegram и открой заново. Нажми **«Проверить подключённый Cloudflare»**. Он должен показать **Durable Objects подключены** и разрешить загрузку 751,7 МБ или большего исходника.
 
