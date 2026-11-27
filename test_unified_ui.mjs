@@ -98,3 +98,20 @@ await assert.rejects(transfer(12,new Set(),3,async i=>{
 },()=>{}),/simulated failure/);
 assert.equal(settled,2,"No outstanding upload workers when retry is enabled");
 console.log("✓ Bounded three-lane transfer, resumable uploads and failure handling");
+
+const interleavedDone=new Set([100]);
+const interleavedSent=[];
+let activeFast=0,peakFast=0;
+await transfer(208,interleavedDone,6,async i=>{
+  interleavedSent.push(i);
+  activeFast++;
+  peakFast=Math.max(peakFast,activeFast);
+  await new Promise(resolve=>setTimeout(resolve,1));
+  activeFast--;
+},()=>{},100);
+assert.equal(peakFast,6);
+assert.equal(interleavedDone.size,208);
+assert.equal(new Set(interleavedSent).size,207);
+assert.deepEqual(interleavedSent.slice(0,3),[0,200,1]);
+assert.ok(!interleavedSent.includes(100));
+console.log("✓ Six upload lanes, shard interleaving, completed pieces skipped");
