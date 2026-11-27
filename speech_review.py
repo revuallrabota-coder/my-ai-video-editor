@@ -20,6 +20,69 @@ def _normal(word: str) -> str:
     return re.sub(r"[^\wа-яё-]+", "", word, flags=re.IGNORECASE).lower()
 
 
+
+# Adjacent, text-confirmed retakes only: do not remove a repeated topic
+# elsewhere in the video, or emphatic "очень очень", "да да", etc.
+_REPEAT_EMPHASIS = frozenset("да нет не очень точно прямо совсем совсем-совсем много мало сильно супер быстро медленно чуть еще вот ну так то и а в на с по из за у к это все как что чтобы".split())
+_REPEAT_FILLERS = frozenset(("э","ээ","эээ","эм","мм","м","а","ну"))
+
+def plan_speech_repeats(words: Sequence[Word]) -> tuple[list[Word], list[tuple[float,float]]]:
+    """Keep latest adjacent exact retake; return retained words and source cuts.
+
+    Match normalized Russian text, not semantic similarity. A short hesitation
+    between attempts is allowed; unrelated intervening words are protected.
+    Never cut across overlapping word timestamps.
+    """
+    original=list(words)
+    keys=[_normal(w[2]).replace("ё","е") for w in original]
+    n=len(original)
+    removed=set()
+    cuts=[]
+    i=0
+    while i<n-1:
+        match=None
+        for length in range(min(40,(n-i)//2),0,-1):
+            if not all(keys[i:i+length]):
+                continue
+            if length==1 and (len(keys[i])<3 or keys[i] in _REPEAT_EMPHASIS):
+                continue
+            end=i+length
+            for j in range(end,min(end+(3 if length>1 else 1),n-length+1)):
+                if any(k not in _REPEAT_FILLERS for k in keys[end:j]):
+                    break
+                if keys[i:end]!=keys[j:j+length]:
+                    continue
+                gap=original[j][0]-original[end-1][1]
+                # For a single word require a short hesitation, not normal
+                # emphatic rapid repetition. Longer exact repeats can be immediate.
+                if gap < (0.18 if length==1 else 0.0) or gap>3.0:
+                    continue
+                if any(original[k][1]<=original[k][0] for k in range(i,j+length)):
+                    continue
+                if any(original[k+1][0]-original[k][1]>3.0 for k in range(i,j+length-1)):
+                    continue
+                if original[i][0]<0 or (i and original[i-1][1]>original[i][0]) or original[j-1][1]>original[j][0]:
+                    continue
+                match=j
+                break
+            if match is not None:
+                break
+        if match is None:
+            i+=1
+            continue
+        j=match
+        left=max(0.0,original[i][0]-.06,original[i-1][1] if i else 0.0)
+        right=min(original[j][0],original[j-1][1]+.06)
+        if right>left and right>=original[j-1][1]:
+            cuts.append((left,right))
+            removed.update(range(i,j))
+        i=j  # chained retakes leave the last occurrence
+    retained=[w for k,w in enumerate(original) if k not in removed]
+    if not retained or len(cuts)>80:
+        return original,[]
+    return retained,cuts
+
+
 def align_corrected_words(
     original: Sequence[Word], corrected: str, duration: float,
 ) -> list[Word]:
