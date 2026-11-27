@@ -131,7 +131,7 @@
     <p class="note">Один монтаж для всех твоих роликов: склейка, вырезание пауз, скорость, шрифты, смысловые вставки и отправка в Telegram. Все параметры настраиваются отдельно.</p>
     <input type="radio" name="mode" value="Мой стиль" checked hidden>
     <h3>Загрузи исходные видео</h3>
-    <p>Выбери несколько видео с iPad. <strong>До 500 МБ суммарно</strong> и до 2 минут общей продолжительности. Соединим их по порядку и смонтируем один Reels.</p>
+    <p>Выбери несколько видео с iPad. <strong>До 10 минут суммарно</strong>. Видео свыше 500 МБ загружаются через R2 (нужно отдельно подключить). У текущего сервера монтажа безопасный предел проекта 4 ГБ. Соединим их по порядку и смонтируем один Reels.</p>
     <label class="upload">
       <div class="emoji">📎</div>
       <strong>Выбрать несколько видео</strong>
@@ -351,7 +351,7 @@
     </select>
     <label class="field" for="hookText">Текст хука (свой текст)</label>
     <input id="hookText" type="text" maxlength="58" placeholder="Например: Найди ошибку за 3 секунды!">
-    <p class="note">Шрифты, эмодзи, плавные анимации, звук и подложки передаются в новый режим загрузки до 500 МБ. Для старого режима через чат доступны не все настройки.</p>
+    <p class="note">Шрифты, эмодзи, плавные анимации, звук и подложки передаются в режим загрузки до 10 минут. Для старого режима через чат доступны не все настройки.</p>
   </section>
 
   <section class="card page" data-page="2">
@@ -415,7 +415,7 @@
     <p>Проверь выбранные параметры и запускай монтаж одной кнопкой. Стили и фильтры применяются к видео в обработчике GitHub Actions.</p>
     <div id="summary"></div>
     <div class="alert" style="margin:16px 0">
-      <strong>🎬 Монтаж Reels · до 500 МБ</strong>
+      <strong>🎬 Монтаж видео · до 10 минут</strong>
       <p class="note">Исходные ролики загрузятся частями. Бот пришлёт текст речи на проверку, а готовый Reels отправит прямо в Telegram. Большой исходный MP4 сохранится отдельно без лишнего сжатия, если поддерживает хранилище.</p>
       <label class="field" for="launcherBase">Адрес Cloudflare (настраивается один раз)</label>
       <input id="launcherBase" type="url" inputmode="url" autocomplete="off" placeholder="https://твой-worker.workers.dev" style="width:100%;max-width:100%">
@@ -424,14 +424,14 @@
       <a id="workerHealthLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none">Открыть /health в Safari</a>
       <button class="btn primary" id="upload50Button" type="button" style="width:100%;margin-top:12px">🎬 Смонтировать Reels</button>
       <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
-      <p class="mini" id="upload50Status" role="status" aria-live="polite">Поддержка до 500 МБ требует подключённого Cloudflare KV. Видео сохраняем в Full HD.</p>
+      <p class="mini" id="upload50Status" role="status" aria-live="polite">До 500 МБ работает KV, для больших файлов нужен отдельный Cloudflare R2 bucket VIDEO_FILES. Исходник не сжимается при загрузке.</p>
       <button class="btn secondary" id="checkUploadedResult" type="button" style="width:100%;margin-top:8px" hidden>⬇️ Скачать готовое Full HD</button>
       <button class="btn secondary" id="checkMontageStatus" type="button" style="width:100%;margin-top:8px">📍 Посмотреть этап обработки</button>
       <p class="note">Видео в Cloudflare хранятся максимум 3 дня; исходники освобождаются сразу после обработки. Статус доступен после закрытия и повторного открытия приложения.</p>
       <details style="margin-top:12px">
         <summary style="cursor:pointer;font-weight:650">Первое подключение Cloudflare · инструкция</summary>
-        <p class="note">Нужно один раз привязать KV-хранилище под именем <strong>UPLOADS</strong> и опубликовать новый код Worker.</p>
-        <p class="note"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/CLOUDFLARE_500MB.md" target="_blank" rel="noopener noreferrer">Как включить загрузку до 500 МБ на iPad</a></p>
+        <p class="note">Для больших видео нужны два ресурса: KV <strong>UPLOADS</strong> для статусов и R2 bucket <strong>VIDEO_FILES</strong> для файлов. Используй Worker v8.</p>
+        <p class="note"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/TEN_MINUTE_R2_SETUP.md" target="_blank" rel="noopener noreferrer">Настроить загрузку больших файлов с iPad</a></p>
       </details>
     </div>
     <!-- Скрытые элементы прежних прототипов сохраняют совместимость JS,
@@ -600,10 +600,11 @@
     var list=byId('clipsList');
     list.replaceChildren();
     var total=selectedClips.reduce(function(sum,f){return sum+f.size},0);
-    var warning=total>500000000||selectedClips.length>12;
+    var warning=total>4000000000||selectedClips.length>12;
     byId('videoInfo').textContent=selectedClips.length
       ? ('🎬 '+selectedClips.length+' видео · '+fmtBytes(total)+
-         ' из 500 МБ'+(warning?' ⚠️ Превышен лимит!':''))
+         ' · до 10 минут · '+(total>500000000?'для этого объёма нужен R2':'KV или R2')+
+         (warning?' ⚠️ Превышен безопасный объём 4 ГБ!':''))
       : 'Видео пока не выбраны. Добавь исходники выше.';
     selectedClips.forEach(function(file,index){
       var item=document.createElement('div');
@@ -1220,7 +1221,7 @@
   // separately even when the user closes the app.
   setInterval(function(){if(!document.hidden && showStatusCard())refreshProjectStatus()},20000);
 
-  // Прямой многоклиповый проект до 500 MB через Cloudflare KV.
+  // Video up to 10 minutes. KV for legacy <=500 MB; R2 for large projects.
   // Обычный Bot API не скачивает больше 20 MB: здесь он не используется
   // для исходника. Размер частей 4 MB и поочерёдная отправка с iPad.
   byId('upload50Button').addEventListener('click',async function(){
@@ -1251,8 +1252,8 @@
         throw new Error('Для эффектов и фотографий доступно до четырёх ZIP-пакетов и до 100 МБ суммарно.');
       if(assets.some(function(f){return !/\.zip$/i.test(f.name)||f.size<100}))
         throw new Error('Для анимаций выбери ZIP-архивы из прикреплённых наборов.');
-      if(totalSize>500000000)throw new Error(
-        'Общий размер проекта '+fmtBytes(totalSize)+'. Максимум 500 МБ на все видео вместе.');
+      if(totalSize>4000000000)throw new Error(
+        'Общий размер проекта '+fmtBytes(totalSize)+'. Для монтажа на текущем сервере безопасный предел 4 ГБ. Для ещё больших видео нужен другой сервер.');
       for(var f=0;f<videos.length;f++){
         if(videos[f].size<4096)throw new Error(
           'Видео №'+(f+1)+' пустое или слишком маленькое.');
@@ -1280,13 +1281,13 @@
       }
       status.textContent='Проверяю, что Cloudflare поддерживает выбранный стиль…';
       var workerHealth=await request('/health','GET');
-      if(workerHealth.style_contract_version!==7){
+      if(![7,8].includes(workerHealth.style_contract_version)){
         byId('workerHealthLink').href=url+'/health';
         byId('workerHealthLink').style.display='inline-block';
         throw new Error(
           'Приложение проверяет адрес '+url+
           '. Версия сервера: '+(workerHealth.style_contract_version??'старая, без номера')+
-          ', требуется версия 7. Сравни адрес с Cloudflare → Workers & Pages → Visit. '+
+          ', требуется версия 7 или 8. Для больших файлов нужна версия 8. Сравни адрес с Cloudflare → Workers & Pages → Visit. '+
           'Если отличается, замени адрес в поле «Адрес Cloudflare». '+
           'Если совпадает, проверь публикацию Deploy именно этого Worker.'
         );
@@ -1301,6 +1302,12 @@
           'Обнови Worker последним кодом из GitHub, нажми Deploy. '+
           'Видео не загружено: старый сервер не должен подменять фисташковый или бургунди другим оформлением.'
         );
+      }
+      if(totalSize>500000000 && (workerHealth.style_contract_version!==8 ||
+          workerHealth.large_storage_configured!==true)){
+        throw new Error('Видео '+fmtBytes(totalSize)+
+          ' нельзя передать в старое хранилище KV. Подключи R2 bucket VIDEO_FILES '+
+          'и опубликуй Worker v8, затем нажми проверку подключения.');
       }
       status.textContent='Подготавливаю проект: '+videos.length+' видео, '+fmtBytes(totalSize)+'…';
       // Each file starts a fresh 4MB-chunk sequence. Flat chunk IDs
@@ -1338,7 +1345,7 @@
              resumed.accepted_talk_scene===settings.talk_scene &&
              resumed.accepted_caption_variant===settings.caption_variant &&
              resumed.accepted_guide_effect===settings.guide_effect &&
-             resumed.style_contract_version===7 &&
+             [7,8].includes(resumed.style_contract_version) &&
               resumed.accepted_insert_style===settings.insert_style){
             id=old.id;
             parts=resumed.input_parts;
@@ -1364,7 +1371,7 @@
           assets:assets.map(function(file){return {name:file.name,size:file.size}}),
           size:totalSize,settings:settings
         }),false);
-        if(start.style_contract_version!==7 ||
+        if(![7,8].includes(start.style_contract_version) ||
             start.accepted_insert_style!==settings.insert_style ||
            start.accepted_talk_scene!==settings.talk_scene ||
            start.accepted_caption_variant!==settings.caption_variant ||
