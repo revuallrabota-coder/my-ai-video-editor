@@ -1,0 +1,42 @@
+name: "🧱 Проверить реальную сборку SQLite Worker v9"
+
+on:
+  push:
+    paths:
+      - "cloudflare_launcher_do_v9.js"
+      - "wrangler.do.v9.toml.template"
+      - "index.html"
+      - ".github/workflows/free-do-wrangler-compile.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Assemble local test Wrangler config (no account credentials)
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          template=Path("wrangler.do.v9.toml.template").read_text("utf-8")
+          Path("wrangler.do.v9.generated.toml").write_text(
+            template.replace("__EXISTING_UPLOADS_KV_NAMESPACE_ID__","0"*32),"utf-8")
+          PY
+      - name: Check full Mini App JavaScript syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html=Path("index.html").read_text("utf-8")
+          source=html.rsplit("<script>",1)[1].split("</script>",1)[0]
+          Path("/tmp/miniapptest.js").write_text(source,"utf-8")
+          PY
+          node --check /tmp/miniapptest.js
+      - name: Let actual Wrangler parse SQLite migrations and bundle Worker v9
+        run: npx --yes wrangler@4 deploy --config wrangler.do.v9.generated.toml --dry-run --outdir /tmp/worker-v9-dry
