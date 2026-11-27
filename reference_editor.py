@@ -344,6 +344,7 @@ def montage_by_reference(
     subject_layout: str = "standard",
     talk_scene: str = "off",
     guide_effect: str = "off",
+    repeat_cuts: tuple[tuple[float,float], ...] = (),
 ) -> dict:
     """Монтаж с точной синхронизацией речи, динамичным кадром и титрами."""
     from reels_effects import apply_effects, validate_effects
@@ -365,10 +366,12 @@ def montage_by_reference(
         raise ValueError("Для разговорного монтажа нужен исходный ролик с речью.")
     # Remove awkward gaps BEFORE camera, text and time remapping; the
     # word timestamps are mapped through the same edit decision.
-    from telegram_editor import get_speech_keep_ranges,get_keep_ranges
+    from telegram_editor import get_speech_keep_ranges,get_keep_ranges,exclude_speech_repeats
     kept = (get_speech_keep_ranges(words_override,source_duration,pause_removal)
             if words_override is not None
             else get_keep_ranges(original,source_duration,source_has_audio))
+    if repeat_cuts:
+        kept=exclude_speech_repeats(kept,repeat_cuts)
     with tempfile.TemporaryDirectory(prefix="reference_render_") as tmp:
         folder = Path(tmp)
         joined = folder / "joined.mp4"
