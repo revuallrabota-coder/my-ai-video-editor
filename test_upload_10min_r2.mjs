@@ -88,31 +88,30 @@ assert.equal(health.max_video_seconds,600);
 assert.equal(health.large_storage_configured,true);
 assert.equal(health.max_upload_mb,4000);
 assert.equal(health.style_contract_version,8);
-const size=2_400_000_000;
+const size=3_000_000_000;
 const start=await request("/upload/start","POST",{
-  files:[{name:"first.mov",size:1_400_000_000},
-         {name:"second.mp4",size:1_000_000_000}],
+  files:[{name:"ten_minutes.mov",size:3_000_000_000}],
   size,settings:{mode:"my_style"}
 });
 assert.equal(start.status,201,JSON.stringify(start));
 assert.equal(start.data.storage,"r2");
-assert.equal(start.data.parts,600);
+assert.equal(start.data.parts,750);
 const uploadId=start.data.upload_id;
 const bigMeta=JSON.parse(metadata.get("user-video:"+uploadId+":meta").value);
 assert.equal(bigMeta.storage,"r2");
 assert.equal(bigMeta.size,size);
-assert.equal(bigMeta.parts,600);
+assert.equal(bigMeta.parts,750);
 assert.equal(kvWrites,1);
 assert.equal((await request("/upload/"+uploadId+"/0","PUT",
   new ArrayBuffer(4_000_000))).status,200);
 assert.equal(r2Writes,1);
 assert.equal(binary.get(uploadId+"/source/0").size,4_000_000);
 // Simulate the rest of the file without allocating gigabytes.
-for(let i=1;i<600;i++)
+for(let i=1;i<750;i++)
   binary.set(uploadId+"/source/"+i,{size:4_000_000});
 const status=await request("/upload/"+uploadId+"/status");
 assert.equal(status.status,200);
-assert.equal(status.data.uploaded_parts.length,600);
+assert.equal(status.data.uploaded_parts.length,750);
 assert.equal(kvLists,0);
 const finished=await request("/upload/"+uploadId+"/finish","POST",{done:true});
 assert.equal(finished.status,202,JSON.stringify(finished));
@@ -154,4 +153,4 @@ const refused=await request("/upload/start","POST",{
 },false,legacy);
 assert.equal(refused.status,400);
 assert.equal(kvLists,0);
-console.log("✓ 10-min R2 cloud accepts 2.4 GB metadata, uploads binary via R2, downloads 512MB master, preserves old KV and rejects large without R2");
+console.log("✓ 10-min R2 cloud accepts a single 3 GB video metadata, uploads binary via R2, downloads 512MB master, preserves old KV and rejects large without R2");
