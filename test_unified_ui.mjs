@@ -58,7 +58,7 @@ for(const setting of ["mode:modeForServer(s.mode)",
                       "font_profile:s.largeFont",
                       "small_font_profile:s.smallFont",
                       "animation_style:s.captionAnimation",
-                      "insert_style:s.motionInserts"]){
+                      "insert_style:(s.motionInserts||manualFx)"]){
   assert.ok(settings.includes(setting),"Unified pipeline missing "+setting);
 }
 assert.match(html,/<option value="1\.2" selected>/);
