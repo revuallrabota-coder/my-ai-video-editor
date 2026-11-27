@@ -9,13 +9,6 @@ on:
       - 'wrangler.do.v9.toml.template'
       - 'test_upload_3gb_do.mjs'
       - '.github/workflows/deploy-free-do-v9.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'cloudflare_launcher_do_v9.js'
-      - 'wrangler.do.v9.toml.template'
-      - '.github/workflows/deploy-free-do-v9.yml'
-      - 'test_upload_3gb_do.mjs'
 
 permissions:
   contents: read
@@ -68,8 +61,6 @@ jobs:
         run: node test_upload_3gb_do.mjs
       - name: Compile Worker before deployment
         run: npx --yes wrangler@4 deploy --config wrangler.do.v9.generated.toml --dry-run --outdir /tmp/worker-v9-dry
-      - name: Verify 3 GB chunk routing and private storage lifecycle
-        run: node test_upload_3gb_do.mjs
       - name: Deploy v9 to EXISTING black-violet-9e64 Worker without deleting secrets
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
