@@ -221,7 +221,7 @@ async function completeParts(env,id,parts,prefix,meta=null) {
       });
       for(const obj of page.objects||[]){
         const suffix=obj.key.slice(r2prefix.length);
-        if(!/^(0|[1-9]\\d*)$/.test(suffix))continue;
+        if(!/^(0|[1-9]\d*)$/.test(suffix))continue;
         const i=Number(suffix);
         const expected=meta && prefix!=="output:" ?
           expectedBytes(meta,i):Math.min(CHUNK,parts.total-i*CHUNK);
