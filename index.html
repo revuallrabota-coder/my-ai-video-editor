@@ -1258,6 +1258,7 @@
     var status=byId('upload50Status');
     var progress=byId('upload50Progress');
     if(btn.disabled)return;
+    btn.disabled=true;
     try{
       var url=connectedWorkerURL();
       var auth=telegramProof();
@@ -1313,14 +1314,25 @@
       async function request(path,method,body,isBinary){
         var headers={'X-Telegram-Init-Data':auth};
         if(!isBinary) headers['Content-Type']='application/json';
-        var response=await fetch(url+path,{
-          method:method,headers:headers,
-          body:body,cache:'no-store'
-        });
-        var data={};
-        try{data=await response.json()}catch(ignore){}
-        if(!response.ok)throw new Error(data.error||('Cloudflare ответил HTTP '+response.status));
-        return data;
+        var controller=new AbortController();
+        var timer=setTimeout(function(){controller.abort()},45000);
+        try{
+          var response=await fetch(url+path,{
+            method:method,headers:headers,body:body,
+            cache:'no-store',signal:controller.signal
+          });
+          var data={};
+          try{data=await response.json()}catch(err){
+            if(controller.signal.aborted)throw err;
+            if(response.ok)throw new Error('Cloudflare вернул некорректный ответ.');
+          }
+          if(!response.ok)throw new Error(data.error||('Cloudflare ответил HTTP '+response.status));
+          return data;
+        }catch(err){
+          if(controller.signal.aborted)throw new Error('Cloudflare не ответил за 45 секунд ('+path.split('/').slice(-1)[0]+'). Нажми «Смонтировать Reels» повторно.');
+          throw err;
+        }finally{clearTimeout(timer)}
+
       }
       status.textContent='Проверяю, что Cloudflare поддерживает выбранный стиль…';
       var workerHealth=await request('/health','GET');
@@ -1402,7 +1414,9 @@
             if(resumed.stage==='failed'){
               // A failed GitHub Actions run can leave KV meta.state="queued".
               // Do not lock an iPad user into the old broken 7/9 project.
-              status.textContent='⚠️ Предыдущий монтаж завершился с ошибкой. Создаю новую попытку.';
+              try{localStorage.removeItem('personalEditorLastUpload')}catch(ignore){}
+              showStatusCard();
+              status.textContent='Предыдущая попытка закрыта. Создаю новый проект…';
             }else{
               status.textContent='✅ Этот видеопроект уже передан на монтаж.';
               refreshProjectStatus();
@@ -1412,6 +1426,7 @@
         }catch(ignore){ /* create a new session when the old one expired */ }
       }
       if(!id){
+        status.textContent='Создаю новый проект в Cloudflare…';
         var start=await request('/upload/start','POST',JSON.stringify({
           files:videos.map(function(file){return {name:file.name,size:file.size}}),
           assets:assets.map(function(file){return {name:file.name,size:file.size}}),
@@ -1441,6 +1456,7 @@
       }
       byId('checkUploadedResult').hidden=true;
       progress.value=Math.round(completed.size*100/parts);
+      status.textContent='📤 Начинаю загрузку: '+completed.size+'/'+parts+' частей. Не закрывай приложение до 100%.';
       for(var i=0;i<parts;i++){
         if(completed.has(i))continue;
         var piece=uploadParts[i];
