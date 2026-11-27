@@ -27,7 +27,7 @@ from telethon import TelegramClient, events
 
 LOG = logging.getLogger("editor")
 MAX_BYTES = 1024 * 1024 * 1024  # 1 GiB
-MAX_SECONDS = 125  # допуск к номинальным 2 минутам
+MAX_SECONDS = 600  # общий лимит проекта: 10 минут
 WAIT_SECONDS = 900
 SIZE = "720:1280"  # тестовая версия: разумный размер для бесплатного CPU
 DEFAULT_COLOR = "#E8A0C0"
@@ -116,7 +116,7 @@ def duration_and_audio(path: Path) -> tuple[float, bool]:
     if not has_video or duration <= 0:
         raise ValueError("В файле не найдена корректная видеодорожка.")
     if duration > MAX_SECONDS:
-        raise ValueError("Пока обрабатываются ролики не длиннее 2 минут.")
+        raise ValueError("Видео должно быть не длиннее 10 минут.")
     return duration, has_audio
 
 
@@ -753,7 +753,7 @@ async def main() -> None:
                 await event.respond(
                     "🎬 Чтобы смонтировать ролик, сначала запусти задание "
                     "«Монтаж через Telegram» в GitHub Actions. "
-                    "Затем пришли сюда видео до 1 ГБ и длительностью до 2 минут."
+                    "Затем пришли сюда видео до 1 ГБ и длительностью до 10 минут."
                 )
                 return
             if busy or not event.file:
