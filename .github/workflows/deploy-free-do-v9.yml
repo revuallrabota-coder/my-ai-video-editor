@@ -7,6 +7,13 @@ on:
     paths:
       - 'cloudflare_launcher_do_v9.js'
       - 'wrangler.do.v9.toml.template'
+      - 'test_upload_3gb_do.mjs'
+      - '.github/workflows/deploy-free-do-v9.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'cloudflare_launcher_do_v9.js'
+      - 'wrangler.do.v9.toml.template'
       - '.github/workflows/deploy-free-do-v9.yml'
       - 'test_upload_3gb_do.mjs'
 
@@ -61,8 +68,22 @@ jobs:
         run: node test_upload_3gb_do.mjs
       - name: Compile Worker before deployment
         run: npx --yes wrangler@4 deploy --config wrangler.do.v9.generated.toml --dry-run --outdir /tmp/worker-v9-dry
+      - name: Verify 3 GB chunk routing and private storage lifecycle
+        run: node test_upload_3gb_do.mjs
       - name: Deploy v9 to EXISTING black-violet-9e64 Worker without deleting secrets
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: npx --yes wrangler@4 deploy --config wrangler.do.v9.generated.toml --keep-vars
+      - name: Verify deployed Worker health
+        run: |
+          curl --fail --silent --show-error --retry 4 --retry-delay 5 https://black-violet-9e64.revuall-rabota.workers.dev/health -o /tmp/worker-health.json
+          python - <<'PY'
+          import json
+          with open('/tmp/worker-health.json') as f:
+              h=json.load(f)
+          for k,v in {'style_contract_version':9,'durable_storage_configured':True,'storage_mode':'do','max_upload_mb':3000,'max_video_seconds':600}.items():
+              if h.get(k)!=v:
+                  raise SystemExit('Unexpected health field: '+k)
+          print('Worker v9 health checks passed.')
+          PY
