@@ -426,6 +426,7 @@
       <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
       <p class="mini" id="upload50Status" role="status" aria-live="polite">До 500 МБ работает KV. Для видео до 3 ГБ нужен бесплатный Worker v9 с Durable Objects VIDEO_SHARDS. Файл передаётся частями без сжатия.</p>
       <button class="btn secondary" id="checkUploadedResult" type="button" style="width:100%;margin-top:8px" hidden>⬇️ Скачать готовое Full HD</button>
+      <p class="mini"><a id="openMasterSafari" href="#" target="_blank" rel="noopener noreferrer" hidden>⬇️ Скачать большой MP4 через Safari</a></p>
       <button class="btn secondary" id="checkMontageStatus" type="button" style="width:100%;margin-top:8px">📍 Посмотреть этап обработки</button>
       <p class="note">Видео в Cloudflare хранятся максимум 3 дня; исходники освобождаются сразу после обработки. Статус доступен после закрытия и повторного открытия приложения.</p>
       <details style="margin-top:12px">
@@ -1516,8 +1517,28 @@
         status.textContent='🎬 Ролик ещё обрабатывается. Если бот уже прислал MP4 файлом, отдельное скачивание не требуется. Для больших результатов повтори проверку позднее.';
         return;
       }
-      if(!data.size || data.size>250000000 || !data.parts || data.parts>63){
+      if(!data.size || data.size>3000000000 || !data.parts || data.parts>750){
         throw new Error('Неверный размер MP4 на сервере.');
+      }
+      // A 3GB Blob inside Telegram WebView would exhaust iPad memory.
+      if(data.size>180000000 || data.storage==='do'){
+        var masterRes=await fetch(
+          previous.url+'/upload/'+previous.id+'/master-link',{
+            headers:{'X-Telegram-Init-Data':proof},cache:'no-store'
+          });
+        var ticket=await masterRes.json();
+        if(!masterRes.ok||!ticket.url)
+          throw new Error(ticket.error||'Не удалось создать ссылку на MP4.');
+        if(!ticket.url.startsWith(previous.url+'/master/'+previous.id+'?'))
+          throw new Error('Сервер вернул недопустимую ссылку.');
+        var safari=byId('openMasterSafari');
+        safari.href=ticket.url;
+        safari.hidden=false;
+        safari.scrollIntoView({behavior:'smooth',block:'nearest'});
+        status.textContent='✅ Мастер '+fmtBytes(data.size)+' готов. '+
+          'Нажми ссылку ниже и сохрани через Safari в «Файлы». '+
+          'Если ссылка истечёт, нажми кнопку скачивания снова.';
+        return;
       }
       var buffers=[];
       for(var i=0;i<data.parts;i++){
