@@ -173,6 +173,24 @@ const resultStatus=await send("/upload/"+id+"/status");
 assert.equal(resultStatus.data.ready,true);
 assert.equal(resultStatus.data.storage,"do");
 assert.equal((await send("/upload/"+id+"/result/0")).status,200);
+// Signed Safari download streams a precise HTTP byte range; never holds 3GB.
+const masterLink=await send("/upload/"+id+"/master-link","GET");
+assert.equal(masterLink.status,200,JSON.stringify(masterLink.data));
+assert.ok(masterLink.data.url.includes("/master/"+id+"?expires="));
+const download=await worker.fetch(new Request(masterLink.data.url,{
+  headers:{"Range":"bytes=0-19"}
+}),env);
+assert.equal(download.status,206);
+assert.equal(download.headers.get("content-length"),"20");
+assert.equal(download.headers.get("content-range"),"bytes 0-19/512000000");
+assert.equal((await download.arrayBuffer()).byteLength,20);
+const broken=new URL(masterLink.data.url);
+broken.searchParams.set("signature","0".repeat(64));
+assert.equal((await worker.fetch(new Request(broken),env)).status,403);
+const invalidRange=await worker.fetch(new Request(masterLink.data.url,{
+  headers:{"Range":"bytes=512000000-512000005"}
+}),env);
+assert.equal(invalidRange.status,416);
 assert.equal(kvLists,0);
 // Legacy small-file projects continue via KV if user hasn't deployed DO yet.
 const fallbackEnv={...env,VIDEO_SHARDS:undefined};
@@ -184,4 +202,4 @@ const refusal=await send("/upload/start","POST",{
   size:700_000_000
 },false,fallbackEnv);
 assert.equal(refusal.status,400);
-console.log("✓ free DO v9: 3GB, 750 chunks, 8 SQLite shards, 72h alarms, prompt source cleanup, 512MB master, no KV binary/list, KV fallback");
+console.log("✓ free DO v9: 3GB/750 chunks/8 SQLite shards; alarms, source cleanup, signed range downloads, 512MB master, no KV binary/list, KV fallback");
