@@ -38,7 +38,7 @@ assert.match(html,/id="workerConnectionResult"/);
 assert.match(html,/id="workerHealthLink"/);
 assert.match(html,/function connectedWorkerURL\(\)/);
 assert.match(html,/async function checkWorkerConnection\(\)/);
-assert.match(html,/!\[7,8\]\.includes\(workerHealth\.style_contract_version\)/);
+assert.match(html,/!\[7,8,9\]\.includes\(workerHealth\.style_contract_version\)/);
 assert.match(html,/id="guideEffect"/);
 assert.match(html,/guideEffect:configuredGuideEffect\(\)/);
 assert.match(html,/guide_effect:\(s.motionInserts\|\|manualFx\)\?s.guideEffect:'off'/);
