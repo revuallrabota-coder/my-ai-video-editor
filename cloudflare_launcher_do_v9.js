@@ -18,7 +18,7 @@ const MAX_ASSETS = 100000000;
 const TTL = 259200;
 const CONTRACT = 9;
 const STAGES = {
-  queued:35, downloading:42, joining:53, transcribing:63, review:72,
+  waiting_telegram:36, queued:35, downloading:42, joining:53, transcribing:63, review:72,
   planning:78, rendering:86, publishing:94, done:100, failed:100
 };
 const CHOICES = {
@@ -603,7 +603,7 @@ async function internalRoute(request,env,path) {
     return response({id,size:meta.size,parts:meta.parts,
       original_name:meta.original_name,files:meta.files,assets:meta.assets||[],
       asset_size:meta.asset_size||0,storage:meta.storage||"kv",
-      settings:meta.settings,chunk_size:CHUNK});
+      settings:meta.settings,chunk_size:CHUNK,transport:meta.transport??"cloudflare"});
   }
   const chunk=operation.match(/^chunk\/(\d+)$/);
   if (request.method==="GET" && chunk) {
@@ -680,6 +680,7 @@ async function internalRoute(request,env,path) {
     return response({ok:true});
   }
   if (request.method==="DELETE" && operation==="release") {
+    if(meta.transport==="telegram"&&meta.parts===0)return response({released:true,next:0,has_more:false});
     const from=Number(new URL(request.url).searchParams.get("from")??0);
     if (!Number.isSafeInteger(from) || from<0 || from>=meta.parts) {
       return response({error:"Bad cleanup cursor"},400);
@@ -725,8 +726,29 @@ async function uploadSpeedProbe(request,env){
   }
   return response({bytes:offset,receive_ms:receiveMs,storage_ms:storageMs});
 }
+async function startTelegramProject(request,env){
+  const body=await readJSON(request);
+  const settings=parseSettings(body.settings??{});
+  if(settings.mode==="reference")return response({error:"Этот способ доступен для «Мой стиль», без второго референса."},400);
+  const id=crypto.randomUUID(),now=Date.now();
+  const storage=env.VIDEO_SHARDS?"do":env.VIDEO_FILES?"r2":"kv";
+  const meta={id,size:0,parts:0,files:[],assets:[],asset_size:0,storage,
+    transport:"telegram",settings,state:"queued",created:now,expires_at:now+TTL*1000};
+  await env.UPLOADS.put(key(id,"meta"),JSON.stringify(meta),{expirationTtl:TTL});
+  try{
+    await dispatch("upload-video-50mb.yml",env.GITHUB_PAT,{
+      upload_id:id,worker_url:new URL(request.url).origin
+    });
+  }catch(err){
+    await env.UPLOADS.delete(key(id,"meta"));
+    throw err;
+  }
+  return response({upload_id:id,started:true,transport:"telegram",
+    style_contract_version:CONTRACT},202);
+}
 async function publicRoute(request,env,path) {
   await verifyTelegram(request.headers.get("X-Telegram-Init-Data"),env);
+  if(request.method==="POST"&&path==="/telegram/start")return startTelegramProject(request,env);
   if(request.method==="PUT"&&path==="/upload/probe")return uploadSpeedProbe(request,env);
   const masterLink=path.match(/^\/upload\/([a-f0-9-]{36})\/master-link$/);
   if(request.method==="GET"&&masterLink)
@@ -846,6 +868,7 @@ export default {
         max_video_seconds:600,
         shared_upload_endpoint:true,
         upload_speed_probe:true,
+        telegram_direct_project:true,
         durable_storage_configured:Boolean(env.VIDEO_SHARDS),
         large_storage_configured:Boolean(env.VIDEO_SHARDS||env.VIDEO_FILES),
         storage_mode:env.VIDEO_SHARDS?"do":env.VIDEO_FILES?"r2":"kv",
