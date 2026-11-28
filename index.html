@@ -111,7 +111,7 @@
       <div class="logo">🎬</div>
       <div><h1>Мой AI Монтажёр</h1><div class="tiny">Твои видео. Твой стиль.</div></div>
     </div>
-    <span class="tiny">Reels Studio · 28.11-R10</span>
+    <span class="tiny">Reels Studio · 28.11-R11</span>
   </div>
   <section id="projectStatusCard" class="card" style="margin-bottom:16px" hidden aria-label="Статус последнего монтажа">
     <h3 style="margin-top:0">📍 Статус последнего монтажа</h3>
@@ -133,7 +133,7 @@
     <p class="note">Один монтаж для всех твоих роликов: склейка, вырезание пауз, скорость, шрифты, смысловые вставки и отправка в Telegram. Все параметры настраиваются отдельно.</p>
     <input type="radio" name="mode" value="Мой стиль" checked hidden>
     <h3>Настрой монтаж</h3>
-    <p>Сначала выбери оформление. На последнем шаге отправишь ссылку на видео с Яндекс Диска. До 10 минут и 1 ГБ на видео.</p>
+    <p>Сначала выбери оформление. На последнем шаге отправишь ссылки на видео с Яндекс Диска. До 12 видео, 1 ГБ на файл, до 3 ГБ и 10 минут суммарно.</p>
     <details id="localSourceOptions" style="margin-top:12px">
       <summary style="cursor:pointer;font-weight:650">Запасной способ: выбрать видео с устройства</summary>
       <p class="note">Для Cloudflare: до 12 видео, до 3 ГБ суммарно. Для Яндекс Диска выбирать файлы здесь не нужно.</p>
@@ -422,14 +422,14 @@
     <div id="summary"></div>
     <div class="alert" style="margin:16px 0">
       <strong>🎬 Всё готово к монтажу</strong>
-      <p class="note">Сохрани оформление, затем пришли в чат бота ссылку на видео с Яндекс Диска. Одно видео до 1 ГБ и 10 минут. Бот пришлёт текст на проверку и готовый Reels.</p>
+      <p class="note">Сохрани оформление, затем пришли в чат бота ссылки на 1–12 видео с Яндекс Диска. До 1 ГБ на файл, 3 ГБ и 10 минут суммарно. После всех ссылок напиши /montage. Бот пришлёт текст на проверку и готовый Reels.</p>
       <button class="btn primary" id="sendViaYandex" type="button" style="width:100%;margin-top:12px">☁️ Отправить через Яндекс Диск</button>
       <p class="mini" id="telegramDirectStatus" role="status" aria-live="polite">Нажми кнопку, чтобы сохранить настройки. Окно останется открытым.</p>
       <div id="yandexNextSteps" hidden style="margin-top:12px">
-        <p class="note"><strong>1.</strong> Открой Яндекс Диск и загрузи видео. <strong>2.</strong> Выбери «Поделиться ссылкой» и скопируй её. <strong>3.</strong> Вернись в чат бота. Пришли ссылку после сообщения «Настройки сохранены».</p>
+        <p class="note"><strong>1.</strong> Открой Яндекс Диск и загрузи нужные видео. <strong>2.</strong> Скопируй ссылки на отдельные видео. <strong>3.</strong> Вернись в чат бота. Пришли все ссылки после сообщения «Настройки сохранены», затем напиши /montage.</p>
         <button class="btn secondary" id="openYandexDisk" type="button" style="width:100%;margin-top:6px">Открыть Яндекс Диск ↗</button>
         <button class="btn secondary" id="returnToBotChat" type="button" style="width:100%;margin-top:8px">Вернуться в чат бота</button>
-        <p class="mini">Если бот ещё не написал, сервер готовится. Не запускай второе задание. После подтверждения скачивания отключи общий доступ на Диске.</p>
+        <p class="mini">Если бот ещё не написал, сервер готовится. Не запускай второе задание. После подтверждения скачивания каждого файла отключи его общий доступ на Диске.</p>
       </div>
       <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
       <p class="mini" id="upload50Status" role="status" aria-live="polite"></p>
