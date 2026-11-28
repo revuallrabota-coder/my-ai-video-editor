@@ -1254,6 +1254,7 @@
       });
       var data=await res.json();
       byId('resumePendingUpload').hidden=true;
+      if(!res.ok||data.state!=='uploading')byId('resumePendingFiles').hidden=true;
       if(!res.ok){
         if(res.status===404){
           clearPendingFiles(project.id);
@@ -1505,6 +1506,21 @@
         Date.now()-old.created<71*60*60*1000);
       if(sameProject&&!requestedResume){
         settings=JSON.parse(old.settings);
+      }else if(old&&old.url===url&&Date.now()-old.created<71*60*60*1000&&!requestedResume){
+        var previousFiles=JSON.parse(old.fingerprint||'[]'),chosenFiles=JSON.parse(fingerprint);
+        var sameNamesAndSizes=previousFiles.length===chosenFiles.length&&
+          previousFiles.every(function(f,i){return f.slice(0,3).join('|')===chosenFiles[i].slice(0,3).join('|')});
+        if(sameNamesAndSizes){
+          // A file picker can change lastModified. Never assume identical bytes.
+          var prior=await readPendingFiles(old);
+          if(prior){
+            videos=prior.videos.slice();assets=prior.assets.slice();
+            fingerprint=old.fingerprint;settings=JSON.parse(old.settings);
+            sameProject=true;
+          }else if(!window.confirm('iPad изменил свойства выбранного файла. Без сохранённой копии нельзя безопасно продолжить старый проект. Начать заново?')){
+            throw new Error('Прежний проект сохранён. Выбери его через «Продолжить загрузку».');
+          }
+        }
       }
       var assetSize=assets.reduce(function(sum,file){return sum+file.size},0);
       if(assets.length>4 || assetSize>100000000)
@@ -1733,7 +1749,8 @@
         var speed=elapsed>0?(transferred-initialBytes)/elapsed:0;
         status.textContent='📤 '+progress.value+'% · '+fmtBytes(transferred)+' / '+fmtBytes(allBytes)+
           ' · части '+completed.size+'/'+parts+
-          (elapsed>=2&&speed>0?' · '+(speed/1000000).toFixed(2)+' МБ/с':'');
+          (elapsed>=2&&speed>0?' · '+(speed/1000000).toFixed(2)+' МБ/с':'')+
+          (cacheOK?' · исходники сохранены':' · не закрывай окно: копия не сохранена');
       }
       for(var round=0;round<3;round++){
         try{
