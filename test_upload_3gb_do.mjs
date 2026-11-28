@@ -243,3 +243,19 @@ const refusal=await send("/upload/start","POST",{
 },false,fallbackEnv);
 assert.equal(refusal.status,400);
 console.log("✓ free DO v9: 3GB/750 chunks/8 SQLite shards; alarms, source cleanup, signed range downloads, 512MB master, no KV binary/list, KV fallback");
+
+assert.equal(health.telegram_direct_project,true);
+const directDispatchBefore=githubDispatches;
+const direct=await send("/telegram/start","POST",{settings:{mode:"my_style",font_profile:"bold",insert_style:"burgundy"}});
+assert.equal(direct.status,202,JSON.stringify(direct.data));
+assert.equal(githubDispatches,directDispatchBefore+1);
+const directId=direct.data.upload_id;
+const directManifest=await send("/internal/upload/"+directId+"/manifest","GET",null,true);
+assert.equal(directManifest.data.transport,"telegram");
+assert.equal(directManifest.data.settings.font_profile,"bold");
+assert.equal(directManifest.data.settings.insert_style,"burgundy");
+assert.equal(directManifest.data.parts,0);
+assert.equal((await send("/internal/upload/"+directId+"/progress","POST",{stage:"waiting_telegram"},true)).status,200);
+assert.equal((await send("/upload/"+directId+"/status")).data.stage,"waiting_telegram");
+assert.equal((await send("/internal/upload/"+directId+"/release","DELETE",undefined,true)).status,200);
+console.log("✓ Direct Telegram handoff preserves settings and uses the existing montage job without source chunks");
