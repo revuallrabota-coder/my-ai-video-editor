@@ -45,6 +45,8 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           OWNER_TELEGRAM_ID: ${{ secrets.OWNER_TELEGRAM_ID }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
           UPLOAD_ID: ${{ inputs.upload_id }}
           UPLOAD_WORKER_URL: ${{ inputs.worker_url }}
           PYTHONUNBUFFERED: "1"
