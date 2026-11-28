@@ -106,6 +106,7 @@ assert.equal(health.durable_storage_configured,true);
 assert.equal(health.storage_mode,"do");
 assert.equal(health.max_upload_mb,3000);
 assert.equal(health.max_video_seconds,600);
+assert.equal(health.shared_upload_endpoint,true);
 const size=3_000_000_000;
 const started=await send("/upload/start","POST",{
   files:[{name:"my-ten-minute-video.mp4",size}],
@@ -125,6 +126,22 @@ assert.equal(response.status,200,JSON.stringify(response.data));
 assert.equal(shards.get(id+":source:0").sql.parts.get(0).bytes,4_000_000);
 assert.ok(shards.get(id+":source:0").storage.getAlarm());
 assert.equal(kvWrites,1,"even the 4MB binary data stays outside KV");
+const sharedURL=base+"/upload/"+id+"/part";
+const cors=await worker.fetch(new Request(sharedURL,{method:"OPTIONS",headers:{Origin:webOrigin,
+  "Access-Control-Request-Method":"PUT",
+  "Access-Control-Request-Headers":"x-telegram-init-data,x-upload-part"}}),env);
+assert.equal(cors.status,200);
+assert.match(cors.headers.get("Access-Control-Allow-Headers"),/X-Upload-Part/i);
+assert.equal(cors.headers.get("Access-Control-Max-Age"),"600");
+const sharedSend=async index=>worker.fetch(new Request(sharedURL,{method:"PUT",
+  headers:{Origin:webOrigin,"X-Telegram-Init-Data":qs.toString(),"X-Upload-Part":String(index)},
+  body:new ArrayBuffer(4_000_000)}),env);
+assert.equal((await sharedSend(1)).status,200);
+assert.equal(shards.get(id+":source:0").sql.parts.get(1).bytes,4_000_000);
+assert.equal((await sharedSend(1)).status,200,"Retry is idempotent");
+assert.equal((await sharedSend(750)).status,400);
+assert.equal((await sharedSend("invalid")).status,400);
+assert.equal(kvWrites,1);
 // Mock upload completion by filling only metadata in each SQLite shard.
 for(let i=1;i<750;i++){
   const name=id+":source:"+Math.floor(i/100);
