@@ -1,0 +1,22 @@
+name: "Yandex multi-video intake checks"
+on:
+  push:
+    paths:
+      - yandex_source.py
+      - test_yandex_source.py
+      - process_uploaded_video.py
+      - .github/workflows/yandex-checks.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests
+      - run: python -m py_compile yandex_source.py process_uploaded_video.py
+      - run: python test_yandex_source.py
