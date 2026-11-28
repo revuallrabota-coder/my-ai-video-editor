@@ -124,7 +124,7 @@
     <button type="button" class="btn secondary" id="refreshMontageStatus" style="width:100%;margin:8px 0">🔄 Проверить этап монтажа</button>
     <a id="montageGithubRun" href="#" target="_blank" rel="noopener noreferrer" hidden>🔍 Открыть журнал задания GitHub Actions</a>
     <button type="button" class="btn primary" id="downloadMasterQuick" style="width:100%;margin:8px 0" hidden>⬇️ Скачать Full HD без перехода по шагам</button>
-    <p class="note">Когда бот подтвердит запуск монтажа, можно закрыть приложение: обработка продолжится в GitHub Actions. iPad может остановить передачу при закрытии окна. Для незавершённой загрузки без дополнительных ZIP и фото выбери «Продолжить загрузку» и те же видео; уже полученные части не передаются повторно. Этапы придут в Telegram.</p>
+    <p class="note">Когда бот подтвердит запуск монтажа, можно закрыть приложение: обработка продолжится в GitHub Actions. iPad может остановить передачу при закрытии окна. Для незавершённой загрузки нажми «Продолжить загрузку»: приложение попробует использовать сохранённые на устройстве исходники и настройки. Если iPad удалил локальные файлы, потребуется выбрать их снова. Уже полученные части не передаются повторно. Этапы придут в Telegram.</p>
   </section>
   <div class="progress" id="progress"></div>
 
@@ -474,7 +474,8 @@
   var byId=function(id){return document.getElementById(id)};
   var videoInput=byId('videos');
   var selectedClips=[];
-  var resumeProject=null;
+  var resumeProject=null, resumePayload=null, pendingMemory=null;
+  var resumeBusy=false;
   var selectedAssetPacks=[]; // Ordered, editable collection; each File stays on device.
   var photoInput=byId('photos');
   function fmtBytes(n){return n>=1000000000?(n/1000000000).toFixed(2)+' ГБ':(n/1000000).toFixed(1)+' МБ'}
@@ -1138,6 +1139,79 @@
     try{return JSON.parse(localStorage.getItem('personalEditorLastUpload')||'null')}
     catch(ignore){return null}
   }
+  // Keep one unfinished project on this device, never in localStorage/base64.
+  function pendingCache(mode,action){
+    return new Promise(function(resolve,reject){
+      if(!window.indexedDB){reject(new Error('Локальное хранилище недоступно'));return;}
+      var req=indexedDB.open('revuall-private-upload',1);
+      req.onupgradeneeded=function(){req.result.createObjectStore('pending')};
+      req.onerror=function(){reject(req.error)};
+      req.onblocked=function(){reject(new Error('Хранилище занято'))};
+      req.onsuccess=function(){
+        var db=req.result,tx,result;
+        try{
+          tx=db.transaction('pending',mode);
+          action(tx.objectStore('pending'),function(value){result=value});
+        }catch(err){db.close();reject(err);return}
+        tx.oncomplete=function(){db.close();resolve(result)};
+        tx.onabort=tx.onerror=function(){db.close();reject(tx.error||new Error('Не удалось сохранить файлы'))};
+      };
+    });
+  }
+  function uploadFingerprint(videos,assets){
+    return JSON.stringify([
+      ...videos.map(function(f){return ['video',f.name,f.size,f.lastModified]}),
+      ...assets.map(function(f){return ['asset',f.name,f.size,f.lastModified]})
+    ]);
+  }
+  function matchingPayload(record,project){
+    return !!(record && project && record.id===project.id && record.url===project.url &&
+      Date.now()-record.created<71*60*60*1000 &&
+      Array.isArray(record.videos)&&Array.isArray(record.assets)&&
+      uploadFingerprint(record.videos,record.assets)===project.fingerprint);
+  }
+  async function cachePendingFiles(project,videos,assets){
+    var record={id:project.id,url:project.url,created:project.created,
+      videos:videos.slice(),assets:assets.slice()};
+    pendingMemory=record;
+    try{
+      await pendingCache('readwrite',function(store){store.put(record,'current')});
+      return true;
+    }catch(err){return false}
+  }
+  async function readPendingFiles(project){
+    if(matchingPayload(pendingMemory,project))return pendingMemory;
+    try{
+      var record=await pendingCache('readonly',function(store,set){
+        var q=store.get('current');q.onsuccess=function(){set(q.result)};
+      });
+      if(matchingPayload(record,project)){pendingMemory=record;return record}
+    }catch(ignore){}
+    return null;
+  }
+  async function clearPendingFiles(id){
+    if(pendingMemory&&(!id||pendingMemory.id===id))pendingMemory=null;
+    try{
+      await pendingCache('readwrite',function(store){
+        var q=store.get('current');
+        q.onsuccess=function(){
+          var r=q.result;
+          if(r&&((id&&r.id===id)||Date.now()-r.created>=71*60*60*1000))store.delete('current');
+        };
+      });
+    }catch(ignore){}
+  }
+  function startCachedResume(project,payload){
+    selectedClips=payload.videos.slice();
+    selectedAssetPacks=[];
+    photoInput.value='';
+    resumeProject=project;
+    resumePayload=payload;
+    renderSelectedClips();
+    current=3;
+    draw();
+    byId('upload50Button').click();
+  }
   function showStatusCard(){
     var previous=loadLastProject();
     var valid=!!(previous && previous.id && previous.url &&
@@ -1160,6 +1234,7 @@
       byId('resumePendingUpload').hidden=true;
       if(!res.ok){
         if(res.status===404){
+          clearPendingFiles(project.id);
           stage.textContent='🗑 Этот проект удалён из временного хранилища. Можно загрузить новое видео.';
           byId('montageRetention').textContent='Старое видео больше не занимает место.';
           byId('montageStageProgress').value=0;
@@ -1176,7 +1251,6 @@
       try{savedFiles=JSON.parse(project.fingerprint||'[]')}catch(ignore){}
       byId('resumePendingUpload').hidden=!(data.state==='uploading' &&
         data.stage!=='failed' && Array.isArray(savedFiles) && savedFiles.length &&
-        savedFiles.every(function(f){return f[0]==='video'}) &&
         typeof project.settings==='string' &&
         !byId('upload50Button').disabled);
       var githubLink=byId('montageGithubRun');
@@ -1211,15 +1285,56 @@
         : '🗑 Временные файлы могут быть уже удалены.';
       byId('checkUploadedResult').hidden=!data.ready;
       byId('downloadMasterQuick').hidden=!data.ready;
+      if(data.state==='queued'||data.state==='done'||data.stage==='failed')clearPendingFiles(project.id);
     }catch(err){
       stage.textContent='⚠️ '+(err.message||err);
     }finally{refreshingStatus=false}
   }
   byId('refreshMontageStatus').addEventListener('click',refreshProjectStatus);
-  byId('resumePendingUpload').addEventListener('click',function(){
-    if(byId('upload50Button').disabled)return;
-    byId('resumePendingFiles').value='';
-    byId('resumePendingFiles').click();
+  byId('resumePendingUpload').addEventListener('click',async function(){
+    var button=this,hint=byId('montageStageHint'),project=loadLastProject();
+    if(resumeBusy||byId('upload50Button').disabled||!project)return;
+    resumeBusy=true;button.disabled=true;
+    try{
+      hint.textContent='Проверяю сохранённую загрузку…';
+      var headers={'X-Telegram-Init-Data':telegramProof()};
+      var res=await fetch(project.url+'/upload/'+project.id+'/status',{headers:headers,cache:'no-store'});
+      var data=await res.json();
+      if(!res.ok)throw new Error(data.error||'Не удалось проверить загрузку');
+      if(data.state!=='uploading'||data.stage==='failed'){refreshProjectStatus();return}
+      var confirmed=new Set((data.uploaded_parts||[]).filter(function(i){
+        return Number.isInteger(i)&&i>=0&&i<data.input_parts;
+      }));
+      if(data.input_parts>0&&confirmed.size===data.input_parts){
+        hint.textContent='Все части уже в облаке. Запускаю монтаж без исходного файла…';
+        var finish=await fetch(project.url+'/upload/'+project.id+'/finish',{
+          method:'POST',headers:Object.assign({},headers,{'Content-Type':'application/json'}),
+          body:JSON.stringify({done:true}),cache:'no-store'
+        });
+        var info=await finish.json();
+        if(!finish.ok)throw new Error(info.error||'Не удалось запустить монтаж');
+        await clearPendingFiles(project.id);
+        refreshProjectStatus();return;
+      }
+      var record=await readPendingFiles(project);
+      if(!record){
+        var expected=JSON.parse(project.fingerprint||'[]');
+        if(expected.every(function(f){return f[0]==='video'})&&
+           uploadFingerprint(selectedClips,[])===project.fingerprint){
+          record={videos:selectedClips.slice(),assets:[]};
+        }
+      }
+      if(record){startCachedResume(project,record);return}
+      var entries=JSON.parse(project.fingerprint||'[]');
+      if(entries.some(function(f){return f[0]!=='video'})){
+        hint.textContent='Локальные исходники и пакеты эффектов не сохранились. Для этого старого проекта нужен новый запуск с исходными видео и пакетами.';
+        return;
+      }
+      hint.textContent='iPad не сохранил исходник этого проекта. Только в этом случае нужно выбрать тот же файл.';
+      byId('resumePendingFiles').value='';
+      byId('resumePendingFiles').hidden=false;
+    }catch(err){hint.textContent='⚠️ '+(err.message||err)}
+    finally{resumeBusy=false;button.disabled=false;}
   });
   byId('resumePendingFiles').addEventListener('change',function(){
     var files=Array.from(this.files||[]),old=loadLastProject();
@@ -1237,14 +1352,8 @@
       ordered.push(pool.splice(at,1)[0]);
     }
     if(pool.length)return;
-    selectedClips=ordered;
-    selectedAssetPacks=[];
-    photoInput.value='';
-    resumeProject=old;
-    renderSelectedClips();
-    current=3;
-    draw();
-    byId('upload50Button').click();
+    this.hidden=true;
+    startCachedResume(old,{videos:ordered,assets:[]});
   });
   byId('downloadMasterQuick').addEventListener('click',function(){
     byId('checkUploadedResult').click();
@@ -1258,6 +1367,7 @@
     byId('projectStatusCard').scrollIntoView({behavior:'smooth',block:'start'});
     refreshProjectStatus();
   });
+  clearPendingFiles();
   if(showStatusCard())refreshProjectStatus();
   document.addEventListener('visibilitychange',function(){
     if(!document.hidden)refreshProjectStatus();
@@ -1340,6 +1450,8 @@
 
       var requestedResume=resumeProject;
       resumeProject=null;
+      var cachedResume=resumePayload;
+      resumePayload=null;
       var settings=requestedResume?JSON.parse(requestedResume.settings):buildRenderSettings();
       if(settings.mode==='reference')throw new Error('Для проекта до 10 минут выбери «Мой стиль» (без второго видео-референса).');
       status.textContent='Проверяю длительность исходных видео перед загрузкой…';
@@ -1357,8 +1469,8 @@
           'Монтажёр дополнительно проверит все исходники после загрузки.';
       }
       var totalSize=videos.reduce(function(sum,file){return sum+file.size},0);
-      var assets=selectedAssetPacks.slice();
-      if(photoInput.files.length){
+      var assets=requestedResume&&cachedResume?cachedResume.assets.slice():selectedAssetPacks.slice();
+      if(!requestedResume&&photoInput.files.length){
         if(typeof makeCarouselPhotoZip!=="function")
           throw new Error("Не удалось подготовить фотографии. Обнови Mini App.");
         var picturePack=await makeCarouselPhotoZip(photoInput.files);
@@ -1461,10 +1573,7 @@
           });
         }
       });
-      var fingerprint=JSON.stringify([
-        ...videos.map(function(file){return ['video',file.name,file.size,file.lastModified]}),
-        ...assets.map(function(file){return ['asset',file.name,file.size,file.lastModified]})
-      ]);
+      var fingerprint=uploadFingerprint(videos,assets);
       var old=null,signature=JSON.stringify(settings);
       try{old=JSON.parse(localStorage.getItem('personalEditorLastUpload')||'null')}catch(ignore){}
       if(requestedResume && (!old || old.id!==requestedResume.id || old.fingerprint!==fingerprint || old.url!==url))
@@ -1532,6 +1641,12 @@
         throw new Error('Сервер вернул неправильное число частей проекта.');
       }
       byId('checkUploadedResult').hidden=true;
+      var cacheProject=loadLastProject();
+      if(cacheProject&&cacheProject.id===id&&!matchingPayload(pendingMemory,cacheProject)){
+        status.textContent='Сохраняю исходники на устройстве для продолжения после закрытия…';
+        var cacheOK=await cachePendingFiles(cacheProject,videos,assets);
+        if(!cacheOK)status.textContent='iPad не разрешил сохранить исходники. Загрузка продолжится, но после закрытия может потребоваться выбор файла.';
+      }
       progress.value=Math.round(completed.size*100/parts);
       status.textContent='📤 Начинаю загрузку: '+completed.size+'/'+parts+' частей. Не закрывай приложение до 100%.';
       var concurrency=workerHealth.durable_storage_configured?6:workerHealth.large_storage_configured?3:1;
@@ -1586,6 +1701,7 @@
         'Открой Telegram-бота, проверь общий текст и ответь /ok. '+
         'Если готовый MP4 больше лимита Telegram, скачай его здесь.';
       progress.value=100;
+      await clearPendingFiles(id);
       refreshProjectStatus();
     }catch(err){
       status.textContent='⚠️ '+(err.message||err);
