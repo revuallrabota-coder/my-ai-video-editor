@@ -111,7 +111,7 @@
       <div class="logo">🎬</div>
       <div><h1>Мой AI Монтажёр</h1><div class="tiny">Твои видео. Твой стиль.</div></div>
     </div>
-    <span class="tiny">Reels Studio · 28.11-R4</span>
+    <span class="tiny">Reels Studio · 28.11-R5</span>
   </div>
   <section id="projectStatusCard" class="card" style="margin-bottom:16px" hidden aria-label="Статус последнего монтажа">
     <h3 style="margin-top:0">📍 Статус последнего монтажа</h3>
@@ -1542,8 +1542,9 @@
       btn.disabled=true;
       progress.hidden=false;
       progress.value=0;
-      async function request(path,method,body,isBinary){
+      async function request(path,method,body,isBinary,partIndex){
         var headers={'X-Telegram-Init-Data':auth};
+        if(Number.isInteger(partIndex))headers['X-Upload-Part']=String(partIndex);
         if(!isBinary) headers['Content-Type']='application/json';
         var controller=new AbortController();
         var requestTimeout=isBinary?120000:45000;
@@ -1712,10 +1713,10 @@
       byId('checkUploadedResult').hidden=true;
       var cacheProject=loadLastProject();
       var cacheOK=!!(pendingMemory&&pendingMemory.persisted&&matchingPayload(pendingMemory,cacheProject));
+      var cacheTask=Promise.resolve(cacheOK);
       if(cacheProject&&cacheProject.id===id&&!cacheOK){
-        status.textContent='Сохраняю исходники на устройстве для продолжения после закрытия…';
-        cacheOK=await cachePendingFiles(cacheProject,videos,assets);
-        if(!cacheOK)status.textContent='iPad не разрешил сохранить исходники. Загрузка продолжится, но после закрытия может потребоваться выбор файла.';
+        // Do not wait for a multi-GB local copy before starting network I/O.
+        cacheTask=cachePendingFiles(cacheProject,videos,assets).then(function(ok){cacheOK=ok;return ok});
       }
       progress.value=Math.round(completed.size*100/parts);
       status.textContent='📤 Продолжаю загрузку: '+completed.size+'/'+parts+' частей.'+
@@ -1739,7 +1740,10 @@
           throw new Error('Локальная часть '+(i+1)+' прочитана не полностью.');
         for(var tries=0;tries<4;tries++){
           try{
-            await request('/upload/'+id+'/'+i,'PUT',binary,true);
+            if(workerHealth.shared_upload_endpoint===true)
+              await request('/upload/'+id+'/part','PUT',binary,true,i);
+            else
+              await request('/upload/'+id+'/'+i,'PUT',binary,true);
             return;
           }catch(err){
             if(err.status===400||err.status===401||err.status===403)throw err;
@@ -1812,7 +1816,8 @@
         'Открой Telegram-бота, проверь общий текст и ответь /ok. '+
         'Если готовый MP4 больше лимита Telegram, скачай его здесь.';
       progress.value=100;
-      await clearPendingFiles(id);
+      // Avoid leaving a stale local copy if its write finishes after upload.
+      cacheTask.then(function(){return clearPendingFiles(id)}).catch(function(){});
       refreshProjectStatus();
     }catch(err){
       status.textContent='⚠️ '+(err.message||err);
