@@ -111,7 +111,7 @@
       <div class="logo">🎬</div>
       <div><h1>Мой AI Монтажёр</h1><div class="tiny">Твои видео. Твой стиль.</div></div>
     </div>
-    <span class="tiny">Reels Studio · 28.11-R7</span>
+    <span class="tiny">Reels Studio · 28.11-R8</span>
   </div>
   <section id="projectStatusCard" class="card" style="margin-bottom:16px" hidden aria-label="Статус последнего монтажа">
     <h3 style="margin-top:0">📍 Статус последнего монтажа</h3>
@@ -426,8 +426,10 @@
       <button class="btn secondary" id="uploadSpeedProbe" type="button" style="width:100%;margin-top:10px">⚡ Проверить скорость загрузки</button>
       <p class="mini" id="uploadProbeResult" role="status" aria-live="polite">Тест отправляет 8 МБ служебных данных, без твоих видео.</p>
       <a id="workerHealthLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none">Открыть /health в Safari</a>
-      <button class="btn primary" id="sendViaTelegram" type="button" style="width:100%;margin-top:12px">✈️ Отправить видео через Telegram</button>
-      <p class="mini" id="telegramDirectStatus" role="status" aria-live="polite">Сохраним оформление, откроем чат бота. После сообщения «Настройки монтажа приняты» отправь видео как файл.</p>
+      <button class="btn primary" id="sendViaYandex" type="button" style="width:100%;margin-top:12px">☁️ Отправить через Яндекс Диск</button>
+      <p class="mini">До 1 ГБ на видео. После сохранения оформления пришли боту ссылку на файл с Диска. Доступ по ссылке открыт всем, у кого она есть; отключи его после подтверждения скачивания.</p>
+      <button class="btn secondary" id="sendViaTelegram" type="button" style="width:100%;margin-top:12px">✈️ Отправить видео через Telegram</button>
+      <p class="mini" id="telegramDirectStatus" role="status" aria-live="polite">Яндекс Диск — без новых ключей. Прямая отправка видео в Telegram без API ID и API HASH ограничена 20 МБ.</p>
       <button class="btn secondary" id="upload50Button" type="button" style="width:100%;margin-top:12px">☁️ Загрузить через Cloudflare</button>
       <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
       <p class="mini" id="upload50Status" role="status" aria-live="polite">До 500 МБ работает KV. Для видео до 3 ГБ нужен бесплатный Worker v9 с Durable Objects VIDEO_SHARDS. Файл передаётся частями без сжатия.</p>
@@ -1497,10 +1499,11 @@
   // Video up to 10 minutes. KV <=500MB; free SQLite Durable Objects up to 3GB.
   // Обычный Bot API не скачивает больше 20 MB: здесь он не используется
   // для исходника. Размер частей 4 MB и поочерёдная отправка с iPad.
-  byId('sendViaTelegram').addEventListener('click',async function(){
-    var button=this,out=byId('telegramDirectStatus'),fallback=byId('upload50Button');
-    if(button.disabled||fallback.disabled)return;
-    button.disabled=true;fallback.disabled=true;
+  async function sendExternalProject(transport,button){
+    var out=byId('telegramDirectStatus'),fallback=byId('upload50Button');
+    var controls=[byId('sendViaYandex'),byId('sendViaTelegram'),fallback];
+    if(controls.some(function(x){return x.disabled}))return;
+    controls.forEach(function(x){x.disabled=true});
     var controller=new AbortController(),timer=setTimeout(function(){controller.abort()},45000);
     try{
       if(ratio!=='9:16')throw new Error('Для Reels выбери вертикальный формат 9:16.');
@@ -1510,7 +1513,7 @@
       if(settings.mode==='reference')throw new Error('Выбери «Мой стиль», без второго видео-референса.');
       out.textContent='Сохраняю настройки и запускаю ожидание видео…';
       var old=loadLastProject();
-      if(old&&old.transport==='telegram'&&old.url===url&&Date.now()-old.created<1800000){
+      if(old&&['telegram','yandex'].includes(old.transport)&&old.url===url&&Date.now()-old.created<1800000){
         var check=await fetch(url+'/upload/'+old.id+'/status',{headers:{'X-Telegram-Init-Data':auth},signal:controller.signal,cache:'no-store'});
         if(check.ok){
           var prior=await check.json();
@@ -1521,20 +1524,22 @@
       }
       var response=await fetch(url+'/telegram/start',{
         method:'POST',headers:{'X-Telegram-Init-Data':auth,'Content-Type':'application/json'},
-        body:JSON.stringify({settings:settings}),signal:controller.signal,cache:'no-store'
+        body:JSON.stringify({settings:settings,transport:transport}),signal:controller.signal,cache:'no-store'
       });
       var data=await response.json();
       if(!response.ok||!data.started||!data.upload_id)throw new Error(data.error||'Сервер не подтвердил запуск.');
-      try{localStorage.setItem('personalEditorLastUpload',JSON.stringify({id:data.upload_id,url:url,transport:'telegram',settings:JSON.stringify(settings),created:Date.now()}))}catch(ignore){}
-      out.textContent='✅ Настройки сохранены. Дождись сообщения бота и отправь видео как файл.';
+      try{localStorage.setItem('personalEditorLastUpload',JSON.stringify({id:data.upload_id,url:url,transport:transport,settings:JSON.stringify(settings),created:Date.now()}))}catch(ignore){}
+      out.textContent=transport==='yandex'?'✅ Настройки сохранены. Дождись сообщения бота и отправь ссылку на видео с Яндекс Диска.':'✅ Настройки сохранены. Дождись сообщения бота и отправь видео как файл.';
       if(tg&&typeof tg.disableClosingConfirmation==='function')tg.disableClosingConfirmation();
       if(tg&&typeof tg.close==='function')tg.close();
     }catch(err){
       out.textContent='⚠️ '+(err.message||err);
     }finally{
-      clearTimeout(timer);button.disabled=false;fallback.disabled=false;
+      clearTimeout(timer);controls.forEach(function(x){x.disabled=false});
     }
-  });
+  }
+  byId('sendViaTelegram').addEventListener('click',function(){sendExternalProject('telegram',this)});
+  byId('sendViaYandex').addEventListener('click',function(){sendExternalProject('yandex',this)});
   byId('upload50Button').addEventListener('click',async function(){
     var btn=byId('upload50Button');
     var status=byId('upload50Status');
