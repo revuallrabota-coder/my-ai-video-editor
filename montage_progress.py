@@ -14,7 +14,7 @@ import requests
 
 LOG=logging.getLogger("montage_progress")
 STAGES=frozenset((
-    "queued","downloading","joining","transcribing","review",
+    "queued","waiting_telegram","downloading","joining","transcribing","review",
     "planning","rendering","publishing","done","failed",
 ))
 
