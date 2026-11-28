@@ -1170,14 +1170,35 @@
       Array.isArray(record.videos)&&Array.isArray(record.assets)&&
       uploadFingerprint(record.videos,record.assets)===project.fingerprint);
   }
+  function packPendingFile(file){
+    return {name:file.name,type:file.type,lastModified:file.lastModified,size:file.size,
+      blob:file.slice(0,file.size,file.type)};
+  }
+  function unpackPendingFile(entry){
+    if(entry instanceof File)return entry; // previous cache format
+    if(!entry||!(entry.blob instanceof Blob)||entry.blob.size!==entry.size)
+      throw new Error('Локальная копия файла повреждена');
+    return new File([entry.blob],entry.name,{type:entry.type,lastModified:entry.lastModified});
+  }
+  function unpackPendingRecord(record){
+    if(!record)return null;
+    return {...record,videos:record.videos.map(unpackPendingFile),
+      assets:record.assets.map(unpackPendingFile)};
+  }
   async function cachePendingFiles(project,videos,assets){
     var record={id:project.id,url:project.url,created:project.created,
       videos:videos.slice(),assets:assets.slice()};
     pendingMemory=record;
     try{
-      await pendingCache('readwrite',function(store){store.put(record,'current')});
+      var stored={...record,videos:videos.map(packPendingFile),assets:assets.map(packPendingFile)};
+      await pendingCache('readwrite',function(store){store.put(stored,'current')});
+      var check=await pendingCache('readonly',function(store,set){
+        var q=store.get('current');q.onsuccess=function(){set(q.result)};
+      });
+      if(!matchingPayload(unpackPendingRecord(check),project))throw new Error('Не удалось проверить локальную копию');
+      pendingMemory.persisted=true;
       return true;
-    }catch(err){return false}
+    }catch(err){record.persisted=false;return false}
   }
   async function readPendingFiles(project){
     if(matchingPayload(pendingMemory,project))return pendingMemory;
@@ -1185,12 +1206,13 @@
       var record=await pendingCache('readonly',function(store,set){
         var q=store.get('current');q.onsuccess=function(){set(q.result)};
       });
-      if(matchingPayload(record,project)){pendingMemory=record;return record}
+      record=unpackPendingRecord(record);
+      if(matchingPayload(record,project)){record.persisted=true;pendingMemory=record;return record}
     }catch(ignore){}
     return null;
   }
   async function clearPendingFiles(id){
-    if(pendingMemory&&(!id||pendingMemory.id===id))pendingMemory=null;
+    if(pendingMemory&&((id&&pendingMemory.id===id)||Date.now()-pendingMemory.created>=71*60*60*1000))pendingMemory=null;
     try{
       await pendingCache('readwrite',function(store){
         var q=store.get('current');
@@ -1440,6 +1462,7 @@
     var progress=byId('upload50Progress');
     if(btn.disabled)return;
     btn.disabled=true;
+    byId('resumePendingUpload').hidden=true;
     try{
       var url=connectedWorkerURL();
       var auth=telegramProof();
@@ -1475,6 +1498,13 @@
           throw new Error("Не удалось подготовить фотографии. Обнови Mini App.");
         var picturePack=await makeCarouselPhotoZip(photoInput.files);
         assets.push(picturePack);
+      }
+      var fingerprint=uploadFingerprint(videos,assets);
+      var old=loadLastProject();
+      var sameProject=!!(old&&old.url===url&&old.fingerprint===fingerprint&&
+        Date.now()-old.created<71*60*60*1000);
+      if(sameProject&&!requestedResume){
+        settings=JSON.parse(old.settings);
       }
       var assetSize=assets.reduce(function(sum,file){return sum+file.size},0);
       if(assets.length>4 || assetSize>100000000)
@@ -1512,13 +1542,28 @@
             if(controller.signal.aborted)throw err;
             if(response.ok)throw new Error('Cloudflare вернул некорректный ответ.');
           }
-          if(!response.ok)throw new Error(data.error||('Cloudflare ответил HTTP '+response.status));
+          if(!response.ok){
+            var httpError=new Error(data.error||('Cloudflare ответил HTTP '+response.status));
+            httpError.status=response.status;throw httpError;
+          }
           return data;
         }catch(err){
           if(controller.signal.aborted)throw new Error('Cloudflare не ответил за '+(requestTimeout/1000)+' секунд ('+path.split('/').slice(-1)[0]+'). Нажми «Смонтировать Reels» повторно.');
           throw err;
         }finally{clearTimeout(timer)}
 
+      }
+      async function readUploadStatus(id){
+        var last;
+        for(var attempt=0;attempt<3;attempt++){
+          try{return await request('/upload/'+id+'/status','GET')}
+          catch(err){
+            last=err;
+            if(err.status===400||err.status===401||err.status===403)throw err;
+            if(attempt<2)await new Promise(function(resolve){setTimeout(resolve,1500*(attempt+1))});
+          }
+        }
+        throw last;
       }
       status.textContent='Проверяю, что Cloudflare поддерживает выбранный стиль…';
       var workerHealth=await request('/health','GET');
@@ -1573,16 +1618,14 @@
           });
         }
       });
-      var fingerprint=uploadFingerprint(videos,assets);
-      var old=null,signature=JSON.stringify(settings);
-      try{old=JSON.parse(localStorage.getItem('personalEditorLastUpload')||'null')}catch(ignore){}
+      var signature=JSON.stringify(settings);
       if(requestedResume && (!old || old.id!==requestedResume.id || old.fingerprint!==fingerprint || old.url!==url))
         throw new Error('Исходники или адрес сервера изменились; прежний проект не возобновлён.');
       var id=null,partSize=4000000,parts=0,completed=new Set();
       if(old && old.url===url && old.fingerprint===fingerprint &&
           old.settings===signature && Date.now()-old.created<71*60*60*1000){
         try{
-          var resumed=await request('/upload/'+old.id+'/status','GET');
+          var resumed=await readUploadStatus(old.id);
           if(resumed.input_size===totalSize && resumed.state==='uploading' &&
              resumed.input_parts===uploadParts.length &&
              resumed.accepted_talk_scene===settings.talk_scene &&
@@ -1607,8 +1650,18 @@
               refreshProjectStatus();
               return;
             }
+          }else{
+            throw new Error('Сервер не подтвердил прежний проект. Загрузка с нуля не запущена.');
           }
-        }catch(err){ if(requestedResume)throw err; /* ordinary new project may start again */ }
+        }catch(err){
+          // Never convert a timeout, VPN drop, 429, or 5xx into a fresh project.
+          if(!requestedResume&&err.status===404&&window.confirm('Старый проект не найден после трёх проверок. Начать новую загрузку с нуля?')){
+            await clearPendingFiles(old.id);
+          }else{
+            throw new Error('Прежняя загрузка сохранена. '+(err.message||err)+
+              ' Нажми «Продолжить загрузку» после восстановления связи.');
+          }
+        }
       }
       if(requestedResume&&!id)throw new Error('Старый проект уже не доступен для продолжения. Проверь его статус.');
       if(!id){
@@ -1642,19 +1695,21 @@
       }
       byId('checkUploadedResult').hidden=true;
       var cacheProject=loadLastProject();
-      if(cacheProject&&cacheProject.id===id&&!matchingPayload(pendingMemory,cacheProject)){
+      var cacheOK=!!(pendingMemory&&pendingMemory.persisted&&matchingPayload(pendingMemory,cacheProject));
+      if(cacheProject&&cacheProject.id===id&&!cacheOK){
         status.textContent='Сохраняю исходники на устройстве для продолжения после закрытия…';
-        var cacheOK=await cachePendingFiles(cacheProject,videos,assets);
+        cacheOK=await cachePendingFiles(cacheProject,videos,assets);
         if(!cacheOK)status.textContent='iPad не разрешил сохранить исходники. Загрузка продолжится, но после закрытия может потребоваться выбор файла.';
       }
       progress.value=Math.round(completed.size*100/parts);
-      status.textContent='📤 Начинаю загрузку: '+completed.size+'/'+parts+' частей. Не закрывай приложение до 100%.';
+      status.textContent='📤 Продолжаю загрузку: '+completed.size+'/'+parts+' частей.'+
+        (cacheOK?' Исходники сохранены на устройстве.':' Не закрывай приложение: локальная копия не подтверждена.');
       var concurrency=workerHealth.durable_storage_configured?6:workerHealth.large_storage_configured?3:1;
       var shardSize=workerHealth.durable_storage_configured?100:0;
       var transferred=0;
       completed.forEach(function(i){var p=uploadParts[i];if(p)transferred+=p.end-p.start});
       var initialBytes=transferred,startedAt=Date.now(),allBytes=totalSize+assetSize;
-      await transferUploadParts(parts,completed,concurrency,async function(i){
+      async function sendUploadPart(i){
         var piece=uploadParts[i];
         var file=piece.archiveIndex===undefined
           ? videos[piece.clipIndex] : assets[piece.archiveIndex];
@@ -1664,12 +1719,13 @@
             await request('/upload/'+id+'/'+i,'PUT',chunk,true);
             return;
           }catch(err){
-            if(tries===3)throw new Error('Не удалось передать часть '+(i+1)+
-              '. Повторно нажми «Смонтировать Reels», загрузка продолжится. '+err.message);
+            if(err.status===400||err.status===401||err.status===403)throw err;
+            if(tries===3){err.message='Не удалось передать часть '+(i+1)+'. '+err.message;throw err;}
             await new Promise(function(resolve){setTimeout(resolve,(tries+1)*1200)});
           }
         }
-      },function(i){
+      }
+      function showUploadedPart(i){
         var piece=uploadParts[i];
         transferred+=piece.end-piece.start;
         progress.value=Math.floor(transferred*100/allBytes);
@@ -1678,7 +1734,29 @@
         status.textContent='📤 '+progress.value+'% · '+fmtBytes(transferred)+' / '+fmtBytes(allBytes)+
           ' · части '+completed.size+'/'+parts+
           (elapsed>=2&&speed>0?' · '+(speed/1000000).toFixed(2)+' МБ/с':'');
-      },shardSize);
+      }
+      for(var round=0;round<3;round++){
+        try{
+          await transferUploadParts(parts,completed,concurrency,sendUploadPart,showUploadedPart,shardSize);
+          break;
+        }catch(err){
+          if(round===2||[400,401,403].includes(err.status))throw err;
+          status.textContent='Связь прервалась. Сохраняю '+completed.size+'/'+parts+
+            ' частей и автоматически восстанавливаю соединение…';
+          await new Promise(function(resolve){setTimeout(resolve,3000*(round+1))});
+          var remote=await readUploadStatus(id);
+          if(remote.state!=='uploading')throw new Error('Состояние проекта изменилось. Проверь этап монтажа.');
+          completed=new Set((remote.uploaded_parts||[]).filter(function(i){
+            return Number.isInteger(i)&&i>=0&&i<parts;
+          }));
+          transferred=0;
+          completed.forEach(function(i){var p=uploadParts[i];transferred+=p.end-p.start});
+          initialBytes=transferred;startedAt=Date.now();
+          progress.value=Math.floor(transferred*100/allBytes);
+          concurrency=Math.max(1,Math.floor(concurrency/2));
+          status.textContent='↩️ Продолжаю тот же проект: '+completed.size+'/'+parts+' частей.';
+        }
+      }
       status.textContent='Проверяю целостность файла и запускаю GitHub Actions…';
       var response;
       for(var retries=0;retries<10;retries++){
@@ -1707,7 +1785,7 @@
       status.textContent='⚠️ '+(err.message||err);
     }finally{
       btn.disabled=false;
-      if(requestedResume)refreshProjectStatus();
+      refreshProjectStatus();
     }
   });
 
