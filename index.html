@@ -111,7 +111,7 @@
       <div class="logo">🎬</div>
       <div><h1>Мой AI Монтажёр</h1><div class="tiny">Твои видео. Твой стиль.</div></div>
     </div>
-    <span class="tiny">Reels Studio · 28.11-R5</span>
+    <span class="tiny">Reels Studio · 28.11-R6</span>
   </div>
   <section id="projectStatusCard" class="card" style="margin-bottom:16px" hidden aria-label="Статус последнего монтажа">
     <h3 style="margin-top:0">📍 Статус последнего монтажа</h3>
@@ -423,6 +423,8 @@
       <input id="launcherBase" type="url" inputmode="url" autocomplete="off" placeholder="https://твой-worker.workers.dev" style="width:100%;max-width:100%">
       <button class="btn secondary" id="checkWorkerConnection" type="button" style="width:100%;margin-top:10px">🔍 Проверить подключённый Cloudflare</button>
       <p class="mini" id="workerConnectionResult" role="status" aria-live="polite">Нажми проверку: покажу адрес и версию Worker, к которому подключено приложение.</p>
+      <button class="btn secondary" id="uploadSpeedProbe" type="button" style="width:100%;margin-top:10px">⚡ Проверить скорость загрузки</button>
+      <p class="mini" id="uploadProbeResult" role="status" aria-live="polite">Тест отправляет 8 МБ служебных данных, без твоих видео.</p>
       <a id="workerHealthLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none">Открыть /health в Safari</a>
       <button class="btn primary" id="upload50Button" type="button" style="width:100%;margin-top:12px">🎬 Смонтировать Reels</button>
       <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
@@ -1078,6 +1080,41 @@
     catch(err){byId('workerConnectionResult').textContent='⚠️ '+String(err.message||err)}
     finally{button.disabled=false}
   });
+  byId('uploadSpeedProbe').addEventListener('click',async function(){
+    var button=this,out=byId('uploadProbeResult');
+    if(button.disabled||byId('upload50Button').disabled)return;
+    button.disabled=true;
+    out.style.whiteSpace='pre-line';
+    try{
+      var url=connectedWorkerURL(),proof=telegramProof();
+      var bytes=new Uint8Array(4000000);
+      for(var i=0;i<bytes.length;i+=65536)crypto.getRandomValues(bytes.subarray(i,Math.min(i+65536,bytes.length)));
+      async function probe(storage){
+        var controller=new AbortController(),timer=setTimeout(function(){controller.abort()},180000);
+        var start=performance.now();
+        try{
+          var res=await fetch(url+'/upload/probe?storage='+(storage?1:0),{
+            method:'PUT',headers:{'X-Telegram-Init-Data':proof},body:bytes,
+            cache:'no-store',signal:controller.signal
+          });
+          var result=await res.json();
+          if(!res.ok||result.bytes!==bytes.length)throw new Error(result.error||'Нужен обновлённый Cloudflare Worker');
+          result.seconds=Math.max(.001,(performance.now()-start)/1000);
+          return result;
+        }finally{clearTimeout(timer)}
+      }
+      out.textContent='Тест 1/2: отправляю 4 МБ напрямую, без записи…';
+      var a=await probe(false);
+      out.textContent='Тест 2/2: проверяю отправку и запись 4 МБ в облако…';
+      var b=await probe(true);
+      var speed=4/a.seconds;
+      out.textContent='Версия 28.11-R6\nОтправка без записи: '+speed.toFixed(2)+' МБ/с ('+a.seconds.toFixed(1)+' с)'+
+        '\nОтправка с записью: '+(4/b.seconds).toFixed(2)+' МБ/с ('+b.seconds.toFixed(1)+' с)'+
+        '\nЗапись на сервере: '+(Number.isFinite(b.storage_ms)?(b.storage_ms/1000).toFixed(2)+' с':'не измерена')+
+        '\nДля 430 МБ при скорости первого теста: около '+Math.ceil(430/speed/60)+' мин (один поток).';
+    }catch(err){out.textContent='Тест не завершён: '+(err.message||err)+'. Проверь связь и версию Worker.'}
+    finally{button.disabled=false}
+  });
   launcherInput.addEventListener('input',function(){
     byId('workerConnectionResult').textContent=
       'Адрес изменён. Нажми «Проверить подключённый Cloudflare».';
@@ -1726,6 +1763,7 @@
       var transferred=0;
       completed.forEach(function(i){var p=uploadParts[i];if(p)transferred+=p.end-p.start});
       var initialBytes=transferred,startedAt=Date.now(),allBytes=totalSize+assetSize;
+      var lastStorageMs=null;
       async function sendUploadPart(i){
         var piece=uploadParts[i];
         var file=piece.archiveIndex===undefined
@@ -1740,10 +1778,12 @@
           throw new Error('Локальная часть '+(i+1)+' прочитана не полностью.');
         for(var tries=0;tries<4;tries++){
           try{
+            var receipt;
             if(workerHealth.shared_upload_endpoint===true)
-              await request('/upload/'+id+'/part','PUT',binary,true,i);
+              receipt=await request('/upload/'+id+'/part','PUT',binary,true,i);
             else
-              await request('/upload/'+id+'/'+i,'PUT',binary,true);
+              receipt=await request('/upload/'+id+'/'+i,'PUT',binary,true);
+            if(Number.isFinite(receipt.storage_ms))lastStorageMs=receipt.storage_ms;
             return;
           }catch(err){
             if(err.status===400||err.status===401||err.status===403)throw err;
@@ -1761,6 +1801,7 @@
         status.textContent='📤 '+progress.value+'% · '+fmtBytes(transferred)+' / '+fmtBytes(allBytes)+
           ' · части '+completed.size+'/'+parts+
           (elapsed>=2&&speed>0?' · '+(speed/1000000).toFixed(2)+' МБ/с':'')+
+          (lastStorageMs===null?'':' · запись '+(lastStorageMs/1000).toFixed(2)+' с')+
           (cacheOK?' · исходники сохранены':' · не закрывай окно: копия не сохранена');
       }
       for(var round=0;round<3;round++){
