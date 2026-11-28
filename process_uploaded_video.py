@@ -55,6 +55,8 @@ def read_chunked_project(
             time.sleep(min(3 + attempt * 2, 15))
     if not isinstance(meta, dict):
         raise RuntimeError("Не удалось получить файлы из Cloudflare.")
+    if meta.get("transport")=="telegram":
+        return meta, []
     storage = meta.get("storage","kv")
     if storage not in ("kv","r2","do"):
         raise ValueError("Неизвестный тип хранилища проекта.")
@@ -304,6 +306,75 @@ def wait_for_transcript_review(
     raise TimeoutError("Не получено подтверждение субтитров за 15 минут.")
 
 
+
+def receive_telegram_source(token,owner,folder,stage):
+    """Accept one new owner video in the current serialized montage job."""
+    import asyncio
+    from bot_api_editor import select_video, download_video
+    api_id=os.environ.get("TELEGRAM_API_ID","").strip()
+    api_hash=os.environ.get("TELEGRAM_API_HASH","").strip()
+    large_ready=bool(api_id and api_hash)
+    if large_ready and (not api_id.isdigit() or not re.fullmatch(r"[a-fA-F0-9]{32}",api_hash)):
+        raise ValueError("Проверь TELEGRAM_API_ID и TELEGRAM_API_HASH в GitHub.")
+    folder.mkdir(parents=True,exist_ok=True)
+    prompt=call_api(token,"sendMessage",{"chat_id":owner,"text":
+        "✅ Настройки монтажа приняты. Пришли ОДНО исходное видео как файл (без сжатия). "
+        +("До 3 ГБ, если Telegram позволяет такой размер. " if large_ready else
+          "Пока доступно до 20 МБ. Для больших файлов нужно добавить TELEGRAM_API_ID и TELEGRAM_API_HASH в GitHub. ")
+        +"После отправки можешь закрыть приложение. /cancel — отмена. Ожидаю 30 минут."})
+    min_id=int(prompt["message_id"])
+    deadline=time.monotonic()+1800
+    offset=None
+    while time.monotonic()<deadline:
+        args={"limit":30,"timeout":15,"allowed_updates":'["message"]'}
+        if offset is not None:args["offset"]=offset
+        updates=call_api(token,"getUpdates",args,timeout=35)
+        for update in updates:
+            offset=update["update_id"]+1
+            msg=update.get("message",{})
+            if (msg.get("from",{}).get("id")!=owner or msg.get("chat",{}).get("id")!=owner
+                or msg.get("chat",{}).get("type")!="private" or msg.get("message_id",0)<=min_id):
+                continue
+            if str(msg.get("text","")).strip().lower()=="/cancel":
+                raise ValueError("Загрузка через Telegram отменена.")
+            media=select_video(msg)
+            if not media:continue
+            size=int(media.get("file_size") or 0)
+            if not 4096<=size<=MAX_DO_BYTES:
+                send_text(token,owner,"Пришли видео от 4 КБ до 3 ГБ.")
+                continue
+            if size>20_000_000 and not large_ready:
+                send_text(token,owner,"Для этого размера нужны TELEGRAM_API_ID и TELEGRAM_API_HASH. Сейчас можно прислать файл до 20 МБ или отменить /cancel.")
+                continue
+            suffix=Path(media.get("file_name") or "source.mp4").suffix.lower()
+            if suffix not in (".mp4",".mov",".m4v",".webm",".mkv"):suffix=".mp4"
+            target=folder/("clip_001"+suffix)
+            stage("downloading","Скачиваю исходник с серверов Telegram.")
+            send_text(token,owner,"📥 Видео получено. Теперь сервер скачивает его сам, мини-приложение не нужно.")
+            if size<=20_000_000:
+                download_video(token,media["file_id"],target)
+            else:
+                async def fetch_source():
+                    from telethon import TelegramClient
+                    from telethon.sessions import MemorySession
+                    client=TelegramClient(MemorySession(),int(api_id),api_hash,receive_updates=False)
+                    await client.start(bot_token=token)
+                    try:
+                        original=await client.get_messages(None,ids=int(msg["message_id"]))
+                        if (not original or original.sender_id!=owner or not original.is_private
+                                or not original.file or original.file.size!=size):
+                            raise ValueError("Не удалось подтвердить исходное сообщение Telegram.")
+                        result=await client.download_media(original,file=str(target))
+                        if not result:raise RuntimeError("Telegram не вернул исходный файл.")
+                    finally:
+                        await client.disconnect()
+                asyncio.run(fetch_source())
+            if not target.is_file() or target.stat().st_size!=size:
+                raise RuntimeError("Исходник Telegram скачан не полностью.")
+            return target
+    raise TimeoutError("Видео не получено за 30 минут. Запусти отправку заново.")
+
+
 def main() -> None:
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     owner = int(os.environ["OWNER_TELEGRAM_ID"])
@@ -322,14 +393,16 @@ def main() -> None:
         out = root/"finished-reels.mp4"
         try:
             stage("downloading","📥 Скачиваю все исходные видео в монтаж.")
-            send_text(token,owner,"📥 Получаю исходные видео через защищённый Cloudflare.")
             metadata,clips=read_chunked_project(
                 worker_url,upload_id,token,root/"source_clips"
             )
             # This is critical for 3 GB on the Free plan's 5 GB TOTAL DO
             # storage. The verified source files are now local to GitHub;
             # free the remote shards BEFORE generating/uploading the master.
-            if metadata.get("storage")=="do":
+            if metadata.get("transport")=="telegram":
+                stage("waiting_telegram","Ожидаю исходное видео в чате Telegram.")
+                clips=[receive_telegram_source(token,owner,root/"source_clips",stage)]
+            elif metadata.get("storage")=="do":
                 release_upload(worker_url,upload_id,token)
                 send_text(token,owner,
                     "🧹 Исходники загружены на сервер монтажа. "
