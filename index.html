@@ -111,7 +111,7 @@
       <div class="logo">🎬</div>
       <div><h1>Мой AI Монтажёр</h1><div class="tiny">Твои видео. Твой стиль.</div></div>
     </div>
-    <span class="tiny">Reels Studio · 28.11-R6</span>
+    <span class="tiny">Reels Studio · 28.11-R7</span>
   </div>
   <section id="projectStatusCard" class="card" style="margin-bottom:16px" hidden aria-label="Статус последнего монтажа">
     <h3 style="margin-top:0">📍 Статус последнего монтажа</h3>
@@ -426,7 +426,9 @@
       <button class="btn secondary" id="uploadSpeedProbe" type="button" style="width:100%;margin-top:10px">⚡ Проверить скорость загрузки</button>
       <p class="mini" id="uploadProbeResult" role="status" aria-live="polite">Тест отправляет 8 МБ служебных данных, без твоих видео.</p>
       <a id="workerHealthLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none">Открыть /health в Safari</a>
-      <button class="btn primary" id="upload50Button" type="button" style="width:100%;margin-top:12px">🎬 Смонтировать Reels</button>
+      <button class="btn primary" id="sendViaTelegram" type="button" style="width:100%;margin-top:12px">✈️ Отправить видео через Telegram</button>
+      <p class="mini" id="telegramDirectStatus" role="status" aria-live="polite">Сохраним оформление, откроем чат бота. После сообщения «Настройки монтажа приняты» отправь видео как файл.</p>
+      <button class="btn secondary" id="upload50Button" type="button" style="width:100%;margin-top:12px">☁️ Загрузить через Cloudflare</button>
       <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
       <p class="mini" id="upload50Status" role="status" aria-live="polite">До 500 МБ работает KV. Для видео до 3 ГБ нужен бесплатный Worker v9 с Durable Objects VIDEO_SHARDS. Файл передаётся частями без сжатия.</p>
       <button class="btn secondary" id="checkUploadedResult" type="button" style="width:100%;margin-top:8px" hidden>⬇️ Скачать готовое Full HD</button>
@@ -612,7 +614,7 @@
       ? ('🎬 '+selectedClips.length+' видео · '+fmtBytes(total)+
          ' · до 10 минут · '+(total>500000000?'нужен Worker v9 с Durable Objects':'обычное KV')+
          (warning?' ⚠️ Превышен лимит 3 ГБ!':''))
-      : 'Видео пока не выбраны. Добавь исходники выше.';
+      : 'Видео можно отправить в чат Telegram после выбора оформления. Для Cloudflare добавь исходники здесь.';
     selectedClips.forEach(function(file,index){
       var item=document.createElement('div');
       item.style.cssText='display:flex;align-items:center;gap:6px;'+
@@ -997,7 +999,7 @@
     });
   });
   function go(dir){
-    if(dir>0 && current===0 && !selectedClips.length){alert('Сначала выбери хотя бы одно видео.');return}
+    // Video selection is optional for direct Telegram delivery; Cloudflare validates files at upload time.
     current=Math.max(0,Math.min(3,current+dir));draw();
   }
   byId('back').addEventListener('click',function(){go(-1)});
@@ -1162,6 +1164,7 @@
   var processingStages={
     uploading:['Загрузка исходников',0],
     queued:['Очередь монтажа',1],
+    waiting_telegram:['Ожидаю видео в Telegram',1],
     downloading:['Скачивание на сервер',2],
     joining:['Склейка видео',3],
     transcribing:['Распознавание речи',4],
@@ -1494,6 +1497,44 @@
   // Video up to 10 minutes. KV <=500MB; free SQLite Durable Objects up to 3GB.
   // Обычный Bot API не скачивает больше 20 MB: здесь он не используется
   // для исходника. Размер частей 4 MB и поочерёдная отправка с iPad.
+  byId('sendViaTelegram').addEventListener('click',async function(){
+    var button=this,out=byId('telegramDirectStatus'),fallback=byId('upload50Button');
+    if(button.disabled||fallback.disabled)return;
+    button.disabled=true;fallback.disabled=true;
+    var controller=new AbortController(),timer=setTimeout(function(){controller.abort()},45000);
+    try{
+      if(ratio!=='9:16')throw new Error('Для Reels выбери вертикальный формат 9:16.');
+      if(selectedAssetPacks.length||photoInput.files.length)
+        throw new Error('Собственные ZIP и фото для карусели пока отправляются через Cloudflare. Встроенные стили доступны в Telegram.');
+      var settings=buildRenderSettings(),url=connectedWorkerURL(),auth=telegramProof();
+      if(settings.mode==='reference')throw new Error('Выбери «Мой стиль», без второго видео-референса.');
+      out.textContent='Сохраняю настройки и запускаю ожидание видео…';
+      var old=loadLastProject();
+      if(old&&old.transport==='telegram'&&old.url===url&&Date.now()-old.created<1800000){
+        var check=await fetch(url+'/upload/'+old.id+'/status',{headers:{'X-Telegram-Init-Data':auth},signal:controller.signal,cache:'no-store'});
+        if(check.ok){
+          var prior=await check.json();
+          if(!['done','failed'].includes(prior.stage)){
+            throw new Error('Предыдущая отправка ещё активна. Вернись в чат бота: там можно отправить видео или отменить /cancel.');
+          }
+        }else if(check.status!==404)throw new Error('Не удалось проверить предыдущее задание.');
+      }
+      var response=await fetch(url+'/telegram/start',{
+        method:'POST',headers:{'X-Telegram-Init-Data':auth,'Content-Type':'application/json'},
+        body:JSON.stringify({settings:settings}),signal:controller.signal,cache:'no-store'
+      });
+      var data=await response.json();
+      if(!response.ok||!data.started||!data.upload_id)throw new Error(data.error||'Сервер не подтвердил запуск.');
+      try{localStorage.setItem('personalEditorLastUpload',JSON.stringify({id:data.upload_id,url:url,transport:'telegram',settings:JSON.stringify(settings),created:Date.now()}))}catch(ignore){}
+      out.textContent='✅ Настройки сохранены. Дождись сообщения бота и отправь видео как файл.';
+      if(tg&&typeof tg.disableClosingConfirmation==='function')tg.disableClosingConfirmation();
+      if(tg&&typeof tg.close==='function')tg.close();
+    }catch(err){
+      out.textContent='⚠️ '+(err.message||err);
+    }finally{
+      clearTimeout(timer);button.disabled=false;fallback.disabled=false;
+    }
+  });
   byId('upload50Button').addEventListener('click',async function(){
     var btn=byId('upload50Button');
     var status=byId('upload50Status');
