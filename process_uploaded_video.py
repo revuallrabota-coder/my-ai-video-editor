@@ -55,7 +55,7 @@ def read_chunked_project(
             time.sleep(min(3 + attempt * 2, 15))
     if not isinstance(meta, dict):
         raise RuntimeError("Не удалось получить файлы из Cloudflare.")
-    if meta.get("transport")=="telegram":
+    if meta.get("transport") in ("telegram","yandex"):
         return meta, []
     storage = meta.get("storage","kv")
     if storage not in ("kv","r2","do"):
@@ -399,7 +399,11 @@ def main() -> None:
             # This is critical for 3 GB on the Free plan's 5 GB TOTAL DO
             # storage. The verified source files are now local to GitHub;
             # free the remote shards BEFORE generating/uploading the master.
-            if metadata.get("transport")=="telegram":
+            if metadata.get("transport")=="yandex":
+                from yandex_source import receive_yandex_source
+                stage("waiting_telegram","Ожидаю ссылку на видео с Яндекс Диска.")
+                clips=[receive_yandex_source(token,owner,root/"source_clips",stage)]
+            elif metadata.get("transport")=="telegram":
                 stage("waiting_telegram","Ожидаю исходное видео в чате Telegram.")
                 clips=[receive_telegram_source(token,owner,root/"source_clips",stage)]
             elif metadata.get("storage")=="do":
