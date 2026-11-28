@@ -680,7 +680,7 @@ async function internalRoute(request,env,path) {
     return response({ok:true});
   }
   if (request.method==="DELETE" && operation==="release") {
-    if(meta.transport==="telegram"&&meta.parts===0)return response({released:true,next:0,has_more:false});
+    if(["telegram","yandex"].includes(meta.transport)&&meta.parts===0)return response({released:true,next:0,has_more:false});
     const from=Number(new URL(request.url).searchParams.get("from")??0);
     if (!Number.isSafeInteger(from) || from<0 || from>=meta.parts) {
       return response({error:"Bad cleanup cursor"},400);
@@ -728,12 +728,13 @@ async function uploadSpeedProbe(request,env){
 }
 async function startTelegramProject(request,env){
   const body=await readJSON(request);
+  const transport=body.transport==="yandex"?"yandex":"telegram";
   const settings=parseSettings(body.settings??{});
   if(settings.mode==="reference")return response({error:"Этот способ доступен для «Мой стиль», без второго референса."},400);
   const id=crypto.randomUUID(),now=Date.now();
   const storage=env.VIDEO_SHARDS?"do":env.VIDEO_FILES?"r2":"kv";
   const meta={id,size:0,parts:0,files:[],assets:[],asset_size:0,storage,
-    transport:"telegram",settings,state:"queued",created:now,expires_at:now+TTL*1000};
+    transport,settings,state:"queued",created:now,expires_at:now+TTL*1000};
   await env.UPLOADS.put(key(id,"meta"),JSON.stringify(meta),{expirationTtl:TTL});
   try{
     await dispatch("upload-video-50mb.yml",env.GITHUB_PAT,{
@@ -743,7 +744,7 @@ async function startTelegramProject(request,env){
     await env.UPLOADS.delete(key(id,"meta"));
     throw err;
   }
-  return response({upload_id:id,started:true,transport:"telegram",
+  return response({upload_id:id,started:true,transport,
     style_contract_version:CONTRACT},202);
 }
 async function publicRoute(request,env,path) {
@@ -869,6 +870,7 @@ export default {
         shared_upload_endpoint:true,
         upload_speed_probe:true,
         telegram_direct_project:true,
+        yandex_link_project:true,
         durable_storage_configured:Boolean(env.VIDEO_SHARDS),
         large_storage_configured:Boolean(env.VIDEO_SHARDS||env.VIDEO_FILES),
         storage_mode:env.VIDEO_SHARDS?"do":env.VIDEO_FILES?"r2":"kv",
