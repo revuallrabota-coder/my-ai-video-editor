@@ -111,7 +111,7 @@
       <div class="logo">🎬</div>
       <div><h1>Мой AI Монтажёр</h1><div class="tiny">Твои видео. Твой стиль.</div></div>
     </div>
-    <span class="tiny">Reels Studio · 28.11-R8</span>
+    <span class="tiny">Reels Studio · 28.11-R9</span>
   </div>
   <section id="projectStatusCard" class="card" style="margin-bottom:16px" hidden aria-label="Статус последнего монтажа">
     <h3 style="margin-top:0">📍 Статус последнего монтажа</h3>
@@ -124,7 +124,7 @@
     <button type="button" class="btn secondary" id="refreshMontageStatus" style="width:100%;margin:8px 0">🔄 Проверить этап монтажа</button>
     <a id="montageGithubRun" href="#" target="_blank" rel="noopener noreferrer" hidden>🔍 Открыть журнал задания GitHub Actions</a>
     <button type="button" class="btn primary" id="downloadMasterQuick" style="width:100%;margin:8px 0" hidden>⬇️ Скачать Full HD без перехода по шагам</button>
-    <p class="note">Когда бот подтвердит запуск монтажа, можно закрыть приложение: обработка продолжится в GitHub Actions. iPad может остановить передачу при закрытии окна. Для незавершённой загрузки нажми «Продолжить загрузку»: приложение попробует использовать сохранённые на устройстве исходники и настройки. Если iPad удалил локальные файлы, потребуется выбрать их снова. Уже полученные части не передаются повторно. Этапы придут в Telegram.</p>
+    <p class="note">Этапы монтажа и готовый ролик придут в Telegram. После подтверждения скачивания с Яндекс Диска можно закрыть монтажёр. Для незавершённой загрузки через Cloudflare используй кнопку продолжения, если она появится.</p>
   </section>
   <div class="progress" id="progress"></div>
 
@@ -132,8 +132,11 @@
     <h2>Мой стиль 💗</h2>
     <p class="note">Один монтаж для всех твоих роликов: склейка, вырезание пауз, скорость, шрифты, смысловые вставки и отправка в Telegram. Все параметры настраиваются отдельно.</p>
     <input type="radio" name="mode" value="Мой стиль" checked hidden>
-    <h3>Загрузи исходные видео</h3>
-    <p>Выбери несколько видео с iPad. <strong>До 10 минут суммарно</strong>. Видео свыше 500 МБ передаются через бесплатные Durable Objects: нужен Worker v9. До 3 ГБ на проект, без R2 и карты. Соединим их по порядку и смонтируем один Reels.</p>
+    <h3>Настрой монтаж</h3>
+    <p>Сначала выбери оформление. На последнем шаге отправишь ссылку на видео с Яндекс Диска. До 10 минут и 1 ГБ на видео.</p>
+    <details id="localSourceOptions" style="margin-top:12px">
+      <summary style="cursor:pointer;font-weight:650">Запасной способ: выбрать видео с устройства</summary>
+      <p class="note">Для Cloudflare: до 12 видео, до 3 ГБ суммарно. Для Яндекс Диска выбирать файлы здесь не нужно.</p>
     <label class="upload">
       <div class="emoji">📎</div>
       <strong>Выбрать несколько видео</strong>
@@ -148,6 +151,7 @@
     <div id="clipsList" aria-live="polite"></div>
     <p class="note">Кнопками ↑ и ↓ настрой порядок сцен. В монтаже сохраняется именно этот порядок. До 12 видео в одном проекте.</p>
     <video id="firstVideo" controls playsinline hidden></video>
+    </details>
     <!-- Старый отдельный референс убран: один согласованный монтажный конвейер. -->
     <div hidden aria-hidden="true"><input id="referenceVideo" type="file" accept="video/*">
       <span id="referenceInfo"></span><video id="referencePreview" hidden></video></div>
@@ -409,7 +413,7 @@
       <option value="balanced">720×1280 · быстрее для слабого сервера</option>
     </select>
     <p class="note">Full HD сохраняет больше деталей из качественного исходника, но дольше обрабатывается и требует мощного сервера. Если исходник 720p, увеличение разрешения не добавит настоящих деталей.</p>
-    <div class="alert">Видео действительно обрабатывается сервером только после подключения backend на последнем шаге. Сам этот экран лишь настраивает монтаж.</div>
+
   </section>
 
   <section class="card page" data-page="3">
@@ -417,8 +421,25 @@
     <p>Проверь выбранные параметры и запускай монтаж одной кнопкой. Стили и фильтры применяются к видео в обработчике GitHub Actions.</p>
     <div id="summary"></div>
     <div class="alert" style="margin:16px 0">
-      <strong>🎬 Монтаж видео · до 10 минут</strong>
-      <p class="note">Исходные ролики загрузятся частями. Бот пришлёт текст речи на проверку, а готовый Reels отправит прямо в Telegram. Большой исходный MP4 сохранится отдельно без лишнего сжатия, если поддерживает хранилище.</p>
+      <strong>🎬 Всё готово к монтажу</strong>
+      <p class="note">Сохрани оформление, затем пришли в чат бота ссылку на видео с Яндекс Диска. Одно видео до 1 ГБ и 10 минут. Бот пришлёт текст на проверку и готовый Reels.</p>
+      <button class="btn primary" id="sendViaYandex" type="button" style="width:100%;margin-top:12px">☁️ Отправить через Яндекс Диск</button>
+      <p class="mini" id="telegramDirectStatus" role="status" aria-live="polite">После подтверждения скачивания отключи общий доступ к видео на Диске.</p>
+      <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
+      <p class="mini" id="upload50Status" role="status" aria-live="polite"></p>
+      <button class="btn secondary" id="checkUploadedResult" type="button" style="width:100%;margin-top:8px" hidden>⬇️ Скачать готовое Full HD</button>
+      <p class="mini"><a id="openMasterSafari" href="#" target="_blank" rel="noopener noreferrer" hidden>⬇️ Скачать большой MP4 через Safari</a></p>
+      <button class="btn secondary" id="checkMontageStatus" type="button" hidden style="width:100%;margin-top:8px">📍 Посмотреть этап обработки</button>
+
+      <details id="advancedUploadOptions" style="margin-top:16px">
+        <summary style="cursor:pointer;font-weight:650">Запасная загрузка и настройки</summary>
+        <p class="note">Cloudflare нужен только для управления заданием Яндекс Диска. Здесь можно загрузить несколько видео или свои ZIP и фото напрямую, если требуется.</p>
+      <button class="btn secondary" id="upload50Button" type="button" style="width:100%;margin-top:12px">☁️ Загрузить через Cloudflare</button>
+        <div hidden aria-hidden="true">
+      <button class="btn secondary" id="sendViaTelegram" type="button" style="width:100%;margin-top:12px">✈️ Отправить видео через Telegram</button>
+        </div>
+        <details style="margin-top:12px">
+          <summary style="cursor:pointer;font-weight:650">Диагностика подключения</summary>
       <label class="field" for="launcherBase">Адрес Cloudflare (настраивается один раз)</label>
       <input id="launcherBase" type="url" inputmode="url" autocomplete="off" placeholder="https://твой-worker.workers.dev" style="width:100%;max-width:100%">
       <button class="btn secondary" id="checkWorkerConnection" type="button" style="width:100%;margin-top:10px">🔍 Проверить подключённый Cloudflare</button>
@@ -426,21 +447,7 @@
       <button class="btn secondary" id="uploadSpeedProbe" type="button" style="width:100%;margin-top:10px">⚡ Проверить скорость загрузки</button>
       <p class="mini" id="uploadProbeResult" role="status" aria-live="polite">Тест отправляет 8 МБ служебных данных, без твоих видео.</p>
       <a id="workerHealthLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none">Открыть /health в Safari</a>
-      <button class="btn primary" id="sendViaYandex" type="button" style="width:100%;margin-top:12px">☁️ Отправить через Яндекс Диск</button>
-      <p class="mini">До 1 ГБ на видео. После сохранения оформления пришли боту ссылку на файл с Диска. Доступ по ссылке открыт всем, у кого она есть; отключи его после подтверждения скачивания.</p>
-      <button class="btn secondary" id="sendViaTelegram" type="button" style="width:100%;margin-top:12px">✈️ Отправить видео через Telegram</button>
-      <p class="mini" id="telegramDirectStatus" role="status" aria-live="polite">Яндекс Диск — без новых ключей. Прямая отправка видео в Telegram без API ID и API HASH ограничена 20 МБ.</p>
-      <button class="btn secondary" id="upload50Button" type="button" style="width:100%;margin-top:12px">☁️ Загрузить через Cloudflare</button>
-      <progress id="upload50Progress" max="100" value="0" style="width:100%" hidden></progress>
-      <p class="mini" id="upload50Status" role="status" aria-live="polite">До 500 МБ работает KV. Для видео до 3 ГБ нужен бесплатный Worker v9 с Durable Objects VIDEO_SHARDS. Файл передаётся частями без сжатия.</p>
-      <button class="btn secondary" id="checkUploadedResult" type="button" style="width:100%;margin-top:8px" hidden>⬇️ Скачать готовое Full HD</button>
-      <p class="mini"><a id="openMasterSafari" href="#" target="_blank" rel="noopener noreferrer" hidden>⬇️ Скачать большой MP4 через Safari</a></p>
-      <button class="btn secondary" id="checkMontageStatus" type="button" style="width:100%;margin-top:8px">📍 Посмотреть этап обработки</button>
-      <p class="note">Видео в Cloudflare хранятся максимум 3 дня; исходники освобождаются сразу после обработки. Статус доступен после закрытия и повторного открытия приложения.</p>
-      <details style="margin-top:12px">
-        <summary style="cursor:pointer;font-weight:650">Первое подключение Cloudflare · инструкция</summary>
-        <p class="note">Для больших видео без карты нужны KV <strong>UPLOADS</strong> для статусов и SQLite Durable Objects <strong>VIDEO_SHARDS</strong> для файлов. Разверни Worker v9 через GitHub Actions, а не обычным копированием в редактор Cloudflare.</p>
-        <p class="note"><a href="https://github.com/revuallrabota-coder/my-ai-video-editor/blob/main/TEN_MINUTE_FREE_DO_SETUP.md" target="_blank" rel="noopener noreferrer">Настроить загрузку больших файлов с iPad</a></p>
+        </details>
       </details>
     </div>
     <!-- Скрытые элементы прежних прототипов сохраняют совместимость JS,
@@ -476,7 +483,7 @@
   if(tg){tg.ready();tg.expand();}
   var current=0, ratio='9:16', previewUrl=null;
   var pages=Array.from(document.querySelectorAll('.page'));
-  var names=['Видео','Шрифты','Эффекты','Итог'];
+  var names=['Старт','Шрифты','Эффекты','Итог'];
   var byId=function(id){return document.getElementById(id)};
   var videoInput=byId('videos');
   var selectedClips=[];
@@ -1028,7 +1035,8 @@
   // Без карты: Cloudflare Worker безопасно запускает GitHub Actions.
   // Worker не получает видео; после запуска пришли файл в Telegram-чат бота.
   var launcherInput=byId('launcherBase');
-  try{launcherInput.value=localStorage.getItem('personalEditorLauncher')||''}catch(ignore){}
+  launcherInput.value='https://black-violet-9e64.revuall-rabota.workers.dev';
+  try{launcherInput.value=localStorage.getItem('personalEditorLauncher')||launcherInput.value}catch(ignore){}
   function connectedWorkerURL(){
     var url=launcherInput.value.trim().replace(/\/+$/,'');
     if(!/^https:\/\/[a-z0-9.-]+\.workers\.dev$/i.test(url)){
