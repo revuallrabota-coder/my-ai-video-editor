@@ -401,8 +401,8 @@ def main() -> None:
             # free the remote shards BEFORE generating/uploading the master.
             if metadata.get("transport")=="yandex":
                 from yandex_source import receive_yandex_source
-                stage("waiting_telegram","Ожидаю ссылку на видео с Яндекс Диска.")
-                clips=[receive_yandex_source(token,owner,root/"source_clips",stage)]
+                stage("waiting_telegram","Ожидаю ссылки на видео с Яндекс Диска.")
+                clips=receive_yandex_source(token,owner,root/"source_clips",stage)
             elif metadata.get("transport")=="telegram":
                 stage("waiting_telegram","Ожидаю исходное видео в чате Telegram.")
                 clips=[receive_telegram_source(token,owner,root/"source_clips",stage)]
