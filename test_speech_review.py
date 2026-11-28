@@ -132,5 +132,42 @@ class RetakeTests(unittest.TestCase):
         self.assertEqual(plan_speech_repeats(raw),(raw,[]))
 
 
+    def test_real_revuall_three_rephrased_openings(self):
+        text=("Девочки, мне кажется, я нашла буквально золото для мастеров, потому что это просто невероятно. "
+              "Девочки, я, кажется, нашла просто золото для мастера Минкю. "
+              "Это реальность, это не реклама, это просто рекомендация как от мастера, "
+              "которая вот только начинала когда-то работать, и которому это действительно "
+              "когда-то могло бы очень сильно помочь. потому что в какой-то момент я считала, "
+              "что у меня просто плохие работы нет "
+              "девочки, я кажется, нашла золото для мастеров маникюра особенно тем, "
+              "кто только начинает работать я потом это покажу вблизи, "
+              "потому что это просто невероятно какая у него консистенция, "
+              "господи Я кайфую от этих гейлаков. Я скупила их все, потому что это невероятно. "
+              "Это просто сто из десяти. Он буквально сам ложится под кучу. "
+              "Вот момент особенно. Нет, нет, нет. Проверим.")
+        raw=[(i*.30+.05,i*.30+.24,w) for i,w in enumerate(text.split())]
+        kept,cuts=plan_speech_repeats(raw)
+        clean=plain_transcript(kept)
+        self.assertTrue(clean.startswith("девочки, я кажется, нашла золото для мастеров маникюра"))
+        self.assertEqual(clean.lower().count("девочки"),1)
+        self.assertNotIn("Это реальность",clean)
+        self.assertNotIn("Нет, нет, нет.",clean)
+        self.assertIn("Проверим.",clean)
+        self.assertIn("Я скупила их все",clean)
+        ranges=exclude_speech_repeats([Segment(0,raw[-1][1]+.1)],cuts)
+        self.assertEqual(plain_transcript(map_words_to_ranges(raw,ranges,1.2)),clean)
+
+    def test_unrelated_explanation_and_negation_remain(self):
+        raw=self.words("Первый шаг важен. Теперь подпиливаем край. Первый шаг важен для результата.")
+        self.assertEqual(plan_speech_repeats(raw),(raw,[]))
+        raw=self.words("Это не реклама. Нет, это не реклама, а моя рекомендация.")
+        kept,cuts=plan_speech_repeats(raw)
+        self.assertIn("не реклама",plain_transcript(kept))
+        raw=self.words("э покрытие эм должно быть ровным мм и тонким")
+        kept,cuts=plan_speech_repeats(raw)
+        self.assertEqual(plain_transcript(kept),"покрытие должно быть ровным и тонким")
+        self.assertEqual(len(cuts),3)
+
+
 if __name__=="__main__":
     unittest.main()
