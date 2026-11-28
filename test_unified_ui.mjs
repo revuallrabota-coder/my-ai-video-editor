@@ -115,3 +115,22 @@ assert.equal(new Set(interleavedSent).size,207);
 assert.deepEqual(interleavedSent.slice(0,3),[0,200,1]);
 assert.ok(!interleavedSent.includes(100));
 console.log("✓ Six upload lanes, shard interleaving, completed pieces skipped");
+
+const cacheHelperStart=html.indexOf("  function uploadFingerprint(");
+const cacheHelperEnd=html.indexOf("  async function cachePendingFiles(",cacheHelperStart);
+assert.ok(cacheHelperStart>=0&&cacheHelperEnd>cacheHelperStart);
+const {uploadFingerprint,matchingPayload}=new Function(
+  html.slice(cacheHelperStart,cacheHelperEnd)+"return {uploadFingerprint,matchingPayload};"
+)();
+const videos=[{name:"clip.mov",size:12345678,lastModified:12345}];
+const assets=[{name:"pack.zip",size:200,lastModified:23456}];
+const project={id:"one",url:"https://test.workers.dev",fingerprint:uploadFingerprint(videos,assets)};
+const record={...project,created:Date.now(),videos,assets};
+assert.equal(matchingPayload(record,project),true);
+assert.equal(matchingPayload({...record,id:"two"},project),false);
+assert.equal(matchingPayload({...record,created:0},project),false);
+assert.equal(matchingPayload({...record,assets:[]},project),false);
+assert.match(html,/indexedDB\.open\('revuall-private-upload',1\)/);
+assert.match(html,/confirmed\.size===data\.input_parts/);
+assert.match(html,/if\(record\)\{startCachedResume\(project,record\);return\}/);
+console.log("✓ Resume verifies cached files and project identity; completed cloud upload needs no file picker");
