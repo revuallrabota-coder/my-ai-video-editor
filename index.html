@@ -111,7 +111,7 @@
       <div class="logo">🎬</div>
       <div><h1>Мой AI Монтажёр</h1><div class="tiny">Твои видео. Твой стиль.</div></div>
     </div>
-    <span class="tiny">Reels Studio</span>
+    <span class="tiny">Reels Studio · 28.11-R4</span>
   </div>
   <section id="projectStatusCard" class="card" style="margin-bottom:16px" hidden aria-label="Статус последнего монтажа">
     <h3 style="margin-top:0">📍 Статус последнего монтажа</h3>
@@ -1720,7 +1720,7 @@
       progress.value=Math.round(completed.size*100/parts);
       status.textContent='📤 Продолжаю загрузку: '+completed.size+'/'+parts+' частей.'+
         (cacheOK?' Исходники сохранены на устройстве.':' Не закрывай приложение: локальная копия не подтверждена.');
-      var concurrency=workerHealth.durable_storage_configured?6:workerHealth.large_storage_configured?3:1;
+      var concurrency=workerHealth.durable_storage_configured?3:workerHealth.large_storage_configured?3:1;
       var shardSize=workerHealth.durable_storage_configured?100:0;
       var transferred=0;
       completed.forEach(function(i){var p=uploadParts[i];if(p)transferred+=p.end-p.start});
@@ -1730,9 +1730,16 @@
         var file=piece.archiveIndex===undefined
           ? videos[piece.clipIndex] : assets[piece.archiveIndex];
         var chunk=file.slice(piece.start,piece.end);
+        // WebKit file-backed Blob requests can fail with a generic "Load failed".
+        // Read only this 4MB slice into memory, not the entire original.
+        var binary;
+        try{binary=await chunk.arrayBuffer()}
+        catch(err){throw new Error('Устройство не смогло прочитать часть '+(i+1)+' локального исходника: '+(err.message||err))}
+        if(binary.byteLength!==piece.end-piece.start)
+          throw new Error('Локальная часть '+(i+1)+' прочитана не полностью.');
         for(var tries=0;tries<4;tries++){
           try{
-            await request('/upload/'+id+'/'+i,'PUT',chunk,true);
+            await request('/upload/'+id+'/'+i,'PUT',binary,true);
             return;
           }catch(err){
             if(err.status===400||err.status===401||err.status===403)throw err;
@@ -1761,7 +1768,16 @@
           status.textContent='Связь прервалась. Сохраняю '+completed.size+'/'+parts+
             ' частей и автоматически восстанавливаю соединение…';
           await new Promise(function(resolve){setTimeout(resolve,3000*(round+1))});
-          var remote=await readUploadStatus(id);
+          var remote;
+          try{remote=await readUploadStatus(id)}
+          catch(checkError){
+            if(round===1||[400,401,403,404].includes(checkError.status))throw checkError;
+            // No new project on a failed status read. Already acknowledged
+            // pieces remain safe; an unacknowledged PUT is idempotent.
+            concurrency=1;
+            status.textContent='Сервер временно недоступен. Повторяю недостающие части того же проекта…';
+            continue;
+          }
           if(remote.state!=='uploading')throw new Error('Состояние проекта изменилось. Проверь этап монтажа.');
           completed=new Set((remote.uploaded_parts||[]).filter(function(i){
             return Number.isInteger(i)&&i>=0&&i<parts;
