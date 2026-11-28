@@ -880,7 +880,7 @@ export default {
         supported_talk_scenes:CHOICES.talk_scene.split(" ")
       });
     }
-    if (!env.UPLOADS && (path.startsWith("/upload/") ||
+    if (!env.UPLOADS && (path==="/telegram/start" || path.startsWith("/upload/") ||
         path.startsWith("/internal/upload/"))) {
       return response({error:"Подключи KV namespace с именем UPLOADS."},503);
     }
@@ -892,7 +892,7 @@ export default {
         return response({error:"Неверный источник запроса."},403,"null");
       }
       if (request.method==="OPTIONS") return response({});
-      if (path.startsWith("/upload/")) return await publicRoute(request,env,path);
+      if (path==="/telegram/start" || path.startsWith("/upload/")) return await publicRoute(request,env,path);
       if (request.method==="POST" && path==="/launch") {
         return await legacyLaunch(request,env);
       }
