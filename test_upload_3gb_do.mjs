@@ -107,6 +107,29 @@ assert.equal(health.storage_mode,"do");
 assert.equal(health.max_upload_mb,3000);
 assert.equal(health.max_video_seconds,600);
 assert.equal(health.shared_upload_endpoint,true);
+assert.equal(health.upload_speed_probe,true);
+const probeHeaders={Origin:webOrigin,"X-Telegram-Init-Data":qs.toString()};
+const probe=async(storage,body=new ArrayBuffer(4_000_000),headers=probeHeaders)=>
+  worker.fetch(new Request(base+"/upload/probe?storage="+storage,{
+    method:"PUT",headers,body
+  }),env);
+const beforeProbeWrites=kvWrites;
+const beforeProbeDispatches=githubDispatches;
+const directProbe=await probe(0);
+assert.equal(directProbe.status,200);
+assert.equal((await directProbe.json()).bytes,4_000_000);
+const storedProbe=await probe(1);
+assert.equal(storedProbe.status,200);
+const probeResult=await storedProbe.json();
+assert.equal(probeResult.bytes,4_000_000);
+assert.ok(Number.isFinite(probeResult.storage_ms));
+assert.equal(kvWrites,beforeProbeWrites);
+assert.equal(githubDispatches,beforeProbeDispatches);
+assert.ok([...shards.values()].every(s=>s.sql.parts.size===0));
+assert.equal((await probe(0,new ArrayBuffer(4_000_001))).status,413);
+assert.equal((await probe(0,new ArrayBuffer(10))).status,400);
+assert.equal((await probe(0,new ArrayBuffer(4_000_000),{Origin:webOrigin})).status,403);
+
 const size=3_000_000_000;
 const started=await send("/upload/start","POST",{
   files:[{name:"my-ten-minute-video.mp4",size}],
