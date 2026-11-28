@@ -259,3 +259,14 @@ assert.equal((await send("/internal/upload/"+directId+"/progress","POST",{stage:
 assert.equal((await send("/upload/"+directId+"/status")).data.stage,"waiting_telegram");
 assert.equal((await send("/internal/upload/"+directId+"/release","DELETE",undefined,true)).status,200);
 console.log("✓ Direct Telegram handoff preserves settings and uses the existing montage job without source chunks");
+
+assert.equal(health.yandex_link_project,true);
+const yandex=await send("/telegram/start","POST",{transport:"yandex",settings:{mode:"my_style",font_profile:"bold",insert_style:"burgundy"}});
+assert.equal(yandex.status,202,JSON.stringify(yandex.data));
+assert.equal(yandex.data.transport,"yandex");
+const yandexManifest=await send("/internal/upload/"+yandex.data.upload_id+"/manifest","GET",null,true);
+assert.equal(yandexManifest.data.transport,"yandex");
+assert.equal(yandexManifest.data.settings.font_profile,"bold");
+assert.equal(yandexManifest.data.parts,0);
+assert.equal((await send("/internal/upload/"+yandex.data.upload_id+"/release","DELETE",undefined,true)).status,200);
+console.log("✓ Yandex link project preserves selected settings without uploading media to Cloudflare");
