@@ -373,7 +373,10 @@ async function uploadChunk(request,env,id,index) {
   if (!Number.isSafeInteger(i) || i<0 || i>=meta.parts) return response({error:"Неверный номер части."},400);
   const expected=expectedBytes(meta,i);
   if (expected<1) return response({error:"Повреждён список частей."},400);
+  const receiveStart=Date.now();
   const data=await request.arrayBuffer();
+  const receiveMs=Date.now()-receiveStart;
+  const writeStart=Date.now();
   if (data.byteLength!==expected) return response({error:"Неверный размер части."},400);
   if(useDO(env,meta)){
     await doPartWrite(env,id,"",i,data);
@@ -384,7 +387,7 @@ async function uploadChunk(request,env,id,index) {
   } else {
     await env.UPLOADS.put(key(id,i),data,{expirationTtl:TTL,metadata:{bytes:data.byteLength}});
   }
-  return response({uploaded:i+1,total:meta.parts});
+  return response({uploaded:i+1,total:meta.parts,receive_ms:receiveMs,storage_ms:Date.now()-writeStart});
 }
 async function finishUpload(request,env,id) {
   const meta=await env.UPLOADS.get(key(id,"meta"),"json");
@@ -694,8 +697,37 @@ async function internalRoute(request,env,path) {
   }
   return response({error:"Unknown internal route"},404);
 }
+async function uploadSpeedProbe(request,env){
+  const size=Number(request.headers.get("Content-Length"));
+  if(size>CHUNK)return response({error:"Тест ограничен 4 МБ."},413);
+  // Fixed-size authenticated diagnostic; no project, video or GitHub job.
+  const reader=request.body?.getReader();
+  if(!reader)return response({error:"Пустой тест."},400);
+  const started=Date.now();
+  const bytes=new Uint8Array(CHUNK);
+  let offset=0;
+  try{
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      if(offset+value.byteLength>CHUNK){await reader.cancel();return response({error:"Тест ограничен 4 МБ."},413)}
+      bytes.set(value,offset);offset+=value.byteLength;
+    }
+  }finally{reader.releaseLock()}
+  if(offset!==CHUNK)return response({error:"Нужен тестовый блок 4 МБ."},400);
+  const receiveMs=Date.now()-started;
+  let storageMs=null;
+  if(new URL(request.url).searchParams.get("storage")==="1"&&env.VIDEO_SHARDS){
+    const id=crypto.randomUUID();
+    const writeStarted=Date.now();
+    try{await doPartWrite(env,id,"",0,bytes);storageMs=Date.now()-writeStarted}
+    finally{await doPartRelease(env,id,0,1)}
+  }
+  return response({bytes:offset,receive_ms:receiveMs,storage_ms:storageMs});
+}
 async function publicRoute(request,env,path) {
   await verifyTelegram(request.headers.get("X-Telegram-Init-Data"),env);
+  if(request.method==="PUT"&&path==="/upload/probe")return uploadSpeedProbe(request,env);
   const masterLink=path.match(/^\/upload\/([a-f0-9-]{36})\/master-link$/);
   if(request.method==="GET"&&masterLink)
     return createMasterLink(request,env,masterLink[1]);
@@ -813,6 +845,7 @@ export default {
         max_upload_mb:env.VIDEO_SHARDS?3000:env.VIDEO_FILES?4000:500,
         max_video_seconds:600,
         shared_upload_endpoint:true,
+        upload_speed_probe:true,
         durable_storage_configured:Boolean(env.VIDEO_SHARDS),
         large_storage_configured:Boolean(env.VIDEO_SHARDS||env.VIDEO_FILES),
         storage_mode:env.VIDEO_SHARDS?"do":env.VIDEO_FILES?"r2":"kv",
