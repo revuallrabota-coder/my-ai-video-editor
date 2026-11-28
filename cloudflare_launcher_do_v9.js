@@ -51,7 +51,8 @@ function response(data, status=200, origin=ORIGIN) {
       "Content-Type":"application/json; charset=utf-8",
       "Cache-Control":"no-store",
       "Access-Control-Allow-Origin":origin,
-      "Access-Control-Allow-Headers":"Content-Type, X-Telegram-Init-Data",
+      "Access-Control-Allow-Headers":"Content-Type, X-Telegram-Init-Data, X-Upload-Part",
+      "Access-Control-Max-Age":"600",
       "Access-Control-Allow-Methods":"GET, POST, PUT, DELETE, OPTIONS",
       "Vary":"Origin"
     }
@@ -707,6 +708,15 @@ async function publicRoute(request,env,path) {
   if (request.method==="POST" && path==="/upload/start") {
     return uploadStart(request,env);
   }
+  // Same URL for each binary request: reuse the browser's CORS preflight
+  // cache without changing the stored 4 MB piece format or resume contract.
+  const fastPart=path.match(/^\/upload\/([a-f0-9-]{36})\/part$/);
+  if(request.method==="PUT"&&fastPart){
+    const index=request.headers.get("X-Upload-Part");
+    if(index===null||! /^(0|[1-9]\d*)$/.test(index))
+      return response({error:"Неверный номер части."},400);
+    return uploadChunk(request,env,fastPart[1],index);
+  }
   const part=path.match(/^\/upload\/([a-f0-9-]{36})\/(\d+)$/);
   if (request.method==="PUT" && part) {
     return uploadChunk(request,env,part[1],part[2]);
@@ -802,6 +812,7 @@ export default {
         status:"online",mode:"github-actions-launcher",
         max_upload_mb:env.VIDEO_SHARDS?3000:env.VIDEO_FILES?4000:500,
         max_video_seconds:600,
+        shared_upload_endpoint:true,
         durable_storage_configured:Boolean(env.VIDEO_SHARDS),
         large_storage_configured:Boolean(env.VIDEO_SHARDS||env.VIDEO_FILES),
         storage_mode:env.VIDEO_SHARDS?"do":env.VIDEO_FILES?"r2":"kv",
